@@ -1,0 +1,30 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  debug:
+    verbosity: detailed
+  kafka:
+    topic: telemetry-metrics
+    encoding: otlp_proto
+    brokers:
+      - kafka:9092
+    producer:
+      compression: snappy
+      max_message_bytes: 1000000
+
+service:
+  extensions: [health_check]
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [debug, kafka]

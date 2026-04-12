@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: spark2
+  labels:
+    app: spark2
+spec:
+  containers:
+  - name: spark2
+    image: ubuntu:22.04
+    command: ["sleep", "infinity"]
+    ports:
+    - containerPort: 4040
+    - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark2
+spec:
+  selector:
+    app: spark2
+  ports:
+  - name: spark-ui
+    port: 4040
+  - name: master-web
+    port: 8080

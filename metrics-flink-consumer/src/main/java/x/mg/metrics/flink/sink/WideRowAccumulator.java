@@ -1,0 +1,203 @@
+package x.mg.metrics.flink.sink;
+
+import x.mg.metrics.flink.classify.MetricCategory;
+import x.mg.metrics.flink.classify.MetricCategoryClassifier;
+import x.mg.metrics.flink.classify.MetricMapping;
+import x.mg.metrics.flink.model.*;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class WideRowAccumulator {
+    private final Map<String, TaskMetricRow> taskRows = new ConcurrentHashMap<>();
+    private final Map<String, StageMetricRow> stageRows = new ConcurrentHashMap<>();
+    private final Map<String, JobMetricRow> jobRows = new ConcurrentHashMap<>();
+    private final Map<String, JvmMemoryMetricRow> memoryRows = new ConcurrentHashMap<>();
+    private final Map<String, JvmGcMetricRow> gcRows = new ConcurrentHashMap<>();
+
+    private final List<HistogramBucket> taskBuckets = Collections.synchronizedList(new ArrayList<>());
+    private final List<HistogramBucket> stageBuckets = Collections.synchronizedList(new ArrayList<>());
+    private final List<HistogramBucket> jobBuckets = Collections.synchronizedList(new ArrayList<>());
+
+    // Governance: per-stage task metric accumulation (persists across flushes until stage completes)
+    private final Map<String, StageTaskAccumulator> stageTaskAccumulators = new ConcurrentHashMap<>();
+    private final Set<String> completedStages = Collections.synchronizedSet(new HashSet<>());
+
+    private long totalSamplesAccepted = 0;
+    private long totalBucketsAccepted = 0;
+    private long totalSamplesSkipped = 0;
+
+    public void accumulate(MetricSample sample) {
+        MetricMapping mapping = MetricCategoryClassifier.classify(sample.getMetricName());
+        if (mapping == null) {
+            totalSamplesSkipped++;
+            return;
+        }
+
+        // For histograms, only take the sum value; skip count
+        if (mapping.isHistogram()) {
+            String histType = sample.getLabels().get("_histogram");
+            if ("count".equals(histType)) {
+                totalSamplesSkipped++;
+                return;
+            }
+        }
+
+        MetricCategory cat = mapping.getCategory();
+        String key = MetricCategoryClassifier.extractGroupKey(cat, sample.getLabels(), sample.getTimestampMs());
+
+        switch (cat) {
+            case TASK:
+                taskRows.computeIfAbsent(key,
+                    k -> TaskMetricRow.fromLabels(sample.getTimestampMs(), sample.getLabels()))
+                    .setMetricColumn(mapping.getColumnName(), sample.getValue());
+
+                // Also accumulate into stage-level running stats for governance
+                String appId = sample.getLabels().get("spark.app.id");
+                String stageIdStr = sample.getLabels().get("spark.stage.id");
+                if (appId != null && stageIdStr != null) {
+                    String stageKey = appId + "|" + stageIdStr;
+                    StageTaskAccumulator stageAcc = stageTaskAccumulators.computeIfAbsent(
+                        stageKey, k -> new StageTaskAccumulator(appId, Integer.parseInt(stageIdStr)));
+                    stageAcc.accumulate(mapping.getColumnName(), sample.getValue());
+                    stageAcc.updateTimestamp(sample.getTimestampMs());
+                }
+                break;
+            case STAGE:
+                stageRows.computeIfAbsent(key,
+                    k -> StageMetricRow.fromLabels(sample.getTimestampMs(), sample.getLabels()))
+                    .setMetricColumn(mapping.getColumnName(), sample.getValue());
+
+                // Mark stage as completed for governance computation
+                String sAppId = sample.getLabels().get("spark.app.id");
+                String sStageIdStr = sample.getLabels().get("spark.stage.id");
+                if (sAppId != null && sStageIdStr != null) {
+                    completedStages.add(sAppId + "|" + sStageIdStr);
+                }
+                break;
+            case JOB:
+                jobRows.computeIfAbsent(key,
+                    k -> JobMetricRow.fromLabels(sample.getTimestampMs(), sample.getLabels()))
+                    .setMetricColumn(mapping.getColumnName(), sample.getValue());
+                break;
+            case JVM_MEMORY:
+                memoryRows.computeIfAbsent(key,
+                    k -> JvmMemoryMetricRow.fromLabels(sample.getTimestampMs(), sample.getLabels()))
+                    .setMetricColumn(mapping.getColumnName(), sample.getValue());
+                break;
+            case JVM_GC:
+                gcRows.computeIfAbsent(key,
+                    k -> JvmGcMetricRow.fromLabels(sample.getTimestampMs(), sample.getLabels()))
+                    .setMetricColumn(mapping.getColumnName(), sample.getValue());
+                break;
+            default:
+                totalSamplesSkipped++;
+                return;
+        }
+        totalSamplesAccepted++;
+    }
+
+    public void accumulateBucket(HistogramBucket bucket) {
+        MetricMapping mapping = MetricCategoryClassifier.classify(bucket.getMetricName());
+        if (mapping == null) {
+            return;
+        }
+
+        switch (mapping.getCategory()) {
+            case TASK:
+                taskBuckets.add(bucket);
+                break;
+            case STAGE:
+                stageBuckets.add(bucket);
+                break;
+            case JOB:
+                jobBuckets.add(bucket);
+                break;
+            default:
+                break;
+        }
+        totalBucketsAccepted++;
+    }
+
+    public FlushResult drain() {
+        FlushResult result = new FlushResult();
+        result.taskRows = new ArrayList<>(taskRows.values());
+        result.stageRows = new ArrayList<>(stageRows.values());
+        result.jobRows = new ArrayList<>(jobRows.values());
+        result.memoryRows = new ArrayList<>(memoryRows.values());
+        result.gcRows = new ArrayList<>(gcRows.values());
+        result.taskBuckets = new ArrayList<>(taskBuckets);
+        result.stageBuckets = new ArrayList<>(stageBuckets);
+        result.jobBuckets = new ArrayList<>(jobBuckets);
+
+        // Compute governance for completed stages
+        List<StageGovernanceRow> governanceRows = new ArrayList<>();
+        for (String stageKey : completedStages) {
+            StageTaskAccumulator acc = stageTaskAccumulators.remove(stageKey);
+            if (acc != null && acc.getTaskCount() > 0) {
+                // Find stage duration from stageRows being flushed
+                Double stageDuration = findStageDuration(stageKey, result.stageRows);
+                governanceRows.add(acc.toGovernanceRow(stageDuration));
+            }
+        }
+        completedStages.clear();
+        result.governanceRows = governanceRows;
+
+        // Clear
+        taskRows.clear();
+        stageRows.clear();
+        jobRows.clear();
+        memoryRows.clear();
+        gcRows.clear();
+        taskBuckets.clear();
+        stageBuckets.clear();
+        jobBuckets.clear();
+
+        return result;
+    }
+
+    private Double findStageDuration(String stageKey, List<StageMetricRow> stageRows) {
+        String[] parts = stageKey.split("\\|");
+        if (parts.length != 2) return null;
+        String appId = parts[0];
+        int stageId;
+        try { stageId = Integer.parseInt(parts[1]); } catch (NumberFormatException e) { return null; }
+
+        for (StageMetricRow r : stageRows) {
+            if (appId.equals(r.getAppId()) && stageId == r.getStageId()) {
+                return r.getDurationMs();
+            }
+        }
+        return null;
+    }
+
+    public int pendingCount() {
+        return taskRows.size() + stageRows.size() + jobRows.size()
+             + memoryRows.size() + gcRows.size()
+             + taskBuckets.size() + stageBuckets.size() + jobBuckets.size();
+    }
+
+    public long getTotalSamplesAccepted() { return totalSamplesAccepted; }
+    public long getTotalBucketsAccepted() { return totalBucketsAccepted; }
+    public long getTotalSamplesSkipped() { return totalSamplesSkipped; }
+
+    public static class FlushResult {
+        public List<TaskMetricRow> taskRows;
+        public List<StageMetricRow> stageRows;
+        public List<JobMetricRow> jobRows;
+        public List<JvmMemoryMetricRow> memoryRows;
+        public List<JvmGcMetricRow> gcRows;
+        public List<HistogramBucket> taskBuckets;
+        public List<HistogramBucket> stageBuckets;
+        public List<HistogramBucket> jobBuckets;
+        public List<StageGovernanceRow> governanceRows;
+
+        public int totalCount() {
+            int total = taskRows.size() + stageRows.size() + jobRows.size()
+                 + memoryRows.size() + gcRows.size()
+                 + taskBuckets.size() + stageBuckets.size() + jobBuckets.size();
+            if (governanceRows != null) total += governanceRows.size();
+            return total;
+        }
+    }
+}

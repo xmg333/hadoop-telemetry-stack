@@ -1,0 +1,45 @@
+spark-telemetry {
+  otel {
+    # OTel Collector endpoint
+    exporter.endpoint = "http://localhost:4317"
+
+    # Export protocol: grpc | http
+    exporter.protocol = "grpc"
+
+    # Service name for resource attributes
+    service.name = "spark-application"
+
+    # Metrics export interval in milliseconds
+    export.interval.ms = 10000
+
+    # Additional resource attributes
+    resource.attributes = {
+      "deployment.environment" = "production"
+    }
+  }
+
+  metrics {
+    # SparkListener-based metrics (task/stage level IO)
+    listener {
+      enabled = true
+      capture.task-end = true
+      capture.stage-complete = true
+      capture.job-end = false
+    }
+
+    # Dropwizard Metrics System (JVM GC, memory, buffer pools)
+    system {
+      enabled = true
+      capture.jvm-memory = true
+      capture.jvm-gc = true
+      capture.buffer-pools = true
+      capture.executor-memory = true
+    }
+  }
+
+  # Application name filtering (regex patterns)
+  filter {
+    app.name.include = [".*"]
+    app.name.exclude = []
+  }
+}

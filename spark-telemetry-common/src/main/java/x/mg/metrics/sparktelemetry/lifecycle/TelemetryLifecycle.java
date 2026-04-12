@@ -1,0 +1,148 @@
+package x.mg.metrics.sparktelemetry.lifecycle;
+
+import io.opentelemetry.api.OpenTelemetry;
+import x.mg.metrics.sparktelemetry.config.TelemetryConfig;
+import x.mg.metrics.sparktelemetry.model.SparkMetricEvent;
+import x.mg.metrics.sparktelemetry.otel.MetricRecorder;
+import x.mg.metrics.sparktelemetry.otel.OtelRegistry;
+
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ * Central lifecycle manager for the telemetry system.
+ * Singleton per JVM (driver or executor).
+ */
+public class TelemetryLifecycle {
+
+    private static final Logger LOG = Logger.getLogger(TelemetryLifecycle.class.getName());
+    private static final Object LOCK = new Object();
+    private static volatile TelemetryLifecycle instance;
+
+    private final TelemetryConfig config;
+    private final OtelRegistry otelRegistry;
+    private final MetricRecorder metricRecorder;
+    private final AtomicBoolean started = new AtomicBoolean(false);
+    private final AtomicBoolean stopped = new AtomicBoolean(false);
+    private final ExecutorService flushExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "telemetry-async-flush");
+        t.setDaemon(true);
+        return t;
+    });
+
+    private TelemetryLifecycle(TelemetryConfig config) {
+        this.config = config;
+        this.otelRegistry = new OtelRegistry(config);
+        this.otelRegistry.start();
+        this.metricRecorder = new MetricRecorder(otelRegistry.getOpenTelemetry(), config);
+    }
+
+    /**
+     * Initialize the singleton instance with Spark conf overrides.
+     */
+    public static TelemetryLifecycle init(Map<String, String> sparkConfOverrides) {
+        if (instance != null && instance.started.get()) {
+            LOG.fine("TelemetryLifecycle already initialized");
+            return instance;
+        }
+        synchronized (LOCK) {
+            if (instance == null || !instance.started.get()) {
+                TelemetryConfig config = new TelemetryConfig(sparkConfOverrides);
+                instance = new TelemetryLifecycle(config);
+                instance.started.set(true);
+                LOG.info("TelemetryLifecycle initialized");
+            }
+        }
+        return instance;
+    }
+
+    /**
+     * Get the singleton instance. Must call init() first.
+     */
+    public static TelemetryLifecycle getInstance() {
+        if (instance == null) {
+            throw new IllegalStateException("TelemetryLifecycle not initialized. Call init() first.");
+        }
+        return instance;
+    }
+
+    /**
+     * Check if initialized.
+     */
+    public static boolean isInitialized() {
+        return instance != null && instance.started.get();
+    }
+
+    /**
+     * Accept a metric event for recording.
+     */
+    public void accept(SparkMetricEvent event) {
+        if (event == null || stopped.get()) return;
+        try {
+            metricRecorder.record(event);
+        } catch (Exception e) {
+            LOG.log(Level.FINE, "Failed to record metric event: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Get the current configuration.
+     */
+    public TelemetryConfig getConfig() {
+        return config;
+    }
+
+    /**
+     * Force flush pending metrics to the OTel exporter (blocking).
+     * Used during shutdown to ensure all metrics are exported.
+     */
+    public void flush() {
+        if (!stopped.get()) {
+            otelRegistry.forceFlush();
+        }
+    }
+
+    /**
+     * Async flush — non-blocking version for use in SparkListener callbacks.
+     * Avoids blocking the Spark DAGScheduler thread which causes job timeouts.
+     */
+    public void flushAsync() {
+        if (!stopped.get()) {
+            flushExecutor.submit(() -> {
+                try {
+                    otelRegistry.forceFlush();
+                } catch (Exception e) {
+                    LOG.log(Level.FINE, "Async flush failed: " + e.getMessage(), e);
+                }
+            });
+        }
+    }
+
+    /**
+     * Shutdown the telemetry system gracefully.
+     */
+    public void stop() {
+        if (stopped.compareAndSet(false, true)) {
+            LOG.info("Shutting down TelemetryLifecycle");
+            flushExecutor.shutdown();
+            otelRegistry.stop();
+            started.set(false);
+        }
+    }
+
+    /**
+     * Reset the singleton for testing purposes.
+     */
+    public static void reset() {
+        synchronized (LOCK) {
+            if (instance != null) {
+                instance.stop();
+                instance = null;
+            }
+        }
+    }
+}

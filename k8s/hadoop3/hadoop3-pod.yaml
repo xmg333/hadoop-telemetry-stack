@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hadoop3
+  labels:
+    app: hadoop3
+spec:
+  containers:
+  - name: hadoop3
+    image: ubuntu:22.04
+    command: ["sleep", "infinity"]
+    ports:
+    - containerPort: 9870
+    - containerPort: 9000
+    - containerPort: 8088
+    - containerPort: 8042
+    - containerPort: 19888
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hadoop3
+spec:
+  selector:
+    app: hadoop3
+  ports:
+  - name: nn-web
+    port: 9870
+  - name: hdfs
+    port: 9000
+  - name: rm-web
+    port: 8088
+  - name: nm-web
+    port: 8042
+  - name: hs-web
+    port: 19888

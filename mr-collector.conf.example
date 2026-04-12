@@ -1,0 +1,35 @@
+mr-telemetry {
+  history-server {
+    url = "http://localhost:19888"
+    poll.interval.secs = 30
+    connect.timeout.secs = 10
+    read.timeout.secs = 30
+  }
+
+  otel {
+    exporter.endpoint = "http://localhost:4317"
+    exporter.protocol = "grpc"
+    service.name = "mr-telemetry-collector"
+    export.interval.ms = 10000
+  }
+
+  state {
+    # Persisted file path for lastPollTime (survives restarts)
+    file = "/tmp/mr-telemetry-state.json"
+  }
+
+  filter {
+    # Only collect jobs matching these user patterns (regex)
+    user.include = [".*"]
+    user.exclude = []
+    # Only collect jobs matching these name patterns (regex)
+    job.name.include = [".*"]
+    job.name.exclude = []
+  }
+
+  collection {
+    job.counters = true
+    task.counters = false    # task-level granularity (can be high volume)
+    job.details = true
+  }
+}

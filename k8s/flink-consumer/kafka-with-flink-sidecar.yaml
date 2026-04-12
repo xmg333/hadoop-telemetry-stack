@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      hostAliases:
+      - ip: "127.0.0.1"
+        hostnames:
+        - "kafka"
+      containers:
+      - name: kafka
+        image: apache/kafka:3.7.0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          /opt/kafka/bin/kafka-storage.sh format -t "$CLUSTER_ID" -c /opt/kafka/config/kraft/server.properties 2>/dev/null || true
+          sed -i 's|^advertised.listeners=.*|advertised.listeners=PLAINTEXT://kafka:9092|' /opt/kafka/config/kraft/server.properties
+          exec /opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/kraft/server.properties
+        env:
+        - name: KAFKA_NODE_ID
+          value: "1"
+        - name: KAFKA_PROCESS_ROLES
+          value: broker,controller
+        - name: KAFKA_LISTENERS
+          value: "PLAINTEXT://:9092,CONTROLLER://:9093"
+        - name: KAFKA_ADVERTISED_LISTENERS
+          value: "PLAINTEXT://kafka:9092"
+        - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+          value: "1@localhost:9093"
+        - name: KAFKA_CONTROLLER_LISTENER_NAMES
+          value: CONTROLLER
+        - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+          value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+        - name: CLUSTER_ID
+          value: "a7b3c9d2-e4f5-4a6b-8c7d-9e0f1a2b3c4d"
+        ports:
+        - containerPort: 9092
+        - containerPort: 9093
+        readinessProbe:
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          tcpSocket:
+            port: 9092
+        livenessProbe:
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          tcpSocket:
+            port: 9092
+      - name: flink-consumer
+        image: ubuntu:22.04
+        command: ["sleep", "infinity"]
+        volumeMounts:
+        - name: flink-config
+          mountPath: /etc/flink-consumer
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "0.5"
+          limits:
+            memory: "1Gi"
+            cpu: "1"
+      volumes:
+      - name: flink-config
+        configMap:
+          name: flink-consumer-config

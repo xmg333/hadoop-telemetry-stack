@@ -1,0 +1,751 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_MYSQL",
+      "label": "MySQL Telemetry",
+      "description": "MySQL datasource for Spark/MR telemetry data (metrics_db)",
+      "type": "datasource",
+      "pluginId": "mysql",
+      "pluginName": "MySQL"
+    }
+  ],
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Total Tasks",
+      "type": "stat",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "blue", "mode": "fixed" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "blue", "value": 1000 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT COUNT(*) AS value FROM task_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id)",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Total Stages",
+      "type": "stat",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "purple", "mode": "fixed" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "purple", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT COUNT(*) AS value FROM stage_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id)",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Skewed Stages",
+      "type": "stat",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "description": "Stages with duration_skew_ratio > 2 (data skew indicator)",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT COUNT(*) AS value FROM stage_governance WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND duration_skew_ratio > 2",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Avg CPU Efficiency",
+      "type": "stat",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "description": "cpu_time / run_time across all stages. < 0.5 indicates low CPU utilization",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.3 },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "green", "value": 0.7 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT AVG(cpu_efficiency) AS value FROM stage_governance WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND cpu_efficiency IS NOT NULL",
+          "format": "table"
+        }
+      ]
+    },
+
+    {
+      "id": 5,
+      "title": "Task I/O Bytes",
+      "type": "timeseries",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10, "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT $__unixEpochGroup(timestamp_ms/1000, $__interval) AS time, SUM(io_bytes_read) AS 'Bytes Read' FROM task_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND io_bytes_read IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "rawSql": "SELECT $__unixEpochGroup(timestamp_ms/1000, $__interval) AS time, SUM(io_bytes_written) AS 'Bytes Written' FROM task_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND io_bytes_written IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "rawSql": "SELECT $__unixEpochGroup(timestamp_ms/1000, $__interval) AS time, SUM(shuffle_bytes_read) AS 'Shuffle Read' FROM task_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND shuffle_bytes_read IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
+          "rawSql": "SELECT $__unixEpochGroup(timestamp_ms/1000, $__interval) AS time, SUM(shuffle_bytes_written) AS 'Shuffle Written' FROM task_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND shuffle_bytes_written IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Task Duration",
+      "type": "timeseries",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10, "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT $__unixEpochGroup(timestamp_ms/1000, $__interval) AS time, AVG(duration_ms) AS 'Avg Duration' FROM task_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "rawSql": "SELECT $__unixEpochGroup(timestamp_ms/1000, $__interval) AS time, MAX(duration_ms) AS 'Max Duration' FROM task_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "rawSql": "SELECT $__unixEpochGroup(timestamp_ms/1000, $__interval) AS time, MIN(duration_ms) AS 'Min Duration' FROM task_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        }
+      ]
+    },
+
+    {
+      "id": 7,
+      "title": "JVM Memory",
+      "type": "timeseries",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 20, "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT $__unixEpochGroup(timestamp_ms/1000, $__interval) AS time, AVG(heap_used) AS 'Heap Used' FROM jvm_memory_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND heap_used IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "rawSql": "SELECT $__unixEpochGroup(timestamp_ms/1000, $__interval) AS time, AVG(non_heap_used) AS 'Non-Heap Used' FROM jvm_memory_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND non_heap_used IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "JVM GC",
+      "type": "timeseries",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "spanNulls": true }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "GC Count" }, "properties": [{ "id": "custom.axisPlacement", "value": "right" }] },
+          { "matcher": { "id": "byName", "options": "GC Time" }, "properties": [{ "id": "unit", "value": "ms" }] }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT $__unixEpochGroup(timestamp_ms/1000, $__interval) AS time, SUM(gc_count) AS 'GC Count' FROM jvm_gc_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND gc_count IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "rawSql": "SELECT $__unixEpochGroup(timestamp_ms/1000, $__interval) AS time, SUM(gc_time_ms) AS 'GC Time' FROM jvm_gc_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND gc_time_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        }
+      ]
+    },
+
+    {
+      "id": 9,
+      "title": "Stage Duration & Task Count",
+      "type": "timeseries",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10, "spanNulls": true }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Stage Duration" }, "properties": [{ "id": "unit", "value": "ms" }] },
+          { "matcher": { "id": "byName", "options": "Task Count" }, "properties": [{ "id": "custom.axisPlacement", "value": "right" }] }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT $__unixEpochGroup(timestamp_ms/1000, $__interval) AS time, AVG(duration_ms) AS 'Stage Duration' FROM stage_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "rawSql": "SELECT $__unixEpochGroup(timestamp_ms/1000, $__interval) AS time, AVG(num_tasks) AS 'Task Count' FROM stage_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) AND num_tasks IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Job Overview",
+      "type": "table",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "duration_ms" }, "properties": [{ "id": "unit", "value": "ms" }] },
+          {
+            "matcher": { "id": "byName", "options": "job_success" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "true": { "text": "SUCCESS", "color": "green" }, "false": { "text": "FAILED", "color": "red" } } }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT app_id, job_id, job_success, duration_ms, num_stages, FROM_UNIXTIME(timestamp_ms/1000, '%Y-%m-%d %H:%i:%s') AS completed_at FROM job_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 100",
+          "format": "table"
+        }
+      ]
+    },
+
+    {
+      "id": 11,
+      "title": "Data Skew Detection",
+      "type": "table",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "description": "Stages with duration_skew_ratio > 2 indicate data skew (max task duration / avg task duration)",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "avg_task_duration_ms" }, "properties": [{ "id": "unit", "value": "ms" }] },
+          { "matcher": { "id": "byName", "options": "max_task_duration_ms" }, "properties": [{ "id": "unit", "value": "ms" }] },
+          { "matcher": { "id": "byName", "options": "min_task_duration_ms" }, "properties": [{ "id": "unit", "value": "ms" }] },
+          { "matcher": { "id": "byName", "options": "stage_duration_ms" }, "properties": [{ "id": "unit", "value": "ms" }] },
+          {
+            "matcher": { "id": "byName", "options": "duration_skew_ratio" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 1.5 },
+                    { "color": "red", "value": 2 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "io_read_skew_ratio" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 1.5 },
+                    { "color": "red", "value": 2 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "shuffle_read_skew_ratio" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 1.5 },
+                    { "color": "red", "value": 2 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "duration_skew_ratio" }] },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT app_id, stage_id, task_count, stage_duration_ms, avg_task_duration_ms, max_task_duration_ms, min_task_duration_ms, duration_skew_ratio, io_read_skew_ratio, io_write_skew_ratio, shuffle_read_skew_ratio FROM stage_governance WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 50",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Resource Efficiency",
+      "type": "table",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "description": "CPU efficiency, GC overhead, shuffle wait, spill ratio per stage",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "cpu_efficiency" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "red", "value": null },
+                    { "color": "yellow", "value": 0.5 },
+                    { "color": "green", "value": 0.7 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "gc_overhead_ratio" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 0.05 },
+                    { "color": "red", "value": 0.1 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "shuffle_wait_ratio" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 0.05 },
+                    { "color": "red", "value": 0.1 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "spill_ratio" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 0.1 },
+                    { "color": "red", "value": 0.3 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "deserialize_overhead" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 0.05 },
+                    { "color": "red", "value": 0.1 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "scheduler_delay_ratio" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 0.05 },
+                    { "color": "red", "value": 0.1 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT app_id, stage_id, task_count, cpu_efficiency, gc_overhead_ratio, shuffle_wait_ratio, spill_ratio, deserialize_overhead, scheduler_delay_ratio FROM stage_governance WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 50",
+          "format": "table"
+        }
+      ]
+    },
+
+    {
+      "id": 13,
+      "title": "Task Duration Histogram",
+      "type": "barchart",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "vertical",
+        "xField": "Bucket LE (ms)",
+        "yField": "Count",
+        "colorByField": "Count",
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT ROUND(bucket_le) AS 'Bucket LE (ms)', SUM(bucket_count) AS 'Count' FROM task_histogram_buckets WHERE $__unixEpochFilter(timestamp_ms/1000) AND metric_name = 'spark.task.duration_ms' AND app_id IN ($app_id) GROUP BY bucket_le ORDER BY bucket_le",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "Small File Detection",
+      "type": "table",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+      "description": "Stages with avg_output_bytes_per_task < 32MB may indicate small file problem",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "avg_output_bytes_per_task" },
+            "properties": [
+              { "id": "unit", "value": "bytes" },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "red", "value": null },
+                    { "color": "yellow", "value": 1048576 },
+                    { "color": "green", "value": 33554432 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "small_output_task_count" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 1 },
+                    { "color": "red", "value": 5 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "total_bytes_written" },
+            "properties": [{ "id": "unit", "value": "bytes" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "total_bytes_read" },
+            "properties": [{ "id": "unit", "value": "bytes" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "total_shuffle_bytes_read" },
+            "properties": [{ "id": "unit", "value": "bytes" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "total_shuffle_bytes_written" },
+            "properties": [{ "id": "unit", "value": "bytes" }]
+          }
+        ]
+      },
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "small_output_task_count" }] },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT app_id, stage_id, task_count, total_bytes_read, total_bytes_written, total_shuffle_bytes_read, total_shuffle_bytes_written, total_records_read, total_records_written, avg_output_bytes_per_task, avg_output_records_per_task, small_output_task_count FROM stage_governance WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 50",
+          "format": "table"
+        }
+      ]
+    },
+
+    {
+      "id": 15,
+      "title": "Task Detail",
+      "type": "table",
+      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 44 },
+      "description": "Latest tasks with IO, duration, and resource metrics",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "duration_ms" }, "properties": [{ "id": "unit", "value": "ms" }] },
+          { "matcher": { "id": "byName", "options": "io_bytes_read" }, "properties": [{ "id": "unit", "value": "bytes" }] },
+          { "matcher": { "id": "byName", "options": "io_bytes_written" }, "properties": [{ "id": "unit", "value": "bytes" }] },
+          { "matcher": { "id": "byName", "options": "shuffle_bytes_read" }, "properties": [{ "id": "unit", "value": "bytes" }] },
+          { "matcher": { "id": "byName", "options": "shuffle_bytes_written" }, "properties": [{ "id": "unit", "value": "bytes" }] },
+          { "matcher": { "id": "byName", "options": "executor_run_time_ms" }, "properties": [{ "id": "unit", "value": "ms" }] },
+          { "matcher": { "id": "byName", "options": "executor_cpu_time_ns" }, "properties": [{ "id": "unit", "value": "ns" }] },
+          { "matcher": { "id": "byName", "options": "jvm_gc_time_ms" }, "properties": [{ "id": "unit", "value": "ms" }] },
+          { "matcher": { "id": "byName", "options": "disk_bytes_spilled" }, "properties": [{ "id": "unit", "value": "bytes" }] },
+          { "matcher": { "id": "byName", "options": "memory_bytes_spilled" }, "properties": [{ "id": "unit", "value": "bytes" }] },
+          { "matcher": { "id": "byName", "options": "result_size_bytes" }, "properties": [{ "id": "unit", "value": "bytes" }] },
+          { "matcher": { "id": "byName", "options": "peak_execution_memory_bytes" }, "properties": [{ "id": "unit", "value": "bytes" }] },
+          {
+            "matcher": { "id": "byName", "options": "task_success" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "true": { "text": "OK", "color": "green" }, "false": { "text": "FAIL", "color": "red" } } }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000, '%Y-%m-%d %H:%i:%s') AS time, app_id, executor_id, stage_id, task_id, task_success, duration_ms, io_bytes_read, io_bytes_written, shuffle_bytes_read, shuffle_bytes_written, shuffle_fetch_wait_time_ms, executor_run_time_ms, executor_cpu_time_ns, jvm_gc_time_ms, disk_bytes_spilled, memory_bytes_spilled FROM task_metrics WHERE $__unixEpochFilter(timestamp_ms/1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 200",
+          "format": "table"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["spark", "mr", "telemetry", "governance"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+        "definition": "SELECT DISTINCT app_id FROM task_metrics ORDER BY app_id",
+        "includeAll": true,
+        "label": "App ID",
+        "multi": true,
+        "name": "app_id",
+        "options": [],
+        "query": "SELECT DISTINCT app_id FROM task_metrics ORDER BY app_id",
+        "queryValue": "",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "utc",
+  "title": "Spark / MR Telemetry Dashboard",
+  "uid": "spark-mr-telemetry",
+  "version": 1
+}

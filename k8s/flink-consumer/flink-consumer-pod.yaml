@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flink-consumer-config
+data:
+  flink-consumer.conf: |
+    flink-consumer {
+      kafka {
+        bootstrap.servers = "kafka:9092"
+        group.id = "flink-metrics-consumer"
+        topic = "telemetry-metrics"
+        auto.offset.reset = "earliest"
+      }
+      sink {
+        type = "mysql"
+        mysql {
+          url = "jdbc:mysql://mysql:3306/metrics_db"
+          username = "metrics"
+          password = "metrics"
+        }
+      }
+      timeout.seconds = 0
+    }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: flink-consumer
+  labels:
+    app: flink-consumer
+spec:
+  containers:
+  - name: flink-consumer
+    image: ubuntu:22.04
+    command: ["sleep", "infinity"]
+    volumeMounts:
+    - name: config
+      mountPath: /etc/flink-consumer
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "0.5"
+      limits:
+        memory: "1Gi"
+        cpu: "1"
+  volumes:
+  - name: config
+    configMap:
+      name: flink-consumer-config

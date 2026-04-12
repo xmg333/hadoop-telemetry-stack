@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hadoop2
+  labels:
+    app: hadoop2
+spec:
+  containers:
+  - name: hadoop2
+    image: ubuntu:22.04
+    command: ["sleep", "infinity"]
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "1"
+      limits:
+        memory: "4Gi"
+        cpu: "2"
+    ports:
+    - containerPort: 50070
+    - containerPort: 9000
+    - containerPort: 8088
+    - containerPort: 8042
+    - containerPort: 19888
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hadoop2
+spec:
+  selector:
+    app: hadoop2
+  ports:
+  - name: nn-web
+    port: 50070
+  - name: hdfs
+    port: 9000
+  - name: rm-web
+    port: 8088
+  - name: nm-web
+    port: 8042
+  - name: hs-web
+    port: 19888

@@ -1,0 +1,45 @@
+# Maven build output
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/
+
+# Playwright MCP
+.playwright-mcp/
+
+# Logs
+*.log
+
+# Compiled class files
+*.class
+
+# Package files (built by maven-shade-plugin)
+*.jar
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Binary / archive files
+*.tgz
+*.tar.gz
+*.zip
+
+# Config files with real credentials
+telemetry.conf
+mr-collector.conf
+flink-consumer.conf
