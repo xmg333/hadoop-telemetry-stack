@@ -1,5 +1,7 @@
 package x.mg.metrics.sparktelemetry.model;
 
+import java.util.List;
+
 /**
  * Version-agnostic metric event model.
  * All Spark version adapters translate their version-specific events into this unified model.
@@ -11,7 +13,8 @@ public class SparkMetricEvent {
         STAGE_COMPLETE,
         JOB_START,
         JOB_END,
-        PERIODIC_SYSTEM
+        PERIODIC_SYSTEM,
+        SQL_EXECUTION
     }
 
     private EventType eventType;
@@ -48,6 +51,10 @@ public class SparkMetricEvent {
     private IOMetrics ioMetrics;
     private MemoryMetrics memoryMetrics;
     private GCMetrics gcMetrics;
+
+    // SQL query execution metrics (Category 6)
+    private SqlExecutionMetrics sqlExecutionMetrics;
+    private List<SqlTableIOMetrics> sqlTableIOMetrics;
 
     public EventType getEventType() { return eventType; }
     public void setEventType(EventType eventType) { this.eventType = eventType; }
@@ -123,4 +130,10 @@ public class SparkMetricEvent {
 
     public GCMetrics getGcMetrics() { return gcMetrics; }
     public void setGcMetrics(GCMetrics gcMetrics) { this.gcMetrics = gcMetrics; }
+
+    public SqlExecutionMetrics getSqlExecutionMetrics() { return sqlExecutionMetrics; }
+    public void setSqlExecutionMetrics(SqlExecutionMetrics sqlExecutionMetrics) { this.sqlExecutionMetrics = sqlExecutionMetrics; }
+
+    public List<SqlTableIOMetrics> getSqlTableIOMetrics() { return sqlTableIOMetrics; }
+    public void setSqlTableIOMetrics(List<SqlTableIOMetrics> sqlTableIOMetrics) { this.sqlTableIOMetrics = sqlTableIOMetrics; }
 }

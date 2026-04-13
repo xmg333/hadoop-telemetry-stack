@@ -6,8 +6,10 @@ import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.LongHistogram;
 import io.opentelemetry.api.metrics.Meter;
+import io.opentelemetry.api.metrics.DoubleHistogram;
 import x.mg.metrics.sparktelemetry.config.TelemetryConfig;
 import x.mg.metrics.sparktelemetry.model.*;
+import java.util.List;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -68,6 +70,17 @@ public class MetricRecorder {
     private final LongHistogram jobDurationHistogram;
     private final LongCounter jobNumStagesCounter;
     private final Map<Integer, Long> jobStartTimes = new ConcurrentHashMap<>();
+
+    // Category 6: SQL query execution (config: metrics.sql.query-execution)
+    private final LongHistogram sqlQueryDurationHistogram;
+    private final LongCounter sqlQueryShuffleBytesReadCounter;
+    private final LongCounter sqlQueryShuffleBytesWrittenCounter;
+    private final LongCounter sqlQueryJoinCountCounter;
+    // Table-level instruments
+    private final LongCounter sqlTableBytesCounter;
+    private final LongCounter sqlTableRowsCounter;
+    private final LongCounter sqlTableFilesReadCounter;
+    private final LongCounter sqlTableTimeMsCounter;
 
     // GC metric state (system metrics)
     private final LongCounter gcCountCounter;
@@ -194,6 +207,36 @@ public class MetricRecorder {
             this.jobNumStagesCounter = null;
         }
 
+        // Category 6: SQL query execution
+        if (config.isCaptureSqlQueryExecution()) {
+            this.sqlQueryDurationHistogram = meter.histogramBuilder("spark.sql.query.duration_ms")
+                    .setDescription("SQL query duration").setUnit("ms").ofLongs().build();
+            this.sqlQueryShuffleBytesReadCounter = meter.counterBuilder("spark.sql.query.shuffle.bytes_read")
+                    .setDescription("SQL query shuffle bytes read").setUnit("By").build();
+            this.sqlQueryShuffleBytesWrittenCounter = meter.counterBuilder("spark.sql.query.shuffle.bytes_written")
+                    .setDescription("SQL query shuffle bytes written").setUnit("By").build();
+            this.sqlQueryJoinCountCounter = meter.counterBuilder("spark.sql.query.join_count")
+                    .setDescription("SQL query join count").setUnit("{joins}").build();
+            // Table-level instruments
+            this.sqlTableBytesCounter = meter.counterBuilder("spark.sql.table.bytes")
+                    .setDescription("SQL table IO bytes").setUnit("By").build();
+            this.sqlTableRowsCounter = meter.counterBuilder("spark.sql.table.rows")
+                    .setDescription("SQL table IO rows").setUnit("{rows}").build();
+            this.sqlTableFilesReadCounter = meter.counterBuilder("spark.sql.table.files_read")
+                    .setDescription("SQL table files read").setUnit("{files}").build();
+            this.sqlTableTimeMsCounter = meter.counterBuilder("spark.sql.table.time_ms")
+                    .setDescription("SQL table IO time").setUnit("ms").build();
+        } else {
+            this.sqlQueryDurationHistogram = null;
+            this.sqlQueryShuffleBytesReadCounter = null;
+            this.sqlQueryShuffleBytesWrittenCounter = null;
+            this.sqlQueryJoinCountCounter = null;
+            this.sqlTableBytesCounter = null;
+            this.sqlTableRowsCounter = null;
+            this.sqlTableFilesReadCounter = null;
+            this.sqlTableTimeMsCounter = null;
+        }
+
         // GC counters (system metrics)
         this.gcCountCounter = meter.counterBuilder("spark.jvm.gc.count")
                 .setDescription("JVM GC count").setUnit("{count}").build();
@@ -231,6 +274,12 @@ public class MetricRecorder {
                     break;
                 case JOB_END:
                     if (config.isCaptureJobLifecycle()) recordJobEnd(event);
+                    break;
+                case SQL_EXECUTION:
+                    if (config.isCaptureSqlQueryExecution()) {
+                        recordSqlExecution(event);
+                        recordSqlTableIO(event);
+                    }
                     break;
                 case PERIODIC_SYSTEM:
                     recordSystemMetrics(event);
@@ -410,6 +459,50 @@ public class MetricRecorder {
         builder.put("spark.job.id", event.getJobId());
         builder.put("spark.job.success", event.isJobSuccessful());
         return builder.build();
+    }
+
+    private void recordSqlExecution(SparkMetricEvent event) {
+        SqlExecutionMetrics sql = event.getSqlExecutionMetrics();
+        if (sql == null) return;
+
+        Attributes attrs = Attributes.builder()
+                .put("spark.app.id", event.getApplicationId() != null ? event.getApplicationId() : "unknown")
+                .put("spark.sql.execution_id", String.valueOf(sql.getExecutionId()))
+                .build();
+
+        if (sql.getDurationMs() > 0) {
+            sqlQueryDurationHistogram.record(sql.getDurationMs(), attrs);
+        }
+        if (sql.getShuffleBytesRead() > 0) {
+            sqlQueryShuffleBytesReadCounter.add(sql.getShuffleBytesRead(), attrs);
+        }
+        if (sql.getShuffleBytesWritten() > 0) {
+            sqlQueryShuffleBytesWrittenCounter.add(sql.getShuffleBytesWritten(), attrs);
+        }
+        if (sql.getJoinCount() > 0) {
+            sqlQueryJoinCountCounter.add(sql.getJoinCount(), attrs);
+        }
+    }
+
+    private void recordSqlTableIO(SparkMetricEvent event) {
+        List<SqlTableIOMetrics> tableMetrics = event.getSqlTableIOMetrics();
+        if (tableMetrics == null || tableMetrics.isEmpty()) return;
+
+        String appId = event.getApplicationId() != null ? event.getApplicationId() : "unknown";
+
+        for (SqlTableIOMetrics tm : tableMetrics) {
+            Attributes attrs = Attributes.builder()
+                    .put("spark.app.id", appId)
+                    .put("spark.sql.execution_id", String.valueOf(tm.getExecutionId()))
+                    .put("spark.sql.table_name", tm.getTableName() != null ? tm.getTableName() : "unknown")
+                    .put("spark.sql.operation", tm.getOperation() != null ? tm.getOperation() : "unknown")
+                    .build();
+
+            if (tm.getBytes() > 0) sqlTableBytesCounter.add(tm.getBytes(), attrs);
+            if (tm.getRows() > 0) sqlTableRowsCounter.add(tm.getRows(), attrs);
+            if (tm.getFilesRead() > 0) sqlTableFilesReadCounter.add(tm.getFilesRead(), attrs);
+            if (tm.getTimeMs() > 0) sqlTableTimeMsCounter.add(tm.getTimeMs(), attrs);
+        }
     }
 
     private Attributes buildSystemAttributes(SparkMetricEvent event) {

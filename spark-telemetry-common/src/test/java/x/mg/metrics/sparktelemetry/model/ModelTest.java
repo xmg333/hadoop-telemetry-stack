@@ -136,7 +136,7 @@ class ModelTest {
     @Test
     void testAllEventTypes() {
         // Verify all event types including new JOB_START
-        assertEquals(5, SparkMetricEvent.EventType.values().length);
+        assertEquals(6, SparkMetricEvent.EventType.values().length);
         assertNotNull(SparkMetricEvent.EventType.valueOf("JOB_START"));
         for (SparkMetricEvent.EventType type : SparkMetricEvent.EventType.values()) {
             SparkMetricEvent event = new SparkMetricEvent();

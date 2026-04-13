@@ -24,7 +24,7 @@ class SparkTelemetryPlugin extends SparkPlugin {
   }
 }
 
-class TelemetryDriverPlugin extends DriverPlugin {
+class TelemetryDriverPlugin extends DriverPlugin with org.apache.spark.internal.Logging {
 
   private var listener: SparkTelemetryListener = _
 
@@ -36,6 +36,42 @@ class TelemetryDriverPlugin extends DriverPlugin {
 
     listener = new SparkTelemetryListener(confMap)
     sc.addSparkListener(listener)
+
+    // Register QueryExecutionListener for SQL metrics (driver-only)
+    val sqlConfig = TelemetryLifecycle.getInstance.getConfig.isCaptureSqlQueryExecution
+    if (sqlConfig) {
+      try {
+        org.apache.spark.sql.SparkSession.getActiveSession match {
+          case Some(session) =>
+            session.listenerManager.register(new SparkTelemetryQueryExecutionListener(confMap))
+            logInfo("QueryExecutionListener registered for SQL metrics capture")
+          case None =>
+            // SparkSession not yet created (e.g. PySpark creates it after SparkContext).
+            // Defer registration to the first job start via a one-shot SparkListener.
+            logInfo("SparkSession not available during plugin init, deferring QEL registration")
+            val qel = new SparkTelemetryQueryExecutionListener(confMap)
+            val deferred = new org.apache.spark.scheduler.SparkListener {
+              override def onJobStart(jobStart: org.apache.spark.scheduler.SparkListenerJobStart): Unit = {
+                try {
+                  // At this point SparkContext is fully initialized, so getOrCreate() is safe
+                  val session = org.apache.spark.sql.SparkSession.getActiveSession.getOrElse(
+                    org.apache.spark.sql.SparkSession.builder().getOrCreate())
+                  session.listenerManager.register(qel)
+                  logInfo("QueryExecutionListener registered for SQL metrics capture (deferred)")
+                } catch {
+                  case e: Exception =>
+                    logWarning("Failed to register QueryExecutionListener (deferred): " + e.getMessage, e)
+                }
+                sc.removeSparkListener(this)
+              }
+            }
+            sc.addSparkListener(deferred)
+        }
+      } catch {
+        case e: Exception =>
+          logWarning("Failed to register QueryExecutionListener: " + e.getMessage, e)
+      }
+    }
 
     util.Collections.emptyMap[String, String]()
   }

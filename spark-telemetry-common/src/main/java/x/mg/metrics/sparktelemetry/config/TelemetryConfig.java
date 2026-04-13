@@ -97,6 +97,7 @@ public class TelemetryConfig {
         defaults.put(ConfigKeys.PREFIX + ".metrics.task.info", true);
         defaults.put(ConfigKeys.PREFIX + ".metrics.stage.detailed", false);
         defaults.put(ConfigKeys.PREFIX + ".metrics.job.lifecycle", false);
+        defaults.put(ConfigKeys.PREFIX + ".metrics.sql.query-execution", false);
         defaults.put(ConfigKeys.PREFIX + ".filter.app.name.include", Collections.singletonList(".*"));
         defaults.put(ConfigKeys.PREFIX + ".filter.app.name.exclude", Collections.emptyList());
         return defaults;
@@ -174,6 +175,10 @@ public class TelemetryConfig {
 
     public boolean isCaptureJobLifecycle() {
         return getBoolean(ConfigKeys.METRICS_JOB_LIFECYCLE, false);
+    }
+
+    public boolean isCaptureSqlQueryExecution() {
+        return getBoolean(ConfigKeys.METRICS_SQL_QUERY_EXECUTION, false);
     }
 
     public boolean shouldAcceptApp(String appName) {
