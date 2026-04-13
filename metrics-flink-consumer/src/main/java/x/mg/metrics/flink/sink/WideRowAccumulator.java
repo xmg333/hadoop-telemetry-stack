@@ -14,6 +14,12 @@ public class WideRowAccumulator {
     private final Map<String, JobMetricRow> jobRows = new ConcurrentHashMap<>();
     private final Map<String, JvmMemoryMetricRow> memoryRows = new ConcurrentHashMap<>();
     private final Map<String, JvmGcMetricRow> gcRows = new ConcurrentHashMap<>();
+    private final Map<String, SqlQueryMetricRow> sqlQueryRows = new ConcurrentHashMap<>();
+    private final Map<String, SqlTableIoMetricRow> sqlTableIoRows = new ConcurrentHashMap<>();
+    private final Map<String, HiveQueryMetricRow> hiveQueryRows = new ConcurrentHashMap<>();
+    private final Map<String, HiveTableIoMetricRow> hiveTableIoRows = new ConcurrentHashMap<>();
+    private final Map<String, MrJobMetricRow> mrJobRows = new ConcurrentHashMap<>();
+    private final Map<String, MrTaskMetricRow> mrTaskRows = new ConcurrentHashMap<>();
 
     private final List<HistogramBucket> taskBuckets = Collections.synchronizedList(new ArrayList<>());
     private final List<HistogramBucket> stageBuckets = Collections.synchronizedList(new ArrayList<>());
@@ -90,6 +96,36 @@ public class WideRowAccumulator {
                     k -> JvmGcMetricRow.fromLabels(sample.getTimestampMs(), sample.getLabels()))
                     .setMetricColumn(mapping.getColumnName(), sample.getValue());
                 break;
+            case SQL_EXECUTION:
+                sqlQueryRows.computeIfAbsent(key,
+                    k -> SqlQueryMetricRow.fromLabels(sample.getTimestampMs(), sample.getLabels()))
+                    .setMetricColumn(mapping.getColumnName(), sample.getValue());
+                break;
+            case SQL_TABLE_IO:
+                sqlTableIoRows.computeIfAbsent(key,
+                    k -> SqlTableIoMetricRow.fromLabels(sample.getTimestampMs(), sample.getLabels()))
+                    .setMetricColumn(mapping.getColumnName(), sample.getValue());
+                break;
+            case HIVE_QUERY:
+                hiveQueryRows.computeIfAbsent(key,
+                    k -> HiveQueryMetricRow.fromLabels(sample.getTimestampMs(), sample.getLabels()))
+                    .setMetricColumn(mapping.getColumnName(), sample.getValue());
+                break;
+            case HIVE_TABLE_IO:
+                hiveTableIoRows.computeIfAbsent(key,
+                    k -> HiveTableIoMetricRow.fromLabels(sample.getTimestampMs(), sample.getLabels()))
+                    .setMetricColumn(mapping.getColumnName(), sample.getValue());
+                break;
+            case MR_JOB:
+                mrJobRows.computeIfAbsent(key,
+                    k -> MrJobMetricRow.fromLabels(sample.getTimestampMs(), sample.getLabels()))
+                    .setMetricColumn(mapping.getColumnName(), sample.getValue());
+                break;
+            case MR_TASK:
+                mrTaskRows.computeIfAbsent(key,
+                    k -> MrTaskMetricRow.fromLabels(sample.getTimestampMs(), sample.getLabels()))
+                    .setMetricColumn(mapping.getColumnName(), sample.getValue());
+                break;
             default:
                 totalSamplesSkipped++;
                 return;
@@ -126,6 +162,12 @@ public class WideRowAccumulator {
         result.jobRows = new ArrayList<>(jobRows.values());
         result.memoryRows = new ArrayList<>(memoryRows.values());
         result.gcRows = new ArrayList<>(gcRows.values());
+        result.sqlQueryRows = new ArrayList<>(sqlQueryRows.values());
+        result.sqlTableIoRows = new ArrayList<>(sqlTableIoRows.values());
+        result.hiveQueryRows = new ArrayList<>(hiveQueryRows.values());
+        result.hiveTableIoRows = new ArrayList<>(hiveTableIoRows.values());
+        result.mrJobRows = new ArrayList<>(mrJobRows.values());
+        result.mrTaskRows = new ArrayList<>(mrTaskRows.values());
         result.taskBuckets = new ArrayList<>(taskBuckets);
         result.stageBuckets = new ArrayList<>(stageBuckets);
         result.jobBuckets = new ArrayList<>(jobBuckets);
@@ -149,6 +191,12 @@ public class WideRowAccumulator {
         jobRows.clear();
         memoryRows.clear();
         gcRows.clear();
+        sqlQueryRows.clear();
+        sqlTableIoRows.clear();
+        hiveQueryRows.clear();
+        hiveTableIoRows.clear();
+        mrJobRows.clear();
+        mrTaskRows.clear();
         taskBuckets.clear();
         stageBuckets.clear();
         jobBuckets.clear();
@@ -174,6 +222,9 @@ public class WideRowAccumulator {
     public int pendingCount() {
         return taskRows.size() + stageRows.size() + jobRows.size()
              + memoryRows.size() + gcRows.size()
+             + sqlQueryRows.size() + sqlTableIoRows.size()
+             + hiveQueryRows.size() + hiveTableIoRows.size()
+             + mrJobRows.size() + mrTaskRows.size()
              + taskBuckets.size() + stageBuckets.size() + jobBuckets.size();
     }
 
@@ -187,6 +238,12 @@ public class WideRowAccumulator {
         public List<JobMetricRow> jobRows;
         public List<JvmMemoryMetricRow> memoryRows;
         public List<JvmGcMetricRow> gcRows;
+        public List<SqlQueryMetricRow> sqlQueryRows;
+        public List<SqlTableIoMetricRow> sqlTableIoRows;
+        public List<HiveQueryMetricRow> hiveQueryRows;
+        public List<HiveTableIoMetricRow> hiveTableIoRows;
+        public List<MrJobMetricRow> mrJobRows;
+        public List<MrTaskMetricRow> mrTaskRows;
         public List<HistogramBucket> taskBuckets;
         public List<HistogramBucket> stageBuckets;
         public List<HistogramBucket> jobBuckets;
@@ -195,6 +252,9 @@ public class WideRowAccumulator {
         public int totalCount() {
             int total = taskRows.size() + stageRows.size() + jobRows.size()
                  + memoryRows.size() + gcRows.size()
+                 + sqlQueryRows.size() + sqlTableIoRows.size()
+                 + hiveQueryRows.size() + hiveTableIoRows.size()
+                 + mrJobRows.size() + mrTaskRows.size()
                  + taskBuckets.size() + stageBuckets.size() + jobBuckets.size();
             if (governanceRows != null) total += governanceRows.size();
             return total;

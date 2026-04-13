@@ -57,6 +57,77 @@ public class MetricCategoryClassifier {
         // JVM GC metrics
         put("spark.jvm.gc.count",                           MetricCategory.JVM_GC, "gc_count",                       false);
         put("spark.jvm.gc.time_ms",                         MetricCategory.JVM_GC, "gc_time_ms",                     false);
+
+        // SQL query execution metrics
+        put("spark.sql.query.duration_ms",                  MetricCategory.SQL_EXECUTION, "duration_ms",            true);
+        put("spark.sql.query.shuffle.bytes_read",           MetricCategory.SQL_EXECUTION, "shuffle_bytes_read",     false);
+        put("spark.sql.query.shuffle.bytes_written",        MetricCategory.SQL_EXECUTION, "shuffle_bytes_written",  false);
+        put("spark.sql.query.join_count",                   MetricCategory.SQL_EXECUTION, "join_count",             false);
+
+        // SQL table IO metrics
+        put("spark.sql.table.bytes",                        MetricCategory.SQL_TABLE_IO, "bytes",                   false);
+        put("spark.sql.table.rows",                         MetricCategory.SQL_TABLE_IO, "rows",                    false);
+        put("spark.sql.table.files_read",                   MetricCategory.SQL_TABLE_IO, "files_read",              false);
+        put("spark.sql.table.time_ms",                      MetricCategory.SQL_TABLE_IO, "time_ms",                 false);
+
+        // Hive query metrics
+        put("hive.query.duration_ms",                       MetricCategory.HIVE_QUERY, "duration_ms",               true);
+        put("hive.query.success",                           MetricCategory.HIVE_QUERY, "success_count",             false);
+        put("hive.query.failure",                           MetricCategory.HIVE_QUERY, "failure_count",             false);
+        put("hive.query.input_bytes",                       MetricCategory.HIVE_QUERY, "input_bytes",               false);
+        put("hive.query.output_bytes",                      MetricCategory.HIVE_QUERY, "output_bytes",              false);
+        put("hive.query.input_rows",                        MetricCategory.HIVE_QUERY, "input_rows",                false);
+        put("hive.query.output_rows",                       MetricCategory.HIVE_QUERY, "output_rows",               false);
+
+        // Hive table IO metrics
+        put("hive.query.input_tables",                      MetricCategory.HIVE_TABLE_IO, "input_table_count",      false);
+        put("hive.query.output_tables",                     MetricCategory.HIVE_TABLE_IO, "output_table_count",     false);
+
+        // MR job metrics (IO)
+        put("mr.job.io.hdfs_bytes_read",                    MetricCategory.MR_JOB, "hdfs_bytes_read",              false);
+        put("mr.job.io.hdfs_bytes_written",                 MetricCategory.MR_JOB, "hdfs_bytes_written",            false);
+        put("mr.job.io.file_bytes_read",                    MetricCategory.MR_JOB, "file_bytes_read",               false);
+        put("mr.job.io.file_bytes_written",                 MetricCategory.MR_JOB, "file_bytes_written",            false);
+
+        // MR job metrics (processing)
+        put("mr.job.map_input_records",                     MetricCategory.MR_JOB, "map_input_records",             false);
+        put("mr.job.map_output_records",                    MetricCategory.MR_JOB, "map_output_records",            false);
+        put("mr.job.map_output_bytes",                      MetricCategory.MR_JOB, "map_output_bytes",              false);
+        put("mr.job.reduce_input_records",                  MetricCategory.MR_JOB, "reduce_input_records",          false);
+        put("mr.job.reduce_output_records",                 MetricCategory.MR_JOB, "reduce_output_records",         false);
+        put("mr.job.reduce_shuffle_bytes",                  MetricCategory.MR_JOB, "reduce_shuffle_bytes",          false);
+        put("mr.job.spilled_records",                       MetricCategory.MR_JOB, "spilled_records",               false);
+
+        // MR job metrics (resource)
+        put("mr.job.cpu_time_ms",                           MetricCategory.MR_JOB, "cpu_time_ms",                   false);
+        put("mr.job.gc_time_ms",                            MetricCategory.MR_JOB, "gc_time_ms",                    false);
+        put("mr.job.physical_memory_bytes",                 MetricCategory.MR_JOB, "physical_memory_bytes",         false);
+        put("mr.job.virtual_memory_bytes",                  MetricCategory.MR_JOB, "virtual_memory_bytes",          false);
+        put("mr.job.committed_heap_bytes",                  MetricCategory.MR_JOB, "committed_heap_bytes",          false);
+
+        // MR job metrics (duration & count)
+        put("mr.job.maps_duration_ms",                      MetricCategory.MR_JOB, "maps_duration_ms",              false);
+        put("mr.job.reduces_duration_ms",                   MetricCategory.MR_JOB, "reduces_duration_ms",           false);
+        put("mr.job.elapsed_time_ms",                       MetricCategory.MR_JOB, "elapsed_time_ms",               false);
+        put("mr.job.launched_maps",                         MetricCategory.MR_JOB, "launched_maps",                 false);
+        put("mr.job.launched_reduces",                      MetricCategory.MR_JOB, "launched_reduces",              false);
+
+        // MR task metrics (IO)
+        put("mr.task.io.hdfs_bytes_read",                   MetricCategory.MR_TASK, "hdfs_bytes_read",              false);
+        put("mr.task.io.hdfs_bytes_written",                MetricCategory.MR_TASK, "hdfs_bytes_written",           false);
+        put("mr.task.io.file_bytes_read",                   MetricCategory.MR_TASK, "file_bytes_read",              false);
+        put("mr.task.io.file_bytes_written",                MetricCategory.MR_TASK, "file_bytes_written",           false);
+        put("mr.task.io.map_input_records",                 MetricCategory.MR_TASK, "map_input_records",            false);
+        put("mr.task.io.map_output_records",                MetricCategory.MR_TASK, "map_output_records",           false);
+        put("mr.task.io.map_output_bytes",                  MetricCategory.MR_TASK, "map_output_bytes",             false);
+        put("mr.task.io.reduce_input_records",              MetricCategory.MR_TASK, "reduce_input_records",         false);
+        put("mr.task.io.reduce_output_records",             MetricCategory.MR_TASK, "reduce_output_records",        false);
+        put("mr.task.io.reduce_shuffle_bytes",              MetricCategory.MR_TASK, "reduce_shuffle_bytes",         false);
+        put("mr.task.io.spilled_records",                   MetricCategory.MR_TASK, "spilled_records",              false);
+
+        // MR task metrics (resource)
+        put("mr.task.cpu_time_ms",                          MetricCategory.MR_TASK, "cpu_time_ms",                  false);
+        put("mr.task.gc_time_ms",                           MetricCategory.MR_TASK, "gc_time_ms",                   false);
     }
 
     private static void put(String metricName, MetricCategory category, String columnName, boolean histogram) {
@@ -94,6 +165,35 @@ public class MetricCategoryClassifier {
                 sb.append('|').append(labels.get("spark.app.id"))
                   .append('|').append(labels.get("spark.executor.id"))
                   .append('|').append(labels.get("gc_name"));
+                break;
+            case SQL_EXECUTION:
+                sb.append('|').append(labels.get("spark.app.id"))
+                  .append('|').append(labels.get("spark.sql.execution_id"));
+                break;
+            case SQL_TABLE_IO:
+                sb.append('|').append(labels.get("spark.app.id"))
+                  .append('|').append(labels.get("spark.sql.execution_id"))
+                  .append('|').append(labels.get("spark.sql.table_name"))
+                  .append('|').append(labels.get("spark.sql.operation"));
+                break;
+            case HIVE_QUERY:
+                sb.append('|').append(labels.get("hive.query.id"))
+                  .append('|').append(labels.getOrDefault("hive.query.operation", "unknown"))
+                  .append('|').append(labels.getOrDefault("hive.query.execution_engine", "unknown"));
+                break;
+            case HIVE_TABLE_IO:
+                sb.append('|').append(labels.get("hive.query.id"))
+                  .append('|').append(labels.getOrDefault("hive.query.operation", "unknown"))
+                  .append('|').append(labels.getOrDefault("hive.query.input_table",
+                        labels.getOrDefault("hive.query.output_table", "unknown")));
+                break;
+            case MR_JOB:
+                sb.append('|').append(labels.get("mr.job.id"));
+                break;
+            case MR_TASK:
+                sb.append('|').append(labels.get("mr.task.id"))
+                  .append('|').append(labels.getOrDefault("mr.task.type", "unknown"))
+                  .append('|').append(labels.get("mr.job.id"));
                 break;
             default:
                 break;
