@@ -16,6 +16,9 @@ mvn clean package -Pspark-2
 # Build for Spark 4.x
 mvn clean package -Pspark-4
 
+# Build Omnipackage (unified JAR: Spark 2/3/4 + MR Collector + MR Agent)
+chmod +x build-omni.sh && ./build-omni.sh
+
 # Run unit tests (default profile)
 mvn test
 
@@ -31,7 +34,7 @@ mvn clean package -DskipTests
 
 ## Architecture
 
-This is a **transparent Spark telemetry plugin** that captures Spark task/stage IO metrics and JVM system metrics, exporting them via OpenTelemetry to an OTel Collector. It also includes a standalone **MR (MapReduce) Telemetry Collector** that polls Hadoop History Server for MR job metrics.
+This is a **transparent Spark telemetry plugin** that captures Spark task/stage IO metrics and JVM system metrics, exporting them via OpenTelemetry to an OTel Collector. It also includes a standalone **MR (MapReduce) Telemetry Collector** that polls Hadoop History Server for MR job metrics, and a **Hive Telemetry Hook** that captures Hive query metrics via `ExecuteWithHookContext`.
 
 ### Module Structure
 
@@ -41,8 +44,13 @@ spark-telemetry-adapter-spark2/   # Scala 2.11 adapter for Spark 2.4 (spark.extr
 spark-telemetry-adapter-spark3/   # Scala 2.12 adapter for Spark 3.5 (SparkPlugin API)
 spark-telemetry-adapter-spark4/   # Scala 2.13 adapter for Spark 4.0 (SparkPlugin API)
 spark-telemetry-dist-spark{2,3,4}/ # Shaded fat JARs for each Spark version
+spark-telemetry-omni-facade/      # Pure Java facade for omnipackage (auto-detect + delegate)
+spark-telemetry-adapters-relocated/ # Intermediate: relocates adapters to v2/v3/v4 packages via shade
+spark-telemetry-dist-omni/        # Unified distribution: Spark 2/3/4 + MR Collector + MR Agent in one JAR
 mr-telemetry-collector/        # Standalone MR job metric collector (Java)
 mr-telemetry-dist/             # Shaded fat JAR for MR collector
+hive-telemetry-hook/           # Hive query telemetry hook via ExecuteWithHookContext (Java)
+hive-telemetry-hook-dist/      # Shaded fat JAR for Hive hook
 metrics-flink-consumer/        # Flink job consuming OTLP protobuf from Kafka → MySQL/ClickHouse
 metrics-flink-consumer-dist/   # Shaded fat JAR for Flink consumer
 integration-tests/             # IT/E2E tests (Spark 3 profile only)
@@ -65,6 +73,23 @@ integration-tests/             # IT/E2E tests (Spark 3 profile only)
 - **appId Fallback**: All SparkTelemetryListener versions fall back from `SparkEnv.get.conf.getAppId` to `spark.app.name` to `"unknown"` to handle local mode and short-lived apps where appId is null.
 - **Stage IO Separation**: Stage-level IO counters (`spark.stage.io.bytes_read/written`) are separate instruments from task-level (`spark.task.io.bytes_read/written`) to prevent counter name collision.
 - **MR Gauge→Counter**: MR Collector uses `LongCounter.add()` for all metrics (including formerly gauge-like values) to avoid `buildWithCallback` memory leaks.
+
+### Omnipackage Architecture
+
+The omnipackage (`spark-telemetry-dist-omni`) produces a single JAR supporting Spark 2/3/4 + MR Collector + MR Agent, auto-detecting Spark version at runtime.
+
+**Core challenge**: Three Spark adapters share the same package (`x.mg.metrics.sparktelemetry.adapter`) but are compiled with incompatible Scala versions (2.11/2.12/2.13). They cannot coexist at the same package path.
+
+**Solution**: Package relocation + facade pattern:
+1. Each adapter is relocated to `x.mg.metrics.sparktelemetry.adapter.internal.v{2,3,4}` via `maven-shade-plugin` in `spark-telemetry-adapters-relocated`
+2. Pure Java facade classes at the original package delegate to the version-specific adapter via reflection
+3. Version detection uses `Class.forName` probing — `OmniContext.java` checks for `SparkPlugin` (Spark 3+) and `scala.jdk.CollectionConverters` (Scala 2.13/Spark 4)
+
+**Key design decision — version detection**: Must use `Class.forName("scala.jdk.CollectionConverters")` NOT `Package.getPackage("scala").getImplementationVersion()`. The `Package` API returns null during early Spark plugin initialization, causing Scala 2.13 runtimes to incorrectly select the v3 adapter.
+
+**Build process**: `build-omni.sh` performs a 7-stage Maven build: common → adapters (3 profiles) → MR modules → relocate → facade + dist. The `omni` profile only includes common, omni-facade, adapters-relocated, and dist-omni modules. Adapter modules are built separately with their own Scala/Spark profiles.
+
+**Backward compatibility**: Per-version dist JARs still build and work unchanged. Existing Spark config keys work with the omnipackage without modification.
 
 ### Key Differences Between Spark Versions
 
@@ -97,13 +122,48 @@ Custom HOCON config file path can be specified via `spark.telemetry.config.path=
 
 Standalone Java app (`Main.java`) that polls Hadoop YARN History Server REST API for completed MR jobs, extracts counters, and exports via OTel. Runs independently from Spark.
 
+### Hive Telemetry Hook
+
+Hive query telemetry hook that implements `ExecuteWithHookContext`, loaded into HiveServer2 via `hive.exec.post.hooks`. Captures query metrics (duration, IO bytes/rows, input/output tables) and exports via OTel. Compatible with Hive 2.x and 3.x (compiled against Hive 2.3.9).
+
+Data flow: `Hive Query → HiveTelemetryHook (POST_EXEC) → OTel SDK → OTLP gRPC → OTel Collector → Kafka → Flink → MySQL/ClickHouse`
+
+- **Hook class**: `x.mg.metrics.hivetelemetry.HiveTelemetryHook`
+- **Lazy init**: `HiveHookContext` singleton initialized on first hook invocation with double-checked locking
+- **Error isolation**: Entire `run()` wrapped in try/catch — hook never breaks query execution
+- **Configuration**: Three-tier merge: HiveConf (`hive.telemetry.*`) > HOCON (`hive-telemetry.conf`) > defaults
+
+**OTel metric names** (9 instruments):
+- `hive.query.duration_ms` (LongHistogram), `hive.query.success` / `hive.query.failure` (LongCounter)
+- `hive.query.input_bytes` / `hive.query.output_bytes` / `hive.query.input_rows` / `hive.query.output_rows` (LongCounter)
+- `hive.query.input_tables` / `hive.query.output_tables` (LongCounter, per-table data points with `hive.query.input_table` / `hive.query.output_table` attributes)
+
+**Flink Consumer tables** (2 new tables in MySQL/ClickHouse):
+- `hive_query_metrics`: query_id, operation, user_name, success, duration_ms, IO metrics
+- `hive_table_io_metrics`: query_id, table_name, table_type (input/output), operation, user_name
+
+```bash
+# Build Hive hook
+mvn clean package -pl hive-telemetry-hook,hive-telemetry-hook-dist -am -DskipTests
+
+# Deploy: copy shaded JAR to HiveServer2 auxlib, configure hive-site.xml:
+# <property>
+#   <name>hive.exec.post.hooks</name>
+#   <value>x.mg.metrics.hivetelemetry.HiveTelemetryHook</value>
+# </property>
+# <property>
+#   <name>hive.telemetry.otel.exporter.endpoint</name>
+#   <value>http://otel-collector:4317</value>
+# </property>
+```
+
 ### Flink Metrics Consumer
 
-Flink 1.18 job that reads OTLP protobuf metrics from Kafka and writes to MySQL or ClickHouse with 9-table wide-row schema. Includes histogram bucket support and stage governance pre-aggregation.
+Flink 1.18 job that reads OTLP protobuf metrics from Kafka and writes to MySQL or ClickHouse with 11-table wide-row schema. Includes histogram bucket support and stage governance pre-aggregation.
 
 Data flow: `Kafka (OTLP Protobuf) → Flink Job → MySQL / ClickHouse`
 
-- **Database schema**: 9 tables — `task_metrics`, `stage_metrics`, `job_metrics`, `jvm_memory_metrics`, `jvm_gc_metrics`, `task_histogram_buckets`, `stage_histogram_buckets`, `job_histogram_buckets`, `stage_governance`
+- **Database schema**: 11 tables — `task_metrics`, `stage_metrics`, `job_metrics`, `jvm_memory_metrics`, `jvm_gc_metrics`, `task_histogram_buckets`, `stage_histogram_buckets`, `job_histogram_buckets`, `stage_governance`, `hive_query_metrics`, `hive_table_io_metrics`
 - **Configuration**: HOCON file `flink-consumer.conf` (see `flink-consumer.conf.example`)
 - **Sink types**: `mysql` (default) or `clickhouse`, switched via `flink-consumer.sink.type`
 - **Flink version**: 1.18.0 (last version supporting Java 8)
@@ -205,6 +265,45 @@ kubectl exec spark3 -- bash -c '
 kubectl cp mr-telemetry-dist/target/*.jar hadoop3:/tmp/mr-collector.jar
 # Create mr-collector.conf with correct IPs, then:
 kubectl exec hadoop3 -- java -jar /tmp/mr-collector.jar /tmp/mr-collector.conf
+```
+
+### Running Omnipackage Integration Tests
+
+```bash
+# 1. Build omnipackage
+./build-omni.sh
+OMNI_JAR=$(ls spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*.jar)
+
+# 2. Get pod IPs
+OTEL_IP=$(kubectl get pods -l app=otel-collector -o jsonpath='{.items[0].status.podIP}')
+
+# 3. Test Omnipackage on Spark 3
+kubectl cp $OMNI_JAR spark3:/opt/omnipackage.jar
+kubectl exec spark3 -- env JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64 SPARK_HOME=/opt/spark \
+  /opt/spark/bin/spark-submit --master "local[2]" \
+    --class org.apache.spark.examples.SparkPi \
+    --jars /opt/omnipackage.jar \
+    --conf spark.plugins=x.mg.metrics.sparktelemetry.adapter.SparkTelemetryPlugin \
+    --conf spark.telemetry.otel.exporter.endpoint=http://$OTEL_IP:4317 \
+    --conf spark.telemetry.otel.service.name=omni-spark3 \
+    --conf spark.telemetry.otel.export.interval.ms=5000 \
+    /opt/spark/examples/jars/spark-examples_2.12-*.jar 5000
+
+# 4. Test Omnipackage on Spark 2
+kubectl cp $OMNI_JAR spark2:/opt/omnipackage.jar
+kubectl exec spark2 -- env JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64 SPARK_HOME=/opt/spark \
+  /opt/spark/bin/spark-submit --master "local[2]" \
+    --class org.apache.spark.examples.SparkPi \
+    --jars /opt/omnipackage.jar \
+    --conf spark.extraListeners=x.mg.metrics.sparktelemetry.adapter.SparkTelemetryListener \
+    --conf spark.telemetry.otel.exporter.endpoint=http://$OTEL_IP:4317 \
+    --conf spark.telemetry.otel.service.name=omni-spark2 \
+    --conf spark.telemetry.otel.export.interval.ms=5000 \
+    /opt/spark/examples/jars/spark-examples_2.11-*.jar 5000
+
+# 5. Test Omnipackage MR Collector mode
+kubectl cp $OMNI_JAR hadoop3:/tmp/omnipackage.jar
+kubectl exec hadoop3 -- java -jar /tmp/omnipackage.jar --mr-collector /tmp/mr-collector.conf
 
 # 5. Verify metrics in OTel Collector
 kubectl logs -l app=otel-collector --tail=100 | grep -E "spark\.|mr\."
