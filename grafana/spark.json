@@ -3,7 +3,7 @@
     {
       "name": "DS_MYSQL",
       "label": "MySQL Telemetry",
-      "description": "MySQL datasource for Spark/MR telemetry data (metrics_db)",
+      "description": "MySQL datasource for Spark telemetry data (metrics_db)",
       "type": "datasource",
       "pluginId": "mysql",
       "pluginName": "MySQL"
@@ -16,7 +16,56 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Overview",
+      "tooltip": "Telemetry Overview dashboard",
+      "type": "link",
+      "url": "/d/telemetry-overview"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": true,
+      "title": "MR Telemetry",
+      "tooltip": "MR Telemetry dashboard",
+      "type": "link",
+      "url": "/d/mr-telemetry"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Hive + MR",
+      "tooltip": "Hive MR Telemetry dashboard",
+      "type": "link",
+      "url": "/d/hive-mr-telemetry"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Hive + Spark",
+      "tooltip": "Hive Spark Telemetry dashboard",
+      "type": "link",
+      "url": "/d/hive-spark-telemetry"
+    }
+  ],
   "panels": [
     {
       "id": 1,
@@ -69,7 +118,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
+          "rawSql": "SELECT COUNT(DISTINCT task_id) AS value FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
           "format": "table"
         }
       ]
@@ -125,7 +174,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM stage_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
+          "rawSql": "SELECT COUNT(DISTINCT stage_id) AS value FROM stage_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
           "format": "table"
         }
       ]
@@ -185,7 +234,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM stage_governance WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_skew_ratio > 2",
+          "rawSql": "SELECT COUNT(DISTINCT stage_id) AS value FROM stage_governance WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_skew_ratio > 2",
           "format": "table"
         }
       ]
@@ -286,22 +335,22 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(io_bytes_read) AS 'Bytes Read' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND io_bytes_read IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(io_bytes_read) AS 'Bytes Read' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND io_bytes_read IS NOT NULL AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(io_bytes_written) AS 'Bytes Written' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND io_bytes_written IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(io_bytes_written) AS 'Bytes Written' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND io_bytes_written IS NOT NULL AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "C",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(shuffle_bytes_read) AS 'Shuffle Read' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND shuffle_bytes_read IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(shuffle_bytes_read) AS 'Shuffle Read' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND shuffle_bytes_read IS NOT NULL AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "D",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(shuffle_bytes_written) AS 'Shuffle Written' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND shuffle_bytes_written IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(shuffle_bytes_written) AS 'Shuffle Written' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND shuffle_bytes_written IS NOT NULL AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         }
       ]
@@ -1405,7 +1454,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id, executor_id, stage_id, task_id, task_success, duration_ms, io_bytes_read, io_bytes_written, shuffle_bytes_read, shuffle_bytes_written, shuffle_fetch_wait_time_ms, executor_run_time_ms, executor_cpu_time_ns, jvm_gc_time_ms, disk_bytes_spilled, memory_bytes_spilled FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 200",
+          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id, executor_id, stage_id, task_id, task_success, duration_ms, io_bytes_read, io_bytes_written, shuffle_bytes_read, shuffle_bytes_written, shuffle_fetch_wait_time_ms, executor_run_time_ms, executor_cpu_time_ns, jvm_gc_time_ms, disk_bytes_spilled, memory_bytes_spilled FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL ORDER BY timestamp_ms DESC LIMIT 200",
           "format": "table"
         }
       ]
@@ -1461,7 +1510,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
+          "rawSql": "SELECT COUNT(DISTINCT execution_id) AS value FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
           "format": "table"
         }
       ]
@@ -1625,7 +1674,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM sql_query_table_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
+          "rawSql": "SELECT COUNT(DISTINCT execution_id) AS value FROM sql_query_table_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
           "format": "table"
         }
       ]
@@ -1855,584 +1904,13 @@
           "format": "table"
         }
       ]
-    },
-    {
-      "id": 24,
-      "title": "Total Hive Queries",
-      "type": "stat",
-      "datasource": {
-        "type": "mysql",
-        "uid": "${DS_MYSQL}"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 80
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "orange",
-            "mode": "fixed"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 10
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
-          "format": "table"
-        }
-      ]
-    },
-    {
-      "id": 25,
-      "title": "Avg Hive Duration",
-      "type": "stat",
-      "datasource": {
-        "type": "mysql",
-        "uid": "${DS_MYSQL}"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 80
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 5000
-              },
-              {
-                "color": "red",
-                "value": 30000
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSql": "SELECT AVG(duration_ms) AS value FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND duration_ms IS NOT NULL",
-          "format": "table"
-        }
-      ]
-    },
-    {
-      "id": 26,
-      "title": "Hive Table IO Events",
-      "type": "stat",
-      "datasource": {
-        "type": "mysql",
-        "uid": "${DS_MYSQL}"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 80
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "light-purple",
-            "mode": "fixed"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM hive_table_io_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
-          "format": "table"
-        }
-      ]
-    },
-    {
-      "id": 27,
-      "title": "Hive IO Bytes",
-      "type": "stat",
-      "datasource": {
-        "type": "mysql",
-        "uid": "${DS_MYSQL}"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 80
-      },
-      "description": "Total input and output bytes across all Hive queries",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "color": {
-            "fixedColor": "blue",
-            "mode": "fixed"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSql": "SELECT SUM(input_bytes) AS 'Input Bytes' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND input_bytes IS NOT NULL",
-          "format": "table"
-        },
-        {
-          "refId": "B",
-          "rawSql": "SELECT SUM(output_bytes) AS 'Output Bytes' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND output_bytes IS NOT NULL",
-          "format": "table"
-        }
-      ]
-    },
-    {
-      "id": 28,
-      "title": "Hive Operations Distribution",
-      "type": "piechart",
-      "datasource": {
-        "type": "mysql",
-        "uid": "${DS_MYSQL}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 84
-      },
-      "description": "Query count breakdown by Hive operation type (QUERY, CREATETABLE, ALTERTABLE_RENAME, etc.)",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "pieType": "donut",
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "values": [
-            "value",
-            "percent"
-          ]
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSql": "SELECT operation AS metric, COUNT(*) AS value FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND operation IS NOT NULL GROUP BY operation ORDER BY value DESC",
-          "format": "table"
-        }
-      ]
-    },
-    {
-      "id": 29,
-      "title": "Hive Duration by Operation",
-      "type": "timeseries",
-      "datasource": {
-        "type": "mysql",
-        "uid": "${DS_MYSQL}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 84
-      },
-      "description": "Average query duration per operation type over time",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 10,
-            "spanNulls": true
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, operation AS metric, AVG(duration_ms) AS value FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND duration_ms IS NOT NULL AND operation IN ($hive_operation) GROUP BY 1, 2 ORDER BY 1, 2",
-          "format": "time_series"
-        }
-      ]
-    },
-    {
-      "id": 30,
-      "title": "Hive IO Throughput",
-      "type": "timeseries",
-      "datasource": {
-        "type": "mysql",
-        "uid": "${DS_MYSQL}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 92
-      },
-      "description": "Input/output bytes over time for Hive queries",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 10,
-            "spanNulls": true
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(input_bytes) AS 'Input Bytes' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND input_bytes IS NOT NULL GROUP BY 1 ORDER BY 1",
-          "format": "time_series"
-        },
-        {
-          "refId": "B",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(output_bytes) AS 'Output Bytes' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND output_bytes IS NOT NULL GROUP BY 1 ORDER BY 1",
-          "format": "time_series"
-        }
-      ]
-    },
-    {
-      "id": 31,
-      "title": "Hive Operation Count",
-      "type": "barchart",
-      "datasource": {
-        "type": "mysql",
-        "uid": "${DS_MYSQL}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 92
-      },
-      "description": "Number of queries and average duration per operation type",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Avg Duration (ms)"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "ms"
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "orientation": "horizontal",
-        "xField": "Operation",
-        "yField": "Query Count",
-        "colorByField": "Query Count",
-        "tooltip": {
-          "mode": "single"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSql": "SELECT operation AS 'Operation', COUNT(*) AS 'Query Count', ROUND(AVG(duration_ms), 1) AS 'Avg Duration (ms)' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND operation IS NOT NULL GROUP BY operation ORDER BY 2 DESC",
-          "format": "table"
-        }
-      ]
-    },
-    {
-      "id": 32,
-      "title": "Hive Query Detail",
-      "type": "table",
-      "datasource": {
-        "type": "mysql",
-        "uid": "${DS_MYSQL}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 100
-      },
-      "description": "Per-query metrics with operation, duration, IO, broken down by operation type",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "duration_ms"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "ms"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "input_bytes"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "bytes"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "output_bytes"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "bytes"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "success"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "true": {
-                        "text": "OK",
-                        "color": "green"
-                      },
-                      "false": {
-                        "text": "FAIL",
-                        "color": "red"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "time"
-          }
-        ]
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, operation, user_name, success, duration_ms, input_bytes, output_bytes, input_rows, output_rows FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND operation IN ($hive_operation) ORDER BY timestamp_ms DESC LIMIT 200",
-          "format": "table"
-        }
-      ]
-    },
-    {
-      "id": 33,
-      "title": "Hive Table IO Detail",
-      "type": "table",
-      "datasource": {
-        "type": "mysql",
-        "uid": "${DS_MYSQL}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 100
-      },
-      "description": "Per-table input/output lineage for each Hive query",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "table_type"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "input": {
-                        "text": "INPUT",
-                        "color": "blue"
-                      },
-                      "output": {
-                        "text": "OUTPUT",
-                        "color": "green"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "time"
-          }
-        ]
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, table_name, table_type, operation, user_name FROM hive_table_io_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND operation IN ($hive_operation) ORDER BY timestamp_ms DESC LIMIT 200",
-          "format": "table"
-        }
-      ]
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
   "tags": [
     "spark",
-    "mr",
-    "hive",
-    "telemetry",
-    "governance"
+    "telemetry"
   ],
   "templating": {
     "list": [
@@ -2463,34 +1941,6 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
-      },
-      {
-        "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "mysql",
-          "uid": "${DS_MYSQL}"
-        },
-        "definition": "SELECT DISTINCT operation FROM hive_query_metrics WHERE operation IS NOT NULL ORDER BY operation",
-        "includeAll": true,
-        "label": "Hive Operation",
-        "multi": true,
-        "name": "hive_operation",
-        "options": [],
-        "query": "SELECT DISTINCT operation FROM hive_query_metrics WHERE operation IS NOT NULL ORDER BY operation",
-        "queryValue": "",
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
       }
     ]
   },
@@ -2499,7 +1949,7 @@
     "to": "now"
   },
   "timezone": "utc",
-  "title": "Spark / MR / Hive Telemetry Dashboard",
-  "uid": "spark-mr-telemetry",
+  "title": "Spark Telemetry",
+  "uid": "spark-telemetry",
   "version": 1
 }
