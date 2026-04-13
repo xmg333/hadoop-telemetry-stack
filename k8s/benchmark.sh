@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# benchmark.sh — End-to-end stress test for the Spark/MR telemetry pipeline
+# benchmark.sh — End-to-end stress test for the Spark/MR/Hive telemetry pipeline
 #
-# Spark/MR → OTel SDK → OTel Collector → Kafka → Flink Consumer → MySQL/ClickHouse
+# Spark/MR/Hive → OTel SDK → OTel Collector → Kafka → Flink Consumer → MySQL/ClickHouse
 #
 # Usage:
 #   ./k8s/benchmark.sh                           # MySQL backend, 10 min
@@ -17,6 +17,7 @@ set -euo pipefail
 BENCHMARK_DURATION="${BENCHMARK_DURATION:-600}"       # seconds
 SPARK_JOB_INTERVAL="${SPARK_JOB_INTERVAL:-30}"        # seconds between Spark jobs
 MR_JOB_INTERVAL="${MR_JOB_INTERVAL:-30}"              # seconds between MR jobs
+HIVE_JOB_INTERVAL="${HIVE_JOB_INTERVAL:-45}"            # seconds between Hive jobs
 SPARK_PI_ITERATIONS="${SPARK_PI_ITERATIONS:-5000}"    # default SparkPi iterations
 SINK_TYPE="${SINK_TYPE:-mysql}"                       # mysql | clickhouse
 FLINK_PARALLELISM="${FLINK_PARALLELISM:-2}"
@@ -31,6 +32,9 @@ SPARK_FAILED=0
 MR_SUBMITTED=0
 MR_SUCCEEDED=0
 MR_FAILED=0
+HIVE_SUBMITTED=0
+HIVE_SUCCEEDED=0
+HIVE_FAILED=0
 HEALTH_ERRORS=0
 
 ##############################################################################
@@ -133,9 +137,9 @@ phase1_preflight() {
 
     # Check JARs exist
     local spark_jar
-    spark_jar=$(ls /home/xmg333/spark-telemetry-listener/spark-telemetry-dist-spark3/target/spark-telemetry-dist-spark3-*-SNAPSHOT.jar 2>/dev/null || true)
+    spark_jar=$(ls /home/xmg333/spark-telemetry-listener/spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*-SNAPSHOT.jar 2>/dev/null || true)
     if [[ -z "$spark_jar" ]]; then
-        fail "Spark plugin JAR not found. Run: mvn clean package -Pspark-3 -DskipTests"
+        fail "Spark omnipackage JAR not found. Run: ./build-omni.sh"
         exit 1
     fi
 
@@ -153,6 +157,21 @@ phase1_preflight() {
         exit 1
     fi
 
+    local hive_jar
+    hive_jar=$(ls /home/xmg333/spark-telemetry-listener/hive-telemetry-hook-dist/target/hive-telemetry-hook-dist-*-SNAPSHOT.jar 2>/dev/null || true)
+    if [[ -z "$hive_jar" ]]; then
+        warn "Hive hook JAR not found. Hive benchmark will be skipped. Run: mvn clean package -Pspark-3 -DskipTests"
+    fi
+
+    # Check if Hive is installed on hadoop3
+    HIVE_AVAILABLE=false
+    if kubectl exec "$HADOOP3_POD" -- test -d /opt/hive 2>/dev/null; then
+        HIVE_AVAILABLE=true
+        ok "Hive installation found on hadoop3"
+    else
+        warn "Hive not installed on hadoop3. Hive benchmark will be skipped."
+    fi
+
     ok "All JARs found"
 }
 
@@ -162,10 +181,49 @@ phase1_preflight() {
 phase2_environment() {
     log "========== Phase 2: Environment Preparation =========="
 
-    # Deploy Spark plugin JAR
-    log "Deploying Spark plugin JAR to spark3..."
-    kubectl cp spark-telemetry-dist-spark3/target/spark-telemetry-dist-spark3-*-SNAPSHOT.jar \
+    # Deploy Spark omnipackage JAR
+    log "Deploying Spark omnipackage JAR to spark3..."
+    kubectl cp spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*-SNAPSHOT.jar \
         "$SPARK3_POD":/opt/spark-telemetry-plugin.jar
+
+    # Deploy Hadoop config to spark3 for YARN submission
+    log "Deploying Hadoop config to spark3 for YARN..."
+    for f in core-site.xml hdfs-site.xml yarn-site.xml mapred-site.xml; do
+        kubectl exec "$HADOOP3_POD" -- cat /opt/hadoop/etc/hadoop/$f > /tmp/$f
+    done
+    # Replace localhost with hadoop3 IP in config files
+    sed -i "s|localhost:9000|${HADOOP3_IP}:9000|g" /tmp/core-site.xml
+    sed -i "s|0\.0\.0\.0|${HADOOP3_IP}|g" /tmp/yarn-site.xml
+    for f in core-site.xml hdfs-site.xml yarn-site.xml mapred-site.xml; do
+        kubectl cp /tmp/$f "$SPARK3_POD":/opt/spark/conf/$f
+    done
+    rm -f /tmp/core-site.xml /tmp/hdfs-site.xml /tmp/yarn-site.xml /tmp/mapred-site.xml
+    ok "Hadoop config deployed to spark3"
+
+    # Upload Spark examples JAR to HDFS for YARN cluster mode
+    log "Uploading Spark examples JAR to HDFS..."
+    local examples_jar_path
+    examples_jar_path=$(kubectl exec "$SPARK3_POD" -- bash -c 'ls /opt/spark/examples/jars/spark-examples_2.13-*.jar 2>/dev/null' | head -1 || true)
+    if [[ -n "$examples_jar_path" ]]; then
+        local examples_jar_name
+        examples_jar_name=$(basename "$examples_jar_path")
+        # Copy to hadoop3 first, then hdfs dfs -put from there
+        kubectl exec "$SPARK3_POD" -- cat "$examples_jar_path" > /tmp/spark-examples.jar
+        kubectl cp /tmp/spark-examples.jar "$HADOOP3_POD":/tmp/spark-examples.jar
+        rm -f /tmp/spark-examples.jar
+        kubectl exec "$HADOOP3_POD" -- bash -c "
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export HADOOP_HOME=/opt/hadoop
+\$HADOOP_HOME/bin/hdfs dfs -mkdir -p /tmp/spark-libs 2>/dev/null || true
+\$HADOOP_HOME/bin/hdfs dfs -put -f /tmp/spark-examples.jar /tmp/spark-libs/ 2>/dev/null || true
+rm -f /tmp/spark-examples.jar
+"
+        SPARK_EXAMPLES_HDFS="hdfs://${HADOOP3_IP}:9000/tmp/spark-libs/spark-examples.jar"
+        ok "Spark examples JAR uploaded to HDFS"
+    else
+        warn "Spark examples JAR not found on spark3"
+        SPARK_EXAMPLES_HDFS=""
+    fi
 
     # Deploy Flink consumer JAR to spark3 (we reuse spark3 pod for Flink)
     log "Deploying Flink consumer JAR to spark3..."
@@ -201,7 +259,7 @@ flink-consumer {
     }
   }
   filter {
-    metric.name.include = ["spark.", "mr."]
+    metric.name.include = ["spark.", "mr.", "hive."]
   }
   processing {
     parallelism = ${FLINK_PARALLELISM}
@@ -228,7 +286,7 @@ flink-consumer {
     }
   }
   filter {
-    metric.name.include = ["spark.", "mr."]
+    metric.name.include = ["spark.", "mr.", "hive."]
   }
   processing {
     parallelism = ${FLINK_PARALLELISM}
@@ -282,11 +340,11 @@ EOF
     log "Cleaning previous benchmark data..."
     if [[ "$SINK_TYPE" == "clickhouse" ]]; then
         kubectl exec "$CLICKHOUSE_POD" -- clickhouse-client -q \
-            "DROP TABLE IF EXISTS task_metrics; DROP TABLE IF EXISTS stage_metrics; DROP TABLE IF EXISTS job_metrics; DROP TABLE IF EXISTS jvm_memory_metrics; DROP TABLE IF EXISTS jvm_gc_metrics; DROP TABLE IF EXISTS task_histogram_buckets; DROP TABLE IF EXISTS stage_histogram_buckets; DROP TABLE IF EXISTS job_histogram_buckets; DROP TABLE IF EXISTS stage_governance;" 2>/dev/null || \
+            "DROP TABLE IF EXISTS task_metrics; DROP TABLE IF EXISTS stage_metrics; DROP TABLE IF EXISTS job_metrics; DROP TABLE IF EXISTS jvm_memory_metrics; DROP TABLE IF EXISTS jvm_gc_metrics; DROP TABLE IF EXISTS task_histogram_buckets; DROP TABLE IF EXISTS stage_histogram_buckets; DROP TABLE IF EXISTS job_histogram_buckets; DROP TABLE IF EXISTS stage_governance; DROP TABLE IF EXISTS sql_query_metrics; DROP TABLE IF EXISTS sql_query_table_metrics; DROP TABLE IF EXISTS hive_query_metrics; DROP TABLE IF EXISTS hive_table_io_metrics;" 2>/dev/null || \
             warn "Could not clean ClickHouse tables (may not exist yet)"
     else
         kubectl exec "$MYSQL_POD" -- mysql -umetrics -pmetrics metrics_db -e \
-            "DROP TABLE IF EXISTS task_metrics, stage_metrics, job_metrics, jvm_memory_metrics, jvm_gc_metrics, task_histogram_buckets, stage_histogram_buckets, job_histogram_buckets, stage_governance;" 2>/dev/null || \
+            "DROP TABLE IF EXISTS task_metrics, stage_metrics, job_metrics, jvm_memory_metrics, jvm_gc_metrics, task_histogram_buckets, stage_histogram_buckets, job_histogram_buckets, stage_governance, sql_query_metrics, sql_query_table_metrics, hive_query_metrics, hive_table_io_metrics;" 2>/dev/null || \
             warn "Could not clean MySQL tables (may not exist yet)"
     fi
 
@@ -326,6 +384,145 @@ export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 cat /dev/urandom | tr -dc "a-zA-Z0-9 " | fold -w 100 | head -n 100000 > /tmp/spark-io-input.txt
 echo "Local IO file ready ($(wc -c < /tmp/spark-io-input.txt) bytes)"
 '
+
+    # Write PySpark SQL benchmark script to spark3
+    log "Writing PySpark SQL benchmark script to spark3..."
+    kubectl exec "$SPARK3_POD" -- bash -c 'cat > /tmp/spark-sql-bench.py << "PYEOF"
+import sys
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
+
+spark = SparkSession.builder.getOrCreate()
+mode = sys.argv[1] if len(sys.argv) > 1 else "scan"
+
+if mode == "scan":
+    # SCAN: create Parquet, read back with filter -> FileSourceScanExec
+    df = spark.range(10000).withColumn("v", F.rand() * 1000)
+    df.write.mode("overwrite").parquet("/tmp/bench-scan.parquet")
+    spark.read.parquet("/tmp/bench-scan.parquet").filter("v > 500").count()
+
+elif mode == "join":
+    # JOIN: two DataFrames -> BroadcastHashJoin or SortMergeJoin
+    df1 = spark.range(10000).withColumn("key", F.col("id") % 100)
+    df2 = spark.range(5000).withColumn("key", F.col("id") % 100)
+    df1.join(df2, "key").count()
+
+elif mode == "groupby":
+    # GROUP BY + aggregation -> shuffle
+    df = spark.range(50000).withColumn("grp", F.col("id") % 50) \
+                           .withColumn("val", F.rand() * 1000)
+    df.groupBy("grp").agg(F.sum("val"), F.count("*"), F.avg("val")).collect()
+
+elif mode == "write":
+    # SCAN + WRITE -> FileSourceScanExec + DataWritingCommandExec
+    df = spark.range(10000).withColumn("name", F.lit("hello"))
+    df.write.mode("overwrite").parquet("/tmp/bench-write.parquet")
+    result = spark.read.parquet("/tmp/bench-write.parquet")
+    result.write.mode("overwrite").csv("/tmp/bench-write-csv")
+
+elif mode == "shuffle_sort":
+    # SHUFFLE-HEAVY: global sort on 500K rows -> full data shuffle across partitions
+    df = spark.range(500000).withColumn("rand_key", F.rand()) \
+                             .withColumn("bucket", F.col("id") % 20) \
+                             .withColumn("value", F.rand() * 10000)
+    df.repartition(8).sort("rand_key").write.mode("overwrite").parquet("/tmp/bench-sort-out.parquet")
+
+elif mode == "shuffle_join":
+    # SHUFFLE-HEAVY: 3-way join on large DataFrames -> multiple shuffle stages
+    orders = spark.range(200000).withColumn("customer_id", F.col("id") % 5000) \
+                                 .withColumn("product_id", F.col("id") % 1000) \
+                                 .withColumn("amount", F.rand() * 500)
+    customers = spark.range(5000).withColumn("region", F.when(F.col("id") % 3 == 0, "east") \
+                                                  .when(F.col("id") % 3 == 1, "west") \
+                                                  .otherwise("north"))
+    products = spark.range(1000).withColumn("category", F.when(F.col("id") % 5 == 0, "A") \
+                                                  .when(F.col("id") % 5 == 1, "B") \
+                                                  .otherwise("C"))
+    joined = orders.join(customers, orders.customer_id == customers.id) \
+                   .join(products, orders.product_id == products.id)
+    joined.groupBy("region", "category").agg(F.sum("amount"), F.count("*")).collect()
+
+elif mode == "shuffle_agg":
+    # SHUFFLE-HEAVY: wide aggregation + distinct + window -> multiple shuffle rounds
+    df = spark.range(500000).withColumn("grp1", F.col("id") % 200) \
+                             .withColumn("grp2", (F.col("id") / 1000).cast("int")) \
+                             .withColumn("val1", F.rand() * 1000) \
+                             .withColumn("val2", F.rand() * 500)
+    # Round 1: groupBy shuffle
+    agg1 = df.groupBy("grp1").agg(F.sum("val1").alias("s1"), F.avg("val2").alias("a2"))
+    # Round 2: join back shuffle
+    enriched = df.join(agg1, "grp1")
+    # Round 3: distinct shuffle
+    enriched.select("grp2").distinct().count()
+
+spark.stop()
+PYEOF'
+    ok "PySpark SQL benchmark script written"
+
+    # Deploy Hive hook JAR and prepare Hive benchmark tables (if Hive available)
+    if [[ "$HIVE_AVAILABLE" == "true" ]]; then
+        local hive_jar
+        hive_jar=$(ls /home/xmg333/spark-telemetry-listener/hive-telemetry-hook-dist/target/hive-telemetry-hook-dist-*-SNAPSHOT.jar 2>/dev/null || true)
+        if [[ -n "$hive_jar" ]]; then
+            log "Deploying Hive hook JAR to hadoop3..."
+            kubectl cp "$hive_jar" "$HADOOP3_POD":/opt/hive/lib/hive-telemetry-hook.jar
+
+            # Ensure hook config in hive-site.xml
+            log "Configuring Hive telemetry hook..."
+            kubectl exec "$HADOOP3_POD" -- bash -c '
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export HIVE_HOME=/opt/hive
+
+# Add hook config to hive-site.xml if not already present
+if ! grep -q "hive.telemetry.otel.exporter.endpoint" $HIVE_HOME/conf/hive-site.xml 2>/dev/null; then
+    # Insert before </configuration>
+    sed -i "s|</configuration>|<property><name>hive.exec.post.hooks</name><value>x.mg.metrics.hivetelemetry.HiveTelemetryHook</value></property>\n<property><name>hive.telemetry.otel.exporter.endpoint</name><value>http://'"$OTEL_IP"':4317</value></property>\n<property><name>hive.telemetry.otel.service.name</name><value>benchmark-hive</value></property>\n<property><name>hive.telemetry.otel.export.interval.ms</name><value>5000</value></property>\n</configuration>|" $HIVE_HOME/conf/hive-site.xml
+fi
+
+# Restart HiveServer2 to pick up hook
+# Kill existing process and wait for it to exit (avoid exit code 143 from SIGTERM)
+for pid in $(jps 2>/dev/null | grep HiveServer2 | awk "{print \$1}"); do
+    kill $pid 2>/dev/null || true
+done
+sleep 3
+# Ensure process is really gone
+for pid in $(jps 2>/dev/null | grep HiveServer2 | awk "{print \$1}"); do
+    kill -9 $pid 2>/dev/null || true
+done
+
+export HADOOP_HOME=/opt/hadoop
+nohup $HIVE_HOME/bin/hiveserver2 > /tmp/hiveserver2.log 2>&1 &
+echo $! > /tmp/hiveserver2.pid
+echo "HiveServer2 restarted with PID $(cat /tmp/hiveserver2.pid)"
+' || warn "Failed to configure Hive hook"
+
+            sleep 5
+
+            # Prepare benchmark tables
+            log "Preparing Hive benchmark tables..."
+            kubectl exec "$HADOOP3_POD" -- bash -c '
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export HIVE_HOME=/opt/hive
+export HADOOP_HOME=/opt/hadoop
+
+$HIVE_HOME/bin/beeline -u "jdbc:hive2://localhost:10000" -e "
+CREATE DATABASE IF NOT EXISTS bench_db;
+USE bench_db;
+CREATE TABLE IF NOT EXISTS orders (id INT, amount DOUBLE, customer STRING, region STRING) ROW FORMAT DELIMITED FIELDS TERMINATED BY \",\";
+CREATE TABLE IF NOT EXISTS products (id INT, name STRING, category STRING, price DOUBLE) ROW FORMAT DELIMITED FIELDS TERMINATED BY \",\";
+TRUNCATE TABLE orders;
+TRUNCATE TABLE products;
+INSERT INTO TABLE orders VALUES (1, 100.0, \"alice\", \"east\"), (2, 200.0, \"bob\", \"west\"), (3, 150.0, \"charlie\", \"east\"), (4, 300.0, \"alice\", \"north\"), (5, 250.0, \"bob\", \"south\");
+INSERT INTO TABLE products VALUES (1, \"widget\", \"hardware\", 10.0), (2, \"gadget\", \"electronics\", 25.0), (3, \"thingamajig\", \"hardware\", 15.0), (4, \"doohickey\", \"electronics\", 30.0), (5, \"whatchamacallit\", \"misc\", 5.0);
+" 2>/dev/null || warn "Hive benchmark table setup failed (tables may already exist)"
+' || warn "Hive benchmark table preparation skipped"
+            ok "Hive benchmark environment prepared"
+        else
+            warn "Hive hook JAR not found — Hive benchmark disabled"
+            HIVE_AVAILABLE=false
+        fi
+    fi
+
     ok "Environment prepared"
 }
 
@@ -414,6 +611,25 @@ submit_spark_job() {
 
     log "Submitting Spark job: $job_name (type=$job_type)"
 
+    case "$job_type" in
+        pi|groupby|wordcount|kmeans)
+            submit_scala_job "$job_type" "$job_name"
+            ;;
+        sql_scan|sql_join|sql_groupby|sql_write|sql_shuffle_sort|sql_shuffle_join|sql_shuffle_agg)
+            submit_sql_job "$job_type" "$job_name"
+            ;;
+        *)
+            fail "Unknown Spark job type: $job_type"
+            return
+            ;;
+    esac
+}
+
+# Submit Scala-based Spark example jobs (pi, groupby, wordcount, kmeans)
+submit_scala_job() {
+    local job_type=$1
+    local job_name=$2
+
     local spark_class=""
     local spark_args=""
 
@@ -438,24 +654,62 @@ submit_spark_job() {
             spark_class="org.apache.spark.examples.SparkKMeans"
             spark_args="3 5 10 4"
             ;;
-        *)
-            fail "Unknown Spark job type: $job_type"
-            return
-            ;;
     esac
 
     (
         kubectl exec "$SPARK3_POD" -- bash -c "
 export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export SPARK_HOME=/opt/spark
-\$SPARK_HOME/bin/spark-submit --master 'local[2]' \
+export HADOOP_CONF_DIR=/opt/spark/conf
+export YARN_CONF_DIR=/opt/spark/conf
+\$SPARK_HOME/bin/spark-submit --master yarn \
+    --deploy-mode cluster \
     --class ${spark_class} \
     --jars /opt/spark-telemetry-plugin.jar \
     --conf spark.plugins=x.mg.metrics.sparktelemetry.adapter.SparkTelemetryPlugin \
     --conf spark.telemetry.otel.exporter.endpoint=http://${OTEL_IP}:4317 \
     --conf spark.telemetry.otel.service.name=${job_name} \
     --conf spark.telemetry.otel.export.interval.ms=5000 \
-    \$SPARK_HOME/examples/jars/spark-examples_2.12-*.jar ${spark_args}
+    --conf spark.telemetry.metrics.stage.detailed=true \
+    --conf spark.telemetry.metrics.job.lifecycle=true \
+    --conf spark.executor.instances=1 \
+    --conf spark.executor.memory=512m \
+    --conf spark.executor.cores=1 \
+    ${SPARK_EXAMPLES_HDFS} ${spark_args}
+" > /tmp/spark-${job_name}.log 2>&1
+        echo $? > /tmp/spark-${job_name}.rc
+    ) &
+
+    SPARK_PIDS["$job_name"]=$!
+}
+
+# Submit PySpark SQL benchmark jobs (sql_scan, sql_join, sql_groupby, sql_write)
+submit_sql_job() {
+    local job_type=$1
+    local job_name=$2
+    local sql_mode="${job_type#sql_}"
+
+    (
+        kubectl exec "$SPARK3_POD" -- bash -c "
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export SPARK_HOME=/opt/spark
+export HADOOP_CONF_DIR=/opt/spark/conf
+export YARN_CONF_DIR=/opt/spark/conf
+export PYSPARK_PYTHON=python3
+\$SPARK_HOME/bin/spark-submit --master yarn \
+    --deploy-mode cluster \
+    --jars /opt/spark-telemetry-plugin.jar \
+    --conf spark.plugins=x.mg.metrics.sparktelemetry.adapter.SparkTelemetryPlugin \
+    --conf spark.telemetry.otel.exporter.endpoint=http://${OTEL_IP}:4317 \
+    --conf spark.telemetry.otel.service.name=${job_name} \
+    --conf spark.telemetry.otel.export.interval.ms=5000 \
+    --conf spark.telemetry.metrics.sql.query-execution=true \
+    --conf spark.telemetry.metrics.stage.detailed=true \
+    --conf spark.telemetry.metrics.job.lifecycle=true \
+    --conf spark.executor.instances=1 \
+    --conf spark.executor.memory=512m \
+    --conf spark.executor.cores=1 \
+    /tmp/spark-sql-bench.py ${sql_mode}
 " > /tmp/spark-${job_name}.log 2>&1
         echo $? > /tmp/spark-${job_name}.rc
     ) &
@@ -534,6 +788,53 @@ hadoop jar \$EXAMPLES_JAR ${mr_class} ${mr_args}
     ) &
 
     MR_PIDS["$job_name"]=$!
+}
+
+submit_hive_job() {
+    local job_type=$1
+    local job_name="hive-${job_type}-$(date +%s)"
+    ((HIVE_SUBMITTED++)) || true
+
+    log "Submitting Hive job: $job_name (type=$job_type)"
+
+    local hive_query=""
+    case "$job_type" in
+        select)
+            # Simple SELECT with filter
+            hive_query="USE bench_db; SELECT * FROM orders WHERE region = 'east';"
+            ;;
+        join)
+            # JOIN two tables
+            hive_query="USE bench_db; SELECT o.id, o.amount, p.name, p.category FROM orders o JOIN products p ON o.id = p.id;"
+            ;;
+        groupby)
+            # GROUP BY with aggregation
+            hive_query="USE bench_db; SELECT region, COUNT(*), SUM(amount), AVG(amount) FROM orders GROUP BY region;"
+            ;;
+        ctas)
+            # CREATE TABLE AS SELECT — exercises write path
+            hive_query="USE bench_db; DROP TABLE IF EXISTS bench_agg; CREATE TABLE bench_agg AS SELECT region, COUNT(*) as cnt, SUM(amount) as total FROM orders GROUP BY region;"
+            ;;
+        orderby)
+            # ORDER BY — exercises shuffle/sort
+            hive_query="USE bench_db; SELECT * FROM orders ORDER BY amount DESC;"
+            ;;
+        *)
+            fail "Unknown Hive job type: $job_type"
+            return
+            ;;
+    esac
+
+    (
+        kubectl exec "$HADOOP3_POD" -- bash -c "
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export HIVE_HOME=/opt/hive
+\$HIVE_HOME/bin/beeline -u 'jdbc:hive2://localhost:10000' -e \"${hive_query}\"
+" > /tmp/hive-${job_name}.log 2>&1
+        echo $? > /tmp/hive-${job_name}.rc
+    ) &
+
+    HIVE_PIDS["$job_name"]=$!
 }
 
 check_health() {
@@ -675,6 +976,27 @@ collect_finished_jobs() {
             unset 'MR_PIDS[$job_name]'
         fi
     done
+
+    # Check Hive jobs
+    for job_name in "${!HIVE_PIDS[@]}"; do
+        local pid=${HIVE_PIDS[$job_name]}
+        if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid" 2>/dev/null || true
+            local rc_file="/tmp/hive-${job_name}.rc"
+            if [[ -f "$rc_file" ]]; then
+                local rc
+                rc=$(cat "$rc_file")
+                if [[ "$rc" == "0" ]]; then
+                    ((HIVE_SUCCEEDED++)) || true
+                else
+                    ((HIVE_FAILED++)) || true
+                    warn "Hive job $job_name failed (rc=$rc)"
+                fi
+            fi
+            rm -f "$rc_file"
+            unset 'HIVE_PIDS[$job_name]'
+        fi
+    done
 }
 
 phase5_main_loop() {
@@ -682,18 +1004,21 @@ phase5_main_loop() {
 
     declare -A SPARK_PIDS
     declare -A MR_PIDS
+    declare -A HIVE_PIDS
 
     local start_time
     start_time=$(date +%s)
     local last_spark=0
     local last_mr=0
+    local last_hive=0
     local last_health=0
     local elapsed=0
     local iteration=0
 
     # Job type rotation
-    local spark_types=("pi" "groupby" "wordcount" "kmeans")
+    local spark_types=("pi" "groupby" "wordcount" "kmeans" "sql_scan" "sql_join" "sql_groupby" "sql_write" "sql_shuffle_sort" "sql_shuffle_join" "sql_shuffle_agg")
     local mr_types=("wordcount" "randomtextwriter" "sort" "terasort")
+    local hive_types=("select" "join" "groupby" "ctas" "orderby")
 
     while true; do
         local now
@@ -732,6 +1057,16 @@ phase5_main_loop() {
             fi
         fi
 
+        # Submit Hive job if interval elapsed — only if Hive is available
+        if [[ "$HIVE_AVAILABLE" == "true" ]]; then
+            local since_hive=$(( now - last_hive ))
+            if [[ "$since_hive" -ge "$HIVE_JOB_INTERVAL" ]]; then
+                local type_idx=$(( (iteration - 1) % ${#hive_types[@]} ))
+                submit_hive_job "${hive_types[$type_idx]}"
+                last_hive=$now
+            fi
+        fi
+
         # Health check every 30 seconds
         local since_health=$(( now - last_health ))
         if [[ "$since_health" -ge 30 ]]; then
@@ -751,7 +1086,7 @@ phase5_main_loop() {
     wait_start=$(date +%s)
     while true; do
         collect_finished_jobs
-        local remaining=$(( ${#SPARK_PIDS[@]} + ${#MR_PIDS[@]} ))
+        local remaining=$(( ${#SPARK_PIDS[@]} + ${#MR_PIDS[@]} + ${#HIVE_PIDS[@]} ))
         if [[ "$remaining" -eq 0 ]]; then
             break
         fi
@@ -762,12 +1097,13 @@ phase5_main_loop() {
             # Count timed-out jobs as failed
             SPARK_FAILED=$((SPARK_FAILED + ${#SPARK_PIDS[@]}))
             MR_FAILED=$((MR_FAILED + ${#MR_PIDS[@]}))
+            HIVE_FAILED=$((HIVE_FAILED + ${#HIVE_PIDS[@]}))
             break
         fi
         sleep 5
     done
 
-    log "Main loop complete. Spark: ${SPARK_SUBMITTED} submitted, ${SPARK_SUCCEEDED} ok, ${SPARK_FAILED} fail | MR: ${MR_SUBMITTED} submitted, ${MR_SUCCEEDED} ok, ${MR_FAILED} fail"
+    log "Main loop complete. Spark: ${SPARK_SUBMITTED} submitted, ${SPARK_SUCCEEDED} ok, ${SPARK_FAILED} fail | MR: ${MR_SUBMITTED} submitted, ${MR_SUCCEEDED} ok, ${MR_FAILED} fail | Hive: ${HIVE_SUBMITTED} submitted, ${HIVE_SUCCEEDED} ok, ${HIVE_FAILED} fail"
 }
 
 ##############################################################################
@@ -825,6 +1161,8 @@ phase7_verify_report() {
     log "Checking data in $SINK_TYPE..."
 
     local task_rows=0 stage_rows=0 job_rows=0 gov_rows=0 mem_rows=0 gc_rows=0 bucket_rows=0
+    local sql_query_rows=0 sql_table_rows=0
+    local hive_query_rows=0 hive_table_rows=0
     local tables_found=""
 
     if [[ "$SINK_TYPE" == "clickhouse" ]]; then
@@ -842,6 +1180,14 @@ phase7_verify_report() {
             "SELECT count() FROM jvm_gc_metrics" 2>/dev/null || echo "0")
         bucket_rows=$(kubectl exec "$CLICKHOUSE_POD" -- clickhouse-client -q \
             "SELECT count() FROM task_histogram_buckets" 2>/dev/null || echo "0")
+        sql_query_rows=$(kubectl exec "$CLICKHOUSE_POD" -- clickhouse-client -q \
+            "SELECT count() FROM sql_query_metrics" 2>/dev/null || echo "0")
+        sql_table_rows=$(kubectl exec "$CLICKHOUSE_POD" -- clickhouse-client -q \
+            "SELECT count() FROM sql_query_table_metrics" 2>/dev/null || echo "0")
+        hive_query_rows=$(kubectl exec "$CLICKHOUSE_POD" -- clickhouse-client -q \
+            "SELECT count() FROM hive_query_metrics" 2>/dev/null || echo "0")
+        hive_table_rows=$(kubectl exec "$CLICKHOUSE_POD" -- clickhouse-client -q \
+            "SELECT count() FROM hive_table_io_metrics" 2>/dev/null || echo "0")
         tables_found=$(kubectl exec "$CLICKHOUSE_POD" -- clickhouse-client -q \
             "SHOW TABLES" 2>/dev/null || echo "")
     else
@@ -859,6 +1205,14 @@ phase7_verify_report() {
             "SELECT count(*) FROM jvm_gc_metrics" 2>/dev/null || echo "0")
         bucket_rows=$(kubectl exec "$MYSQL_POD" -- mysql -umetrics -pmetrics metrics_db -N -e \
             "SELECT count(*) FROM task_histogram_buckets" 2>/dev/null || echo "0")
+        sql_query_rows=$(kubectl exec "$MYSQL_POD" -- mysql -umetrics -pmetrics metrics_db -N -e \
+            "SELECT count(*) FROM sql_query_metrics" 2>/dev/null || echo "0")
+        sql_table_rows=$(kubectl exec "$MYSQL_POD" -- mysql -umetrics -pmetrics metrics_db -N -e \
+            "SELECT count(*) FROM sql_query_table_metrics" 2>/dev/null || echo "0")
+        hive_query_rows=$(kubectl exec "$MYSQL_POD" -- mysql -umetrics -pmetrics metrics_db -N -e \
+            "SELECT count(*) FROM hive_query_metrics" 2>/dev/null || echo "0")
+        hive_table_rows=$(kubectl exec "$MYSQL_POD" -- mysql -umetrics -pmetrics metrics_db -N -e \
+            "SELECT count(*) FROM hive_table_io_metrics" 2>/dev/null || echo "0")
         tables_found=$(kubectl exec "$MYSQL_POD" -- mysql -umetrics -pmetrics metrics_db -N -e \
             "SHOW TABLES" 2>/dev/null || echo "")
     fi
@@ -867,6 +1221,8 @@ phase7_verify_report() {
     log "task_metrics: $task_rows | stage_metrics: $stage_rows | job_metrics: $job_rows"
     log "stage_governance: $gov_rows | jvm_memory: $mem_rows | jvm_gc: $gc_rows"
     log "histogram_buckets: $bucket_rows"
+    log "sql_query_metrics: $sql_query_rows | sql_query_table_metrics: $sql_table_rows"
+    log "hive_query_metrics: $hive_query_rows | hive_table_io_metrics: $hive_table_rows"
 
     # Sample data from task_metrics
     log "Sample task_metrics data:"
@@ -890,6 +1246,28 @@ phase7_verify_report() {
         fi
     fi
 
+    # Sample data from SQL tables
+    if [[ "$sql_query_rows" -gt 0 ]]; then
+        log "Sample sql_query_metrics data:"
+        if [[ "$SINK_TYPE" == "clickhouse" ]]; then
+            kubectl exec "$CLICKHOUSE_POD" -- clickhouse-client -q \
+                "SELECT app_id, execution_id, duration_ms, join_count FROM sql_query_metrics LIMIT 3" 2>/dev/null || true
+        else
+            kubectl exec "$MYSQL_POD" -- mysql -umetrics -pmetrics metrics_db -e \
+                "SELECT app_id, execution_id, duration_ms, join_count FROM sql_query_metrics LIMIT 3;" 2>/dev/null || true
+        fi
+    fi
+    if [[ "$sql_table_rows" -gt 0 ]]; then
+        log "Sample sql_query_table_metrics data:"
+        if [[ "$SINK_TYPE" == "clickhouse" ]]; then
+            kubectl exec "$CLICKHOUSE_POD" -- clickhouse-client -q \
+                "SELECT app_id, execution_id, table_name, operation, bytes, \`rows\` FROM sql_query_table_metrics LIMIT 3" 2>/dev/null || true
+        else
+            kubectl exec "$MYSQL_POD" -- mysql -umetrics -pmetrics metrics_db -e \
+                "SELECT app_id, execution_id, table_name, operation, bytes, \`rows\` FROM sql_query_table_metrics LIMIT 3;" 2>/dev/null || true
+        fi
+    fi
+
     # --- Data volume checks ---
     if [[ "$task_rows" -eq 0 ]]; then
         fail "No task_metrics data found!"
@@ -900,6 +1278,38 @@ phase7_verify_report() {
     fi
     if [[ "$gov_rows" -eq 0 ]]; then
         warn "No stage_governance data found"
+    fi
+    if [[ "$sql_query_rows" -eq 0 ]]; then
+        warn "No sql_query_metrics data found (SQL jobs may not have completed yet)"
+    fi
+
+    # Sample data from Hive tables
+    if [[ "$hive_query_rows" -gt 0 ]]; then
+        log "Sample hive_query_metrics data:"
+        if [[ "$SINK_TYPE" == "clickhouse" ]]; then
+            kubectl exec "$CLICKHOUSE_POD" -- clickhouse-client -q \
+                "SELECT query_id, operation, user_name, success, duration_ms FROM hive_query_metrics LIMIT 3" 2>/dev/null || true
+        else
+            kubectl exec "$MYSQL_POD" -- mysql -umetrics -pmetrics metrics_db -e \
+                "SELECT query_id, operation, user_name, success, duration_ms FROM hive_query_metrics LIMIT 3;" 2>/dev/null || true
+        fi
+    fi
+    if [[ "$hive_table_rows" -gt 0 ]]; then
+        log "Sample hive_table_io_metrics data:"
+        if [[ "$SINK_TYPE" == "clickhouse" ]]; then
+            kubectl exec "$CLICKHOUSE_POD" -- clickhouse-client -q \
+                "SELECT query_id, table_name, table_type, operation FROM hive_table_io_metrics LIMIT 3" 2>/dev/null || true
+        else
+            kubectl exec "$MYSQL_POD" -- mysql -umetrics -pmetrics metrics_db -e \
+                "SELECT query_id, table_name, table_type, operation FROM hive_table_io_metrics LIMIT 3;" 2>/dev/null || true
+        fi
+    fi
+
+    # --- Data volume checks for Hive ---
+    if [[ "$HIVE_AVAILABLE" == "true" ]]; then
+        if [[ "$hive_query_rows" -eq 0 ]]; then
+            warn "No hive_query_metrics data found (Hive queries may not have completed yet)"
+        fi
     fi
 
     # --- Data freshness check ---
@@ -914,7 +1324,7 @@ phase7_verify_report() {
     log "Latest data timestamp: $latest_ts"
 
     # --- Generate report ---
-    local total_rows=$((task_rows + stage_rows + job_rows + gov_rows + mem_rows + gc_rows + bucket_rows))
+    local total_rows=$((task_rows + stage_rows + job_rows + gov_rows + mem_rows + gc_rows + bucket_rows + sql_query_rows + sql_table_rows + hive_query_rows + hive_table_rows))
     echo ""
     echo "============================================"
     echo "  Benchmark Report"
@@ -924,8 +1334,9 @@ phase7_verify_report() {
     echo ""
     echo "Spark jobs:         $SPARK_SUBMITTED submitted, $SPARK_SUCCEEDED succeeded, $SPARK_FAILED failed"
     echo "MR jobs:            $MR_SUBMITTED submitted, $MR_SUCCEEDED succeeded, $MR_FAILED failed"
+    echo "Hive jobs:          $HIVE_SUBMITTED submitted, $HIVE_SUCCEEDED succeeded, $HIVE_FAILED failed"
     echo ""
-    echo "Pipeline (9 tables, total $total_rows rows):"
+    echo "Pipeline (13 tables, total $total_rows rows):"
     echo "  task_metrics:     $task_rows rows"
     echo "  stage_metrics:    $stage_rows rows"
     echo "  job_metrics:      $job_rows rows"
@@ -933,6 +1344,10 @@ phase7_verify_report() {
     echo "  jvm_memory:       $mem_rows rows"
     echo "  jvm_gc:           $gc_rows rows"
     echo "  hist_buckets:     $bucket_rows rows"
+    echo "  sql_query:        $sql_query_rows rows"
+    echo "  sql_table_io:     $sql_table_rows rows"
+    echo "  hive_query:       $hive_query_rows rows"
+    echo "  hive_table_io:    $hive_table_rows rows"
     echo "  Latest data:      $latest_ts"
     echo ""
     echo "Errors:"
@@ -955,8 +1370,11 @@ phase7_verify_report() {
         echo "Duration: ${BENCHMARK_DURATION}s, Sink: $SINK_TYPE"
         echo "Spark: $SPARK_SUBMITTED/$SPARK_SUCCEEDED/$SPARK_FAILED"
         echo "MR: $MR_SUBMITTED/$MR_SUCCEEDED/$MR_FAILED"
+        echo "Hive: $HIVE_SUBMITTED/$HIVE_SUCCEEDED/$HIVE_FAILED"
         echo "task_metrics: $task_rows, stage_metrics: $stage_rows, job_metrics: $job_rows"
         echo "stage_governance: $gov_rows, jvm_memory: $mem_rows, jvm_gc: $gc_rows, hist_buckets: $bucket_rows"
+        echo "sql_query_metrics: $sql_query_rows, sql_query_table_metrics: $sql_table_rows"
+        echo "hive_query_metrics: $hive_query_rows, hive_table_io_metrics: $hive_table_rows"
         echo "Flink errors: $flink_errors, MR errors: $mr_errors, Health failures: $HEALTH_ERRORS"
     } > "$report_file"
     log "Report saved to $report_file"
