@@ -37,6 +37,7 @@
         <mysql-connector.version>8.0.33</mysql-connector.version>
         <clickhouse-jdbc.version>0.4.6</clickhouse-jdbc.version>
         <gson.version>2.10.1</gson.version>
+        <hive.version>2.3.9</hive.version>
     </properties>
 
     <dependencyManagement>
@@ -137,6 +138,14 @@
                 <version>${gson.version}</version>
             </dependency>
 
+            <!-- Hive -->
+            <dependency>
+                <groupId>org.apache.hive</groupId>
+                <artifactId>hive-exec</artifactId>
+                <version>${hive.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
             <!-- Spark (provided) -->
             <dependency>
                 <groupId>org.apache.spark</groupId>
@@ -219,6 +228,25 @@
                 <module>integration-tests</module>
                 <module>metrics-flink-consumer</module>
                 <module>metrics-flink-consumer-dist</module>
+                <module>hive-telemetry-hook</module>
+                <module>hive-telemetry-hook-dist</module>
+            </modules>
+        </profile>
+
+        <profile>
+            <id>omni</id>
+            <properties>
+                <scala.version>2.12.18</scala.version>
+                <scala.binary.version>2.12</scala.binary.version>
+                <spark.version>3.5.5</spark.version>
+                <maven.compiler.source>1.8</maven.compiler.source>
+                <maven.compiler.target>1.8</maven.compiler.target>
+            </properties>
+            <modules>
+                <module>spark-telemetry-common</module>
+                <module>spark-telemetry-omni-facade</module>
+                <module>spark-telemetry-adapters-relocated</module>
+                <module>spark-telemetry-dist-omni</module>
             </modules>
         </profile>
 

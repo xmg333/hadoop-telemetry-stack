@@ -1,0 +1,34 @@
+# Hive Telemetry Hook Configuration Example
+# Place this file on the HiveServer2 classpath as hive-telemetry.conf
+# Or specify path via hive.telemetry.config.path in hive-site.xml
+
+hive-telemetry {
+  otel {
+    # OTel Collector gRPC endpoint
+    exporter.endpoint = "http://localhost:4317"
+    # Service name identifier
+    service.name = "hive-server2"
+    # Export interval in milliseconds
+    export.interval.ms = 10000
+  }
+
+  metrics {
+    # Master switch
+    enabled = true
+    # Query duration histogram
+    query.duration = true
+    # IO counters (bytes read/written, rows read/written)
+    query.io = true
+    # Per-table input/output tracking
+    query.tables = true
+  }
+
+  filter {
+    # Regex patterns for user filtering
+    user.include = [".*"]
+    user.exclude = []
+    # Regex patterns for operation filtering (QUERY, CREATETABLE, LOAD, etc.)
+    operation.include = [".*"]
+    operation.exclude = []
+  }
+}

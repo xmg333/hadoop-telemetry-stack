@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hive
+  labels:
+    app: hive
+spec:
+  containers:
+  - name: hive
+    image: ubuntu:22.04
+    command: ["sleep", "infinity"]
+    ports:
+    - containerPort: 9083   # Metastore
+    - containerPort: 10000  # HiveServer2
+    - containerPort: 10002  # HiveServer2 Web UI
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hive
+spec:
+  selector:
+    app: hive
+  ports:
+  - name: metastore
+    port: 9083
+  - name: hiveserver2
+    port: 10000
+  - name: hs2-web
+    port: 10002
