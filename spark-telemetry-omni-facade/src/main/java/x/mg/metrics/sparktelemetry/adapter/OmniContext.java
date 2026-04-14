@@ -12,9 +12,12 @@ public class OmniContext {
         try {
             Class.forName("org.apache.spark.api.plugin.SparkPlugin");
             // Spark 3.x or 4.x — distinguish by Scala version
-            // scala.jdk.CollectionConverters was introduced in Scala 2.13
+            // scala.collection.IterableOnce was introduced in Scala 2.13
+            // NOTE: Do NOT use scala.jdk.CollectionConverters — it's backported
+            // to Scala 2.12 by scala-collection-compat (bundled with Spark 3.2+),
+            // causing false Scala 2.13 detection.
             try {
-                Class.forName("scala.jdk.CollectionConverters");
+                Class.forName("scala.collection.IterableOnce");
                 return "4"; // Scala 2.13 → use v4 adapter (Spark 4.x)
             } catch (ClassNotFoundException e) {
                 // Spark 3.x (Scala 2.12) — probe sub-version by API existence

@@ -58,9 +58,10 @@ class TelemetryDriverPlugin extends DriverPlugin with org.apache.spark.internal.
             val deferred = new org.apache.spark.scheduler.SparkListener {
               override def onJobStart(jobStart: org.apache.spark.scheduler.SparkListenerJobStart): Unit = {
                 try {
-                  // At this point SparkContext is fully initialized, so getOrCreate() is safe
-                  val session = org.apache.spark.sql.SparkSession.getActiveSession.getOrElse(
-                    org.apache.spark.sql.SparkSession.builder().getOrCreate())
+                  val activeOpt = org.apache.spark.sql.SparkSession.getActiveSession
+                  val defaultOpt = org.apache.spark.sql.SparkSession.getDefaultSession
+                  val session = activeOpt.orElse(defaultOpt)
+                    .getOrElse(org.apache.spark.sql.SparkSession.builder().getOrCreate())
                   session.listenerManager.register(qel)
                   logInfo("QueryExecutionListener registered for SQL metrics capture (deferred)")
                 } catch {

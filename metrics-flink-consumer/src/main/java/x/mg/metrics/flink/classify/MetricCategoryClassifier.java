@@ -167,7 +167,12 @@ public class MetricCategoryClassifier {
                   .append('|').append(labels.get("gc_name"));
                 break;
             case SQL_EXECUTION:
-                sb.append('|').append(labels.get("spark.app.id"))
+                // Use only app_id + execution_id as key (NOT timestamp).
+                // OTLP exports duration_ms and join_count as separate data points with
+                // potentially different timestamps; including timestampMs would split them
+                // into different rows, preventing wide-row aggregation.
+                sb.setLength(0); // clear timestamp prefix
+                sb.append(labels.get("spark.app.id"))
                   .append('|').append(labels.get("spark.sql.execution_id"));
                 break;
             case SQL_TABLE_IO:

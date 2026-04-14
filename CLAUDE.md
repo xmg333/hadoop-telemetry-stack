@@ -83,9 +83,13 @@ The omnipackage (`spark-telemetry-dist-omni`) produces a single JAR supporting S
 **Solution**: Package relocation + facade pattern:
 1. Each adapter is relocated to `x.mg.metrics.sparktelemetry.adapter.internal.v{2,3,4}` via `maven-shade-plugin` in `spark-telemetry-adapters-relocated`
 2. Pure Java facade classes at the original package delegate to the version-specific adapter via reflection
-3. Version detection uses `Class.forName` probing — `OmniContext.java` checks for `SparkPlugin` (Spark 3+) and `scala.jdk.CollectionConverters` (Scala 2.13/Spark 4)
+3. Version detection uses `Class.forName` probing — `OmniContext.java` checks for `SparkPlugin` (Spark 3+) and `scala.collection.IterableOnce` (Scala 2.13/Spark 4)
 
-**Key design decision — version detection**: Must use `Class.forName("scala.jdk.CollectionConverters")` NOT `Package.getPackage("scala").getImplementationVersion()`. The `Package` API returns null during early Spark plugin initialization, causing Scala 2.13 runtimes to incorrectly select the v3 adapter.
+**Key design decision — version detection**:
+- Must use `Class.forName("scala.collection.IterableOnce")` to detect Scala 2.13. Do NOT use `scala.jdk.CollectionConverters` — it is backported to Scala 2.12 by `scala-collection-compat` (bundled with Spark 3.2+), causing false Scala 2.13 detection and loading the v4 adapter (compiled with Scala 2.13) on Scala 2.12 runtimes, which crashes with `ClassNotFoundException: scala.$less$colon$less`.
+- Must use `Package.getPackage("scala").getImplementationVersion()` is unreliable — returns null during early Spark plugin initialization.
+
+**Key design decision — classloader**: The facade `SparkTelemetryPlugin` must use `SparkTelemetryPlugin.class.getClassLoader()` (child classloader that has `--jars`), NOT `SparkPlugin.class.getClassLoader()` (parent classloader). The parent classloader cannot see the relocated adapter classes (`internal.v32` etc.) that live in the same JAR. Using the wrong classloader causes `ClassNotFoundException` for version-specific adapters.
 
 **Build process**: `build-omni.sh` performs a 7-stage Maven build: common → adapters (3 profiles) → MR modules → relocate → facade + dist. The `omni` profile only includes common, omni-facade, adapters-relocated, and dist-omni modules. Adapter modules are built separately with their own Scala/Spark profiles.
 

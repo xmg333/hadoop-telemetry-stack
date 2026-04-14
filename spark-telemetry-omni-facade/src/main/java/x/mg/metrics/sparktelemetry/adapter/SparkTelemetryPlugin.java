@@ -16,7 +16,10 @@ import org.apache.spark.api.plugin.SparkPlugin;
  */
 public class SparkTelemetryPlugin implements SparkPlugin {
 
-    private static final ClassLoader SPARK_CLASSLOADER = SparkPlugin.class.getClassLoader();
+    // Use the facade class's own classloader (child URLClassLoader from --jars),
+    // NOT SparkPlugin's classloader (parent classloader) — the parent cannot see
+    // the relocated adapter classes (internal.v32 etc.) that live in the same JAR.
+    private static final ClassLoader PLUGIN_CLASSLOADER = SparkTelemetryPlugin.class.getClassLoader();
 
     @Override
     public DriverPlugin driverPlugin() {
@@ -24,7 +27,7 @@ public class SparkTelemetryPlugin implements SparkPlugin {
         try {
             @SuppressWarnings("unchecked")
             Class<? extends DriverPlugin> clazz =
-                    (Class<? extends DriverPlugin>) Class.forName(pkg + ".TelemetryDriverPlugin", true, SPARK_CLASSLOADER);
+                    (Class<? extends DriverPlugin>) Class.forName(pkg + ".TelemetryDriverPlugin", true, PLUGIN_CLASSLOADER);
             return clazz.getConstructor().newInstance();
         } catch (Exception e) {
             throw new RuntimeException("Failed to create DriverPlugin for Spark " + OmniContext.getVersion(), e);
@@ -37,7 +40,7 @@ public class SparkTelemetryPlugin implements SparkPlugin {
         try {
             @SuppressWarnings("unchecked")
             Class<? extends ExecutorPlugin> clazz =
-                    (Class<? extends ExecutorPlugin>) Class.forName(pkg + ".TelemetryExecutorPlugin", true, SPARK_CLASSLOADER);
+                    (Class<? extends ExecutorPlugin>) Class.forName(pkg + ".TelemetryExecutorPlugin", true, PLUGIN_CLASSLOADER);
             return clazz.getConstructor().newInstance();
         } catch (Exception e) {
             throw new RuntimeException("Failed to create ExecutorPlugin for Spark " + OmniContext.getVersion(), e);

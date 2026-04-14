@@ -1,6 +1,7 @@
 package x.mg.metrics.sparktelemetry.adapter
 
 import org.apache.spark.sql.execution.{FileSourceScanExec, QueryExecution, SparkPlan}
+import org.apache.spark.sql.execution.adaptive.{AdaptiveSparkPlanExec, QueryStageExec}
 import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.execution.joins._
@@ -45,8 +46,35 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
     (queryMetrics, tableMetrics)
   }
 
+  /**
+   * Traverse the physical plan tree, unwrapping AQE nodes.
+   *
+   * Spark 3.x/4.x AQE: AdaptiveSparkPlanExec and QueryStageExec extend LeafExecNode (children=Nil),
+   * which makes the default `plan foreach` skip all inner plan nodes.
+   * We must extract their inner plans manually to reach joins, scans, and exchanges.
+   */
   private def collectPlanMetrics(plan: SparkPlan, qm: SqlExecutionMetrics, tm: java.util.List[SqlTableIOMetrics]): Unit = {
-    plan foreach {
+    visit(plan, qm, tm)
+  }
+
+  private def visit(plan: SparkPlan, qm: SqlExecutionMetrics, tm: java.util.List[SqlTableIOMetrics]): Unit = {
+    // Unwrap AQE wrappers that hide inner plans
+    plan match {
+      case a: AdaptiveSparkPlanExec =>
+        // AdaptiveSparkPlanExec extends LeafExecNode, children=Nil
+        // Use public inputPlan() method to get the inner plan
+        visit(a.inputPlan, qm, tm)
+        return
+      case q: QueryStageExec =>
+        // QueryStageExec extends LeafExecNode, children=Nil
+        // Use public plan() method to get the inner plan
+        visit(q.plan, qm, tm)
+        return
+      case _ =>
+    }
+
+    // Handle the current node
+    plan match {
       case s: FileSourceScanExec =>
         val tableMetric = new SqlTableIOMetrics
         tableMetric.setOperation("scan")
@@ -100,6 +128,9 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
 
       case _ =>
     }
+
+    // Recurse into children
+    plan.children.foreach(c => visit(c, qm, tm))
   }
 
   private def metricValue(plan: SparkPlan, name: String): Long = {
