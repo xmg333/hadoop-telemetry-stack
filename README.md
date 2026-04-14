@@ -37,7 +37,9 @@
 | **Spark Telemetry Plugin** | 透明 Spark 插件，捕获任务/阶段 IO 指标及 JVM 系统指标 |
 | **MR Telemetry Collector** | 独立 Java 应用，轮询 Hadoop History Server 采集 MR 作业指标 |
 | **MR Telemetry Agent** | Java Agent，通过字节码增强实时采集 MR 任务级指标 |
+| **Hive Telemetry Hook** | Hive 查询 Hook，捕获 HiveServer2 查询指标（支持 MR 和 Spark 引擎） |
 | **Flink Metrics Consumer** | Flink 作业，消费 Kafka 中的 OTLP 指标写入 MySQL / ClickHouse |
+| **Omnipackage** | 统一 JAR，自动检测 Spark 版本（2/3/4），同时包含 MR 和 Hive 组件 |
 
 ## 支持版本
 
@@ -49,41 +51,18 @@
 
 ## 快速开始
 
+详细的部署指南见 **[QUICKSTART.md](QUICKSTART.md)**，包含完整的构建、基础设施部署、组件配置和数据验证步骤。
+
 ### 构建
 
 ```bash
-# Spark 3.x（默认）
-mvn clean package -DskipTests
+# Omnipackage（推荐，单 JAR 支持 Spark 2/3/4 + MR Agent/Collector + Hive Hook）
+chmod +x build-omni.sh && ./build-omni.sh
 
-# Spark 2.x
-mvn clean package -Pspark-2 -DskipTests
-
-# Spark 4.x
-mvn clean package -Pspark-4 -DskipTests
-```
-
-### Spark 插件部署
-
-```bash
-spark-submit \
-  --master yarn \
-  --jars spark-telemetry-plugin.jar \
-  --conf spark.plugins=x.mg.metrics.sparktelemetry.adapter.SparkTelemetryPlugin \
-  --conf spark.telemetry.otel.exporter.endpoint=http://otel-collector:4317 \
-  --conf spark.telemetry.otel.service.name=my-spark-app \
-  your-app.jar
-```
-
-### MR Collector 部署
-
-```bash
-java -jar mr-telemetry-dist.jar mr-collector.conf
-```
-
-### Flink Consumer 部署
-
-```bash
-java -jar metrics-flink-consumer-dist.jar flink-consumer.conf
+# 或单独构建各版本
+mvn clean package -DskipTests              # Spark 3.x（默认）
+mvn clean package -Pspark-2 -DskipTests    # Spark 2.x
+mvn clean package -Pspark-4 -DskipTests    # Spark 4.x
 ```
 
 ## 模块结构
@@ -92,9 +71,14 @@ java -jar metrics-flink-consumer-dist.jar flink-consumer.conf
 spark-telemetry-common/             # 核心库：配置、模型、OTel SDK、生命周期管理
 spark-telemetry-adapter-spark{2,3,4}/  # 各 Spark 版本适配层（Scala）
 spark-telemetry-dist-spark{2,3,4}/  # 各版本 Shaded Fat JAR
+spark-telemetry-omni-facade/        # Omnipackage Java 门面（自动检测 Spark 版本）
+spark-telemetry-adapters-relocated/ # 适配器重定位（v2/v3/v4 包隔离）
+spark-telemetry-dist-omni/          # 统一 Shaded Fat JAR（Spark 2/3/4 + MR + Hive）
 mr-telemetry-collector/             # MR 作业指标采集器（独立 Java 应用）
 mr-telemetry-agent/                 # MR 任务级 Agent（Java Agent）
 mr-telemetry-{agent-,}dist/         # Shaded Fat JAR
+hive-telemetry-hook/                # Hive 查询 Hook（ExecuteWithHookContext）
+hive-telemetry-hook-dist/           # Shaded Fat JAR
 metrics-flink-consumer/             # Flink 消费者（Kafka → MySQL / ClickHouse）
 metrics-flink-consumer-dist/        # Shaded Fat JAR
 integration-tests/                  # 集成测试（Spark 3）
@@ -138,16 +122,28 @@ integration-tests/                  # 集成测试（Spark 3）
 | MR Collector（作业级） | `mr.job.io.hdfs_bytes_read/written`, `mr.job.cpu_time_ms` |
 | MR Agent（任务级） | `mr.task.io.map_input_records`, `mr.task.cpu_time_ms` |
 
+### Hive 指标
+
+| 类别 | 示例指标 |
+|------|---------|
+| 查询执行 | `hive.query.duration_ms`, `hive.query.success` / `hive.query.failure` |
+| IO 指标 | `hive.query.input_bytes`, `hive.query.output_bytes`, `hive.query.input_rows`, `hive.query.output_rows` |
+| 表级统计 | `hive.query.input_tables`, `hive.query.output_tables` |
+
 ## Grafana 可视化
 
-项目提供预构建仪表盘 `grafana/spark-mr-telemetry-dashboard.json`，包含：
+`grafana/` 目录提供预构建仪表盘 JSON 文件：
 
-- 任务 IO / 时长时序趋势
-- JVM 内存 / GC 监控
-- 数据倾斜检测（duration/IO/shuffle skew ratio）
-- 资源效率分析（CPU/GC/Shuffle/Spill 开销）
-- 小文件检测
-- 任务时长直方图分布
+| 文件 | 面板名 | 说明 |
+|------|--------|------|
+| `overview.json` | Platform Telemetry Overview | 全平台总览 |
+| `spark.json` | Spark Telemetry | Task/Stage/SQL 指标 |
+| `mr.json` | MapReduce Telemetry | Job Level + Task Level |
+| `hive-mr.json` | Hive on MR Telemetry | Hive MR 引擎查询 |
+| `hive-spark.json` | Hive on Spark Telemetry | Hive Spark 引擎查询 |
+| `spark-mr-telemetry-dashboard.json` | Spark/MR/Hive 合并面板 | 综合视图 |
+
+面板覆盖：任务 IO / 时长时序趋势、JVM 内存 / GC 监控、数据倾斜检测、资源效率分析、小文件检测、任务时长直方图分布。
 
 ## 完整文档
 
