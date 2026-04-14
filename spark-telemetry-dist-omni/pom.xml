@@ -39,7 +39,19 @@
             <groupId>x.mg.metrics</groupId>
             <artifactId>spark-telemetry-adapters-relocated</artifactId>
             <version>${project.version}</version>
-            <classifier>spark3</classifier>
+            <classifier>spark30</classifier>
+        </dependency>
+        <dependency>
+            <groupId>x.mg.metrics</groupId>
+            <artifactId>spark-telemetry-adapters-relocated</artifactId>
+            <version>${project.version}</version>
+            <classifier>spark32</classifier>
+        </dependency>
+        <dependency>
+            <groupId>x.mg.metrics</groupId>
+            <artifactId>spark-telemetry-adapters-relocated</artifactId>
+            <version>${project.version}</version>
+            <classifier>spark35</classifier>
         </dependency>
         <dependency>
             <groupId>x.mg.metrics</groupId>

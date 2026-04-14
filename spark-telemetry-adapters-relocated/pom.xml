@@ -27,6 +27,24 @@
         </dependency>
         <dependency>
             <groupId>x.mg.metrics</groupId>
+            <artifactId>spark-telemetry-adapter-spark30</artifactId>
+            <version>${project.version}</version>
+            <exclusions>
+                <exclusion><groupId>org.apache.spark</groupId><artifactId>*</artifactId></exclusion>
+                <exclusion><groupId>org.scala-lang</groupId><artifactId>*</artifactId></exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>x.mg.metrics</groupId>
+            <artifactId>spark-telemetry-adapter-spark32</artifactId>
+            <version>${project.version}</version>
+            <exclusions>
+                <exclusion><groupId>org.apache.spark</groupId><artifactId>*</artifactId></exclusion>
+                <exclusion><groupId>org.scala-lang</groupId><artifactId>*</artifactId></exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>x.mg.metrics</groupId>
             <artifactId>spark-telemetry-adapter-spark3</artifactId>
             <version>${project.version}</version>
             <exclusions>
@@ -84,14 +102,78 @@
                         </configuration>
                     </execution>
 
-                    <!-- Relocate Spark 3.x adapter -->
+                    <!-- Relocate Spark 3.0.x adapter -->
                     <execution>
-                        <id>relocate-spark3</id>
+                        <id>relocate-spark30</id>
                         <phase>package</phase>
                         <goals><goal>shade</goal></goals>
                         <configuration>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
-                            <shadedClassifierName>spark3</shadedClassifierName>
+                            <shadedClassifierName>spark30</shadedClassifierName>
+                            <artifactSet>
+                                <includes>
+                                    <include>x.mg.metrics:spark-telemetry-adapter-spark30</include>
+                                </includes>
+                            </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>x.mg.metrics.sparktelemetry.adapter</pattern>
+                                    <shadedPattern>x.mg.metrics.sparktelemetry.adapter.internal.v30</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+
+                    <!-- Relocate Spark 3.2.x adapter -->
+                    <execution>
+                        <id>relocate-spark32</id>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>spark32</shadedClassifierName>
+                            <artifactSet>
+                                <includes>
+                                    <include>x.mg.metrics:spark-telemetry-adapter-spark32</include>
+                                </includes>
+                            </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>x.mg.metrics.sparktelemetry.adapter</pattern>
+                                    <shadedPattern>x.mg.metrics.sparktelemetry.adapter.internal.v32</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+
+                    <!-- Relocate Spark 3.5.x adapter -->
+                    <execution>
+                        <id>relocate-spark35</id>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>spark35</shadedClassifierName>
                             <artifactSet>
                                 <includes>
                                     <include>x.mg.metrics:spark-telemetry-adapter-spark3</include>
@@ -100,7 +182,7 @@
                             <relocations>
                                 <relocation>
                                     <pattern>x.mg.metrics.sparktelemetry.adapter</pattern>
-                                    <shadedPattern>x.mg.metrics.sparktelemetry.adapter.internal.v3</shadedPattern>
+                                    <shadedPattern>x.mg.metrics.sparktelemetry.adapter.internal.v35</shadedPattern>
                                 </relocation>
                             </relocations>
                             <filters>
