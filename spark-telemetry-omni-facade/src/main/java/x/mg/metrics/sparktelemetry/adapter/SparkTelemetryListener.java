@@ -20,6 +20,8 @@ import java.lang.reflect.Method;
  */
 public class SparkTelemetryListener extends SparkListener {
 
+    private static final ClassLoader SPARK_CLASSLOADER = org.apache.spark.scheduler.SparkListener.class.getClassLoader();
+
     private volatile Object delegate;
     private volatile Method onTaskEndMethod;
     private volatile Method onStageCompletedMethod;
@@ -32,7 +34,7 @@ public class SparkTelemetryListener extends SparkListener {
             if (delegate != null) return;
             try {
                 String className = OmniContext.getAdapterPackage() + ".SparkTelemetryListener";
-                Class<?> clazz = Class.forName(className);
+                Class<?> clazz = Class.forName(className, true, SPARK_CLASSLOADER);
                 // Spark 2.x adapter uses no-arg constructor with lazy init
                 delegate = clazz.getConstructor().newInstance();
 

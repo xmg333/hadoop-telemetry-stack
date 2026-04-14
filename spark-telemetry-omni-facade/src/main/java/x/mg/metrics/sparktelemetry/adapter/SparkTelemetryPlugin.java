@@ -16,13 +16,15 @@ import org.apache.spark.api.plugin.SparkPlugin;
  */
 public class SparkTelemetryPlugin implements SparkPlugin {
 
+    private static final ClassLoader SPARK_CLASSLOADER = SparkPlugin.class.getClassLoader();
+
     @Override
     public DriverPlugin driverPlugin() {
         String pkg = OmniContext.getAdapterPackage();
         try {
             @SuppressWarnings("unchecked")
             Class<? extends DriverPlugin> clazz =
-                    (Class<? extends DriverPlugin>) Class.forName(pkg + ".TelemetryDriverPlugin");
+                    (Class<? extends DriverPlugin>) Class.forName(pkg + ".TelemetryDriverPlugin", true, SPARK_CLASSLOADER);
             return clazz.getConstructor().newInstance();
         } catch (Exception e) {
             throw new RuntimeException("Failed to create DriverPlugin for Spark " + OmniContext.getVersion(), e);
@@ -35,7 +37,7 @@ public class SparkTelemetryPlugin implements SparkPlugin {
         try {
             @SuppressWarnings("unchecked")
             Class<? extends ExecutorPlugin> clazz =
-                    (Class<? extends ExecutorPlugin>) Class.forName(pkg + ".TelemetryExecutorPlugin");
+                    (Class<? extends ExecutorPlugin>) Class.forName(pkg + ".TelemetryExecutorPlugin", true, SPARK_CLASSLOADER);
             return clazz.getConstructor().newInstance();
         } catch (Exception e) {
             throw new RuntimeException("Failed to create ExecutorPlugin for Spark " + OmniContext.getVersion(), e);
