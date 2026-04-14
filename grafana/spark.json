@@ -1,21 +1,10 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_MYSQL",
-      "label": "MySQL Telemetry",
-      "description": "MySQL datasource for Spark telemetry data (metrics_db)",
-      "type": "datasource",
-      "pluginId": "mysql",
-      "pluginName": "MySQL"
-    }
-  ],
   "annotations": {
     "list": []
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": null,
   "links": [
     {
       "asDropdown": false,
@@ -73,7 +62,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -129,7 +118,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -185,7 +174,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -245,7 +234,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -312,7 +301,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -361,7 +350,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -405,7 +394,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -444,7 +433,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -506,7 +495,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -569,7 +558,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -606,11 +595,13 @@
                     "options": {
                       "true": {
                         "text": "SUCCESS",
-                        "color": "green"
+                        "color": "green",
+                        "index": 0
                       },
                       "false": {
                         "text": "FAILED",
-                        "color": "red"
+                        "color": "red",
+                        "index": 1
                       }
                     }
                   }
@@ -637,7 +628,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -827,7 +818,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1068,7 +1059,7 @@
       "type": "barchart",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1105,7 +1096,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1264,7 +1255,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1434,11 +1425,13 @@
                     "options": {
                       "true": {
                         "text": "OK",
-                        "color": "green"
+                        "color": "green",
+                        "index": 0
                       },
                       "false": {
                         "text": "FAIL",
-                        "color": "red"
+                        "color": "red",
+                        "index": 1
                       }
                     }
                   }
@@ -1465,7 +1458,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -1521,7 +1514,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -1581,7 +1574,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -1633,7 +1626,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -1685,7 +1678,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1724,7 +1717,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1763,7 +1756,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1813,11 +1806,13 @@
                     "options": {
                       "scan": {
                         "text": "SCAN",
-                        "color": "blue"
+                        "color": "blue",
+                        "index": 0
                       },
                       "write": {
                         "text": "WRITE",
-                        "color": "green"
+                        "color": "green",
+                        "index": 1
                       }
                     }
                   }
@@ -1844,7 +1839,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1926,7 +1921,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "${DS_MYSQL}"
+          "uid": "DS_MYSQL"
         },
         "definition": "SELECT DISTINCT app_id FROM task_metrics ORDER BY app_id",
         "includeAll": true,
@@ -1950,6 +1945,5 @@
   },
   "timezone": "utc",
   "title": "Spark Telemetry",
-  "uid": "spark-telemetry",
-  "version": 1
+  "uid": "spark-telemetry"
 }

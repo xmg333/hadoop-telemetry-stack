@@ -1,21 +1,10 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_MYSQL",
-      "label": "MySQL Telemetry",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "mysql",
-      "pluginName": "MySQL"
-    }
-  ],
   "annotations": {
     "list": []
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": null,
   "links": [
     {
       "title": "Spark",
@@ -40,7 +29,10 @@
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["overview", "telemetry"],
+  "tags": [
+    "overview",
+    "telemetry"
+  ],
   "templating": {
     "list": []
   },
@@ -51,13 +43,20 @@
   "timezone": "utc",
   "title": "Platform Telemetry Overview",
   "uid": "telemetry-overview",
-  "version": 1,
   "panels": [
     {
       "title": "Total Spark Apps",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
-      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "DS_MYSQL"
+      },
       "targets": [
         {
           "rawSql": "SELECT COUNT(DISTINCT app_id) AS value FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
@@ -73,8 +72,14 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "blue", "value": 5 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "blue",
+                "value": 5
+              }
             ]
           },
           "mappings": []
@@ -87,7 +92,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -99,8 +106,16 @@
     {
       "title": "Total MR Jobs",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
-      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "DS_MYSQL"
+      },
       "targets": [
         {
           "rawSql": "SELECT COUNT(DISTINCT job_id) AS value FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
@@ -116,8 +131,14 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "purple", "value": 5 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "purple",
+                "value": 5
+              }
             ]
           },
           "mappings": []
@@ -130,7 +151,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -142,8 +165,16 @@
     {
       "title": "Total Hive Queries",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
-      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "DS_MYSQL"
+      },
       "targets": [
         {
           "rawSql": "SELECT COUNT(*) AS value FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
@@ -159,8 +190,14 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 10 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 10
+              }
             ]
           },
           "mappings": []
@@ -173,7 +210,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -185,8 +224,16 @@
     {
       "title": "MR Job Success Rate",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
-      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "DS_MYSQL"
+      },
       "targets": [
         {
           "rawSql": "SELECT ROUND(SUM(CASE WHEN state='SUCCEEDED' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(DISTINCT job_id), 0), 1) AS value FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
@@ -203,9 +250,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 80 },
-              { "color": "green", "value": 95 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 80
+              },
+              {
+                "color": "green",
+                "value": 95
+              }
             ]
           },
           "mappings": []
@@ -218,7 +274,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -230,11 +288,19 @@
     {
       "title": "Success Rates by Engine",
       "type": "piechart",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
-      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "DS_MYSQL"
+      },
       "targets": [
         {
-          "rawSql": "SELECT 'Spark OK' AS metric, COUNT(DISTINCT job_id) AS value FROM job_metrics WHERE job_success='true' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) UNION ALL SELECT 'Spark Fail', COUNT(DISTINCT job_id) FROM job_metrics WHERE job_success='false' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) UNION ALL SELECT 'MR OK', COUNT(DISTINCT job_id) FROM mr_job_metrics WHERE state='SUCCEEDED' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) UNION ALL SELECT 'MR Fail', COUNT(DISTINCT job_id) FROM mr_job_metrics WHERE state!='SUCCEEDED' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) UNION ALL SELECT 'Hive OK', COUNT(*) FROM hive_query_metrics WHERE success='true' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) UNION ALL SELECT 'Hive Fail', COUNT(*) FROM hive_query_metrics WHERE success='false' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
+          "rawSql": "SELECT SUM(CASE WHEN job_success='true' THEN 1 ELSE 0 END) AS 'Spark OK', SUM(CASE WHEN job_success='false' AND duration_ms IS NULL AND NOT EXISTS (SELECT 1 FROM job_metrics j2 WHERE j2.app_id = job_metrics.app_id AND j2.job_success='true') THEN 1 ELSE 0 END) AS 'Spark Fail', (SELECT COUNT(DISTINCT job_id) FROM mr_job_metrics WHERE state='SUCCEEDED' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)) AS 'MR OK', (SELECT COUNT(DISTINCT job_id) FROM mr_job_metrics WHERE state!='SUCCEEDED' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)) AS 'MR Fail', (SELECT COUNT(*) FROM hive_query_metrics WHERE success='true' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)) AS 'Hive OK', (SELECT COUNT(*) FROM hive_query_metrics WHERE success='false' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)) AS 'Hive Fail' FROM job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
           "format": "table",
           "refId": "A"
         }
@@ -250,7 +316,9 @@
       },
       "options": {
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -262,7 +330,10 @@
         "legend": {
           "displayMode": "table",
           "placement": "right",
-          "values": ["value", "percent"]
+          "values": [
+            "value",
+            "percent"
+          ]
         }
       },
       "id": 5
@@ -270,8 +341,16 @@
     {
       "title": "IO Throughput by Engine",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "DS_MYSQL"
+      },
       "targets": [
         {
           "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(io_bytes_read + io_bytes_written) AS 'Spark' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
@@ -322,8 +401,16 @@
     {
       "title": "Job Duration Trends",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
-      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "DS_MYSQL"
+      },
       "targets": [
         {
           "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(duration_ms) AS 'Spark Jobs' FROM job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
@@ -368,8 +455,16 @@
     {
       "title": "Recent Failed Tasks",
       "type": "table",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
-      "datasource": { "type": "mysql", "uid": "${DS_MYSQL}" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "DS_MYSQL"
+      },
       "targets": [
         {
           "rawSql": "SELECT 'Spark' AS engine, app_id AS id, stage_id, task_id, duration_ms, FROM_UNIXTIME(timestamp_ms/1000) AS time FROM task_metrics WHERE task_success='false' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) UNION ALL SELECT 'MR' AS engine, job_id AS id, NULL AS stage_id, task_id, cpu_time_ms AS duration_ms, FROM_UNIXTIME(timestamp_ms/1000) AS time FROM mr_task_metrics WHERE state != 'SUCCEEDED' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) ORDER BY time DESC LIMIT 50",

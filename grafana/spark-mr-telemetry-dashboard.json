@@ -1,14 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_MYSQL",
-      "label": "MySQL Telemetry",
-      "description": "MySQL datasource for Spark/MR telemetry data (metrics_db)",
-      "type": "datasource",
-      "pluginId": "mysql",
-      "pluginName": "MySQL"
-    }
-  ],
   "annotations": {
     "list": []
   },
@@ -24,7 +14,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -80,7 +70,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -136,7 +126,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -196,7 +186,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -263,7 +253,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -312,7 +302,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -356,7 +346,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -395,7 +385,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -457,7 +447,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -520,7 +510,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -557,11 +547,13 @@
                     "options": {
                       "true": {
                         "text": "SUCCESS",
-                        "color": "green"
+                        "color": "green",
+                        "index": 0
                       },
                       "false": {
                         "text": "FAILED",
-                        "color": "red"
+                        "color": "red",
+                        "index": 1
                       }
                     }
                   }
@@ -588,7 +580,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -778,7 +770,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1019,7 +1011,7 @@
       "type": "barchart",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1056,7 +1048,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1215,7 +1207,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1385,11 +1377,13 @@
                     "options": {
                       "true": {
                         "text": "OK",
-                        "color": "green"
+                        "color": "green",
+                        "index": 0
                       },
                       "false": {
                         "text": "FAIL",
-                        "color": "red"
+                        "color": "red",
+                        "index": 1
                       }
                     }
                   }
@@ -1416,7 +1410,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -1472,7 +1466,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -1532,7 +1526,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -1573,7 +1567,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT SUM(join_count) AS value FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND join_count IS NOT NULL",
+          "rawSql": "SELECT COALESCE(SUM(join_count), 0) AS value FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
           "format": "table"
         }
       ]
@@ -1584,7 +1578,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -1636,7 +1630,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1675,7 +1669,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1698,12 +1692,12 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(shuffle_bytes_read) AS 'Shuffle Read' FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND shuffle_bytes_read IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, COALESCE(SUM(shuffle_bytes_read), 0) AS 'Shuffle Read' FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(shuffle_bytes_written) AS 'Shuffle Written' FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND shuffle_bytes_written IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, COALESCE(SUM(shuffle_bytes_written), 0) AS 'Shuffle Written' FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         }
       ]
@@ -1714,7 +1708,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1764,11 +1758,13 @@
                     "options": {
                       "scan": {
                         "text": "SCAN",
-                        "color": "blue"
+                        "color": "blue",
+                        "index": 0
                       },
                       "write": {
                         "text": "WRITE",
-                        "color": "green"
+                        "color": "green",
+                        "index": 1
                       }
                     }
                   }
@@ -1795,7 +1791,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -1862,7 +1858,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -1918,7 +1914,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -1978,7 +1974,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -2030,7 +2026,7 @@
       "type": "stat",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 4,
@@ -2073,12 +2069,12 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT SUM(input_bytes) AS 'Input Bytes' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND input_bytes IS NOT NULL",
+          "rawSql": "SELECT COALESCE(SUM(input_bytes), 0) AS 'Input Bytes' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
           "format": "table"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT SUM(output_bytes) AS 'Output Bytes' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND output_bytes IS NOT NULL",
+          "rawSql": "SELECT COALESCE(SUM(output_bytes), 0) AS 'Output Bytes' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
           "format": "table"
         }
       ]
@@ -2089,7 +2085,7 @@
       "type": "piechart",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -2142,7 +2138,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -2177,7 +2173,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -2217,7 +2213,7 @@
       "type": "barchart",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -2268,7 +2264,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -2330,11 +2326,13 @@
                     "options": {
                       "true": {
                         "text": "OK",
-                        "color": "green"
+                        "color": "green",
+                        "index": 0
                       },
                       "false": {
                         "text": "FAIL",
-                        "color": "red"
+                        "color": "red",
+                        "index": 1
                       }
                     }
                   }
@@ -2367,7 +2365,7 @@
       "type": "table",
       "datasource": {
         "type": "mysql",
-        "uid": "${DS_MYSQL}"
+        "uid": "DS_MYSQL"
       },
       "gridPos": {
         "h": 8,
@@ -2393,11 +2391,13 @@
                     "options": {
                       "input": {
                         "text": "INPUT",
-                        "color": "blue"
+                        "color": "blue",
+                        "index": 0
                       },
                       "output": {
                         "text": "OUTPUT",
-                        "color": "green"
+                        "color": "green",
+                        "index": 1
                       }
                     }
                   }
@@ -2448,7 +2448,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "${DS_MYSQL}"
+          "uid": "DS_MYSQL"
         },
         "definition": "SELECT DISTINCT app_id FROM task_metrics ORDER BY app_id",
         "includeAll": true,
@@ -2476,7 +2476,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "${DS_MYSQL}"
+          "uid": "DS_MYSQL"
         },
         "definition": "SELECT DISTINCT operation FROM hive_query_metrics WHERE operation IS NOT NULL ORDER BY operation",
         "includeAll": true,
