@@ -55,8 +55,8 @@
           "type": "mysql",
           "uid": "DS_MYSQL"
         },
-        "definition": "SELECT DISTINCT job_id FROM (SELECT job_id FROM mr_job_metrics UNION SELECT DISTINCT job_id FROM mr_task_metrics) t ORDER BY job_id",
-        "query": "SELECT DISTINCT job_id FROM (SELECT job_id FROM mr_job_metrics UNION SELECT DISTINCT job_id FROM mr_task_metrics) t ORDER BY job_id",
+        "definition": "SELECT DISTINCT job_id FROM (SELECT DISTINCT job_id FROM mr_job_metrics UNION SELECT DISTINCT job_id FROM mr_task_metrics) t ORDER BY job_id",
+        "query": "SELECT DISTINCT job_id FROM (SELECT DISTINCT job_id FROM mr_job_metrics UNION SELECT DISTINCT job_id FROM mr_task_metrics) t ORDER BY job_id",
         "refresh": 2,
         "multi": true,
         "includeAll": true,
@@ -81,7 +81,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT COUNT(DISTINCT job_id) AS value FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND job_id IN ($mr_job_id)",
+          "rawSql": "SELECT COUNT(DISTINCT job_id) AS value FROM (SELECT job_id FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND job_id IN ($mr_job_id) UNION SELECT DISTINCT job_id FROM mr_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND job_id IN ($mr_job_id)) t",
           "format": "table",
           "refId": "A"
         }
@@ -110,7 +110,7 @@
     },
     {
       "id": 2,
-      "title": "Avg Job Duration",
+      "title": "Avg Task Duration",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -124,7 +124,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT ROUND(AVG(elapsed_time_ms)) AS value FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND elapsed_time_ms IS NOT NULL AND job_id IN ($mr_job_id)",
+          "rawSql": "SELECT COALESCE(ROUND(AVG(elapsed_time_ms)), ROUND(AVG(cpu_time_ms))) AS value FROM (SELECT job_id, elapsed_time_ms, NULL as cpu_time_ms FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND elapsed_time_ms IS NOT NULL AND job_id IN ($mr_job_id) UNION ALL SELECT job_id, NULL, cpu_time_ms FROM mr_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND cpu_time_ms IS NOT NULL AND job_id IN ($mr_job_id)) t",
           "format": "table",
           "refId": "A"
         }
@@ -158,7 +158,7 @@
     },
     {
       "id": 3,
-      "title": "MR Job Success Rate",
+      "title": "Total Tasks",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -172,55 +172,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT ROUND(SUM(CASE WHEN state='SUCCEEDED' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(DISTINCT job_id), 0), 1) AS value FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND job_id IN ($mr_job_id)",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 80
-              },
-              {
-                "color": "green",
-                "value": 95
-              }
-            ]
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 4,
-      "title": "Total Map Tasks",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 0
-      },
-      "datasource": {
-        "type": "mysql",
-        "uid": "DS_MYSQL"
-      },
-      "targets": [
-        {
-          "rawSql": "SELECT SUM(launched_maps) AS value FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND launched_maps IS NOT NULL AND job_id IN ($mr_job_id)",
+          "rawSql": "SELECT COUNT(DISTINCT task_id) AS value FROM mr_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND task_type='map' AND job_id IN ($mr_job_id)",
           "format": "table",
           "refId": "A"
         }
@@ -236,8 +188,39 @@
       }
     },
     {
+      "id": 4,
+      "title": "Map / Reduce Tasks",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "DS_MYSQL"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT CONCAT(SUM(CASE WHEN task_type='map' THEN 1 ELSE 0 END), ' map / ', SUM(CASE WHEN task_type='reduce' THEN 1 ELSE 0 END), ' reduce') AS value FROM (SELECT DISTINCT task_id, task_type FROM mr_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND job_id IN ($mr_job_id)) t",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "super-orange"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 5,
-      "title": "Job IO Bytes",
+      "title": "Task IO Bytes",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -251,22 +234,22 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(hdfs_bytes_read) AS 'HDFS Read' FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND hdfs_bytes_read IS NOT NULL AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(map_output_bytes) AS 'Map Output Bytes' FROM mr_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND map_output_bytes IS NOT NULL AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "refId": "A"
         },
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(hdfs_bytes_written) AS 'HDFS Written' FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND hdfs_bytes_written IS NOT NULL AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(reduce_shuffle_bytes) AS 'Reduce Shuffle Bytes' FROM mr_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND reduce_shuffle_bytes IS NOT NULL AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "refId": "B"
         },
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(file_bytes_read) AS 'File Read' FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND file_bytes_read IS NOT NULL AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(hdfs_bytes_read) AS 'HDFS Read' FROM (SELECT timestamp_ms, hdfs_bytes_read, job_id FROM mr_job_metrics UNION ALL SELECT timestamp_ms, hdfs_bytes_read, job_id FROM mr_task_metrics) combined WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND hdfs_bytes_read IS NOT NULL AND hdfs_bytes_read > 0 AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "refId": "C"
         },
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(file_bytes_written) AS 'File Written' FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND file_bytes_written IS NOT NULL AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(hdfs_bytes_written) AS 'HDFS Written' FROM (SELECT timestamp_ms, hdfs_bytes_written, job_id FROM mr_job_metrics UNION ALL SELECT timestamp_ms, hdfs_bytes_written, job_id FROM mr_task_metrics) combined WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND hdfs_bytes_written IS NOT NULL AND hdfs_bytes_written > 0 AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "refId": "D"
         }
@@ -299,12 +282,12 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(launched_maps) AS 'Maps' FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND launched_maps IS NOT NULL AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, COUNT(DISTINCT CASE WHEN task_type='map' THEN task_id END) AS 'Map Tasks' FROM mr_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "refId": "A"
         },
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(launched_reduces) AS 'Reduces' FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND launched_reduces IS NOT NULL AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, COUNT(DISTINCT CASE WHEN task_type='reduce' THEN task_id END) AS 'Reduce Tasks' FROM mr_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "refId": "B"
         }
@@ -336,12 +319,12 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(cpu_time_ms) AS 'Avg CPU Time' FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND cpu_time_ms IS NOT NULL AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(cpu_time_ms) AS 'Avg CPU Time' FROM (SELECT timestamp_ms, cpu_time_ms, job_id FROM mr_job_metrics WHERE cpu_time_ms IS NOT NULL UNION ALL SELECT timestamp_ms, cpu_time_ms, job_id FROM mr_task_metrics WHERE cpu_time_ms IS NOT NULL) t WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "refId": "A"
         },
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(gc_time_ms) AS 'Avg GC Time' FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND gc_time_ms IS NOT NULL AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(gc_time_ms) AS 'Avg GC Time' FROM (SELECT timestamp_ms, gc_time_ms, job_id FROM mr_job_metrics WHERE gc_time_ms IS NOT NULL UNION ALL SELECT timestamp_ms, gc_time_ms, job_id FROM mr_task_metrics WHERE gc_time_ms IS NOT NULL) t WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND job_id IN ($mr_job_id) GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "refId": "B"
         }
@@ -484,7 +467,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, task_id, task_type, job_id, hdfs_bytes_read, hdfs_bytes_written, map_input_records, map_output_records, reduce_input_records, reduce_output_records, cpu_time_ms, gc_time_ms FROM mr_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND job_id IN ($mr_job_id) ORDER BY timestamp_ms DESC LIMIT 200",
+          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, task_id, task_type, job_id, map_input_records, map_output_records, map_output_bytes, reduce_input_records, reduce_output_records, reduce_shuffle_bytes, spilled_records, hdfs_bytes_read, hdfs_bytes_written FROM mr_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND job_id IN ($mr_job_id) ORDER BY timestamp_ms DESC LIMIT 200",
           "format": "table",
           "refId": "A"
         }
@@ -519,24 +502,24 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "cpu_time_ms"
+              "options": "map_output_bytes"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "ms"
+                "value": "bytes"
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "gc_time_ms"
+              "options": "reduce_shuffle_bytes"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "ms"
+                "value": "bytes"
               }
             ]
           }

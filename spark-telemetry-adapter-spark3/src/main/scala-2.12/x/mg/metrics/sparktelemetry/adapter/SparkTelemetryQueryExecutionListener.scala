@@ -1,7 +1,7 @@
 package x.mg.metrics.sparktelemetry.adapter
 
 import org.apache.spark.sql.execution.{FileSourceScanExec, QueryExecution, SparkPlan}
-import org.apache.spark.sql.execution.adaptive.{AdaptiveSparkPlanExec, QueryStageExec}
+import org.apache.spark.sql.execution.adaptive.{AdaptiveSparkPlanExec, QueryStageExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.execution.joins._
@@ -64,8 +64,38 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
     plan match {
       case a: AdaptiveSparkPlanExec =>
         // AdaptiveSparkPlanExec extends LeafExecNode, children=Nil
-        // Use public inputPlan() method to get the inner plan
-        visit(a.inputPlan, qm, tm)
+        // inputPlan() returns the INITIAL plan (before AQE optimizations).
+        // currentPhysicalPlan (private[sql]) holds the FINAL plan with
+        // ShuffleQueryStageExec nodes that contain actual shuffle stats.
+        try {
+          val method = a.getClass.getDeclaredMethod("currentPhysicalPlan")
+          method.setAccessible(true)
+          val finalPlan = method.invoke(a).asInstanceOf[SparkPlan]
+          if (finalPlan != null) visit(finalPlan, qm, tm)
+          else visit(a.inputPlan, qm, tm)
+        } catch {
+          case _: Exception => visit(a.inputPlan, qm, tm)
+        }
+        return
+      case sqs: ShuffleQueryStageExec =>
+        // ShuffleQueryStageExec holds shuffle stats (bytesWritten) that are
+        // NOT available on the inner ShuffleExchangeExec node in AQE mode.
+        // mapOutputStatistics is private[spark], so use reflection.
+        try {
+          val method = sqs.getClass.getDeclaredMethod("mapOutputStatistics")
+          method.setAccessible(true)
+          val stats = method.invoke(sqs)
+          if (stats != null) {
+            val bytesField = stats.getClass.getDeclaredField("bytesWritten")
+            bytesField.setAccessible(true)
+            val bytes = bytesField.getLong(stats)
+            if (bytes > 0) {
+              qm.setShuffleBytesWritten(qm.getShuffleBytesWritten + bytes)
+              qm.setShuffleBytesRead(qm.getShuffleBytesRead + bytes)
+            }
+          }
+        } catch { case _: Exception => }
+        visit(sqs.plan, qm, tm)
         return
       case q: QueryStageExec =>
         // QueryStageExec extends LeafExecNode, children=Nil
