@@ -206,6 +206,36 @@
         </profile>
 
         <profile>
+            <id>spark-30</id>
+            <properties>
+                <scala.version>2.12.10</scala.version>
+                <scala.binary.version>2.12</scala.binary.version>
+                <spark.version>3.0.3</spark.version>
+                <maven.compiler.source>1.8</maven.compiler.source>
+                <maven.compiler.target>1.8</maven.compiler.target>
+            </properties>
+            <modules>
+                <module>spark-telemetry-common</module>
+                <module>spark-telemetry-adapter-spark30</module>
+            </modules>
+        </profile>
+
+        <profile>
+            <id>spark-32</id>
+            <properties>
+                <scala.version>2.12.15</scala.version>
+                <scala.binary.version>2.12</scala.binary.version>
+                <spark.version>3.2.4</spark.version>
+                <maven.compiler.source>1.8</maven.compiler.source>
+                <maven.compiler.target>1.8</maven.compiler.target>
+            </properties>
+            <modules>
+                <module>spark-telemetry-common</module>
+                <module>spark-telemetry-adapter-spark32</module>
+            </modules>
+        </profile>
+
+        <profile>
             <id>spark-3</id>
             <activation>
                 <activeByDefault>true</activeByDefault>
