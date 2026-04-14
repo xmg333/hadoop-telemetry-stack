@@ -22,6 +22,7 @@ class SparkTelemetryListener extends SparkListener {
   private var initialized = false
   private var lifecycle: TelemetryLifecycle = _
   private var config: x.mg.metrics.sparktelemetry.config.TelemetryConfig = _
+  private var qelRegistered = false
 
   private def ensureInit(): Unit = {
     if (!initialized) {
@@ -40,8 +41,22 @@ class SparkTelemetryListener extends SparkListener {
           lifecycle = TelemetryLifecycle.getInstance
           config = lifecycle.getConfig
           initialized = true
+          registerQELIfNeeded()
         }
       }
+    }
+  }
+
+  private def registerQELIfNeeded(): Unit = {
+    if (qelRegistered) return
+    if (config == null || !config.isCaptureSqlQueryExecution) return
+    try {
+      val session = org.apache.spark.sql.SparkSession.getActiveSession.getOrElse(
+        org.apache.spark.sql.SparkSession.builder().getOrCreate())
+      session.listenerManager.register(new SparkTelemetryQueryExecutionListener())
+      qelRegistered = true
+    } catch {
+      case _: Exception => // best effort, may not be on driver
     }
   }
 
@@ -220,6 +235,7 @@ class SparkTelemetryListener extends SparkListener {
   // Category 5: Job lifecycle
   override def onJobStart(jobStart: SparkListenerJobStart): Unit = {
     ensureInit()
+    registerQELIfNeeded()
     if (!config.isCaptureJobLifecycle) return
 
     val event = new SparkMetricEvent

@@ -2,6 +2,7 @@ package x.mg.metrics.sparktelemetry.adapter
 
 import org.apache.spark.sql.execution.{FileSourceScanExec, QueryExecution, SparkPlan}
 import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
+import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.command.DataWritingCommandExec
 import org.apache.spark.sql.execution.datasources.InsertIntoHadoopFsRelationCommand
@@ -77,6 +78,13 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
       case j: ShuffledHashJoinExec =>
         qm.setJoinCount(qm.getJoinCount + 1)
         qm.setJoinTypes(appendJoinType(qm.getJoinTypes, "hash"))
+
+      case e: ShuffleExchangeExec =>
+        val dataSize = metricValue(e, "dataSize")
+        if (dataSize > 0) {
+          qm.setShuffleBytesWritten(qm.getShuffleBytesWritten + dataSize)
+          qm.setShuffleBytesRead(qm.getShuffleBytesRead + dataSize)
+        }
 
       case w: DataWritingCommandExec =>
         w.cmd match {

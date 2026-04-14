@@ -107,6 +107,8 @@ class SparkTelemetryQueryExecutionListener extends QueryExecutionListener {
             val tableMetric = new SqlTableIOMetrics
             tableMetric.setOperation("write")
             tableMetric.setTableName(i.options.getOrElse("path", "unknown"))
+            tableMetric.setRows(metricValue(w, "numOutputRows"))
+            tableMetric.setBytes(metricValue(w, "numOutputBytes"))
             tm.add(tableMetric)
           case _ =>
         }
