@@ -35,7 +35,7 @@
   "refresh": "30s",
   "schemaVersion": 39,
   "time": {
-    "from": "now-6h",
+    "from": "now-24h",
     "to": "now"
   },
   "timezone": "utc",
@@ -55,8 +55,8 @@
           "type": "mysql",
           "uid": "DS_MYSQL"
         },
-        "definition": "SELECT DISTINCT job_id FROM mr_job_metrics ORDER BY job_id",
-        "query": "SELECT DISTINCT job_id FROM mr_job_metrics ORDER BY job_id",
+        "definition": "SELECT DISTINCT job_id FROM (SELECT job_id FROM mr_job_metrics UNION SELECT DISTINCT job_id FROM mr_task_metrics) t ORDER BY job_id",
+        "query": "SELECT DISTINCT job_id FROM (SELECT job_id FROM mr_job_metrics UNION SELECT DISTINCT job_id FROM mr_task_metrics) t ORDER BY job_id",
         "refresh": 2,
         "multi": true,
         "includeAll": true,

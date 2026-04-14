@@ -35,7 +35,7 @@
   "refresh": "30s",
   "schemaVersion": 39,
   "time": {
-    "from": "now-6h",
+    "from": "now-24h",
     "to": "now"
   },
   "timezone": "utc",
