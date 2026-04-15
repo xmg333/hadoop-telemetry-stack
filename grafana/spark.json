@@ -25,6 +25,11 @@
       "title": "Hive on Spark",
       "url": "/d/hive-spark-telemetry",
       "type": "dashboard"
+    },
+    {
+      "title": "Spark / MR / Hive",
+      "url": "/d/spark-mr-telemetry",
+      "type": "dashboard"
     }
   ],
   "panels": [
