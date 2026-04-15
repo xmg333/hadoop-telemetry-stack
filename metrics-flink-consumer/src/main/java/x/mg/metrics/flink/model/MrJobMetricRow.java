@@ -39,9 +39,28 @@ public class MrJobMetricRow {
     private Double launchedMaps;
     private Double launchedReduces;
 
+    // Actual job timing from History Server
+    private long startTimeMs;
+    private long finishTimeMs;
+
     public static MrJobMetricRow fromLabels(long timestampMs, Map<String, String> labels) {
         MrJobMetricRow row = new MrJobMetricRow();
-        row.timestampMs = timestampMs;
+        // Use actual job finish time if available, otherwise fall back to OTel export time
+        String finishTimeStr = labels.get("mr.job.finish_time_ms");
+        if (finishTimeStr != null && !finishTimeStr.isEmpty()) {
+            try { row.timestampMs = Long.parseLong(finishTimeStr); }
+            catch (NumberFormatException e) { row.timestampMs = timestampMs; }
+        } else {
+            row.timestampMs = timestampMs;
+        }
+        // Extract actual start/finish time from labels
+        String startTimeStr = labels.get("mr.job.start_time_ms");
+        if (startTimeStr != null && !startTimeStr.isEmpty()) {
+            try { row.startTimeMs = Long.parseLong(startTimeStr); }
+            catch (NumberFormatException e) { row.startTimeMs = 0; }
+        }
+        row.finishTimeMs = row.timestampMs; // timestampMs is already set to finish time above
+
         row.jobId = labels.getOrDefault("mr.job.id", "unknown");
         row.jobName = labels.getOrDefault("mr.job.name", "unknown");
         row.userName = labels.getOrDefault("mr.job.user", "unknown");
@@ -103,4 +122,6 @@ public class MrJobMetricRow {
     public Double getElapsedTimeMs() { return elapsedTimeMs; }
     public Double getLaunchedMaps() { return launchedMaps; }
     public Double getLaunchedReduces() { return launchedReduces; }
+    public long getStartTimeMs() { return startTimeMs; }
+    public long getFinishTimeMs() { return finishTimeMs; }
 }

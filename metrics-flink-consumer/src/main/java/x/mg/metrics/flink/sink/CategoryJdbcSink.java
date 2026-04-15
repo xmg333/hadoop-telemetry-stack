@@ -408,6 +408,8 @@ public class CategoryJdbcSink {
             "elapsed_time_ms DOUBLE, " +
             "launched_maps DOUBLE, " +
             "launched_reduces DOUBLE, " +
+            "start_time_ms BIGINT, " +
+            "finish_time_ms BIGINT, " +
             "INDEX idx_job_time (job_id, timestamp_ms), " +
             "INDEX idx_state_time (state, timestamp_ms), " +
             "INDEX idx_user_time (user_name, timestamp_ms))");
@@ -434,6 +436,15 @@ public class CategoryJdbcSink {
             "spilled_records DOUBLE, " +
             "cpu_time_ms DOUBLE, " +
             "gc_time_ms DOUBLE, " +
+            "duration_ms DOUBLE, " +
+            "success_count DOUBLE, " +
+            "failure_count DOUBLE, " +
+            "hdfs_read_ops DOUBLE, " +
+            "hdfs_write_ops DOUBLE, " +
+            "hdfs_large_read_ops DOUBLE, " +
+            "file_read_ops DOUBLE, " +
+            "file_write_ops DOUBLE, " +
+            "file_large_read_ops DOUBLE, " +
             "INDEX idx_task_time (task_id, timestamp_ms), " +
             "INDEX idx_job_time (job_id, timestamp_ms), " +
             "INDEX idx_type_time (task_type, timestamp_ms))");
@@ -683,7 +694,9 @@ public class CategoryJdbcSink {
             "reduces_duration_ms Nullable(Float64), " +
             "elapsed_time_ms Nullable(Float64), " +
             "launched_maps Nullable(Float64), " +
-            "launched_reduces Nullable(Float64)" +
+            "launched_reduces Nullable(Float64), " +
+            "start_time_ms Nullable(Int64), " +
+            "finish_time_ms Nullable(Int64)" +
             ") ENGINE = MergeTree() " +
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (job_id, timestamp_ms)");
@@ -708,7 +721,16 @@ public class CategoryJdbcSink {
             "reduce_shuffle_bytes Nullable(Float64), " +
             "spilled_records Nullable(Float64), " +
             "cpu_time_ms Nullable(Float64), " +
-            "gc_time_ms Nullable(Float64)" +
+            "gc_time_ms Nullable(Float64), " +
+            "duration_ms Nullable(Float64), " +
+            "success_count Nullable(Float64), " +
+            "failure_count Nullable(Float64), " +
+            "hdfs_read_ops Nullable(Float64), " +
+            "hdfs_write_ops Nullable(Float64), " +
+            "hdfs_large_read_ops Nullable(Float64), " +
+            "file_read_ops Nullable(Float64), " +
+            "file_write_ops Nullable(Float64), " +
+            "file_large_read_ops Nullable(Float64)" +
             ") ENGINE = MergeTree() " +
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (job_id, timestamp_ms)");
@@ -1030,8 +1052,9 @@ public class CategoryJdbcSink {
             "map_input_records, map_output_records, map_output_bytes, " +
             "reduce_input_records, reduce_output_records, reduce_shuffle_bytes, spilled_records, " +
             "cpu_time_ms, gc_time_ms, physical_memory_bytes, virtual_memory_bytes, committed_heap_bytes, " +
-            "maps_duration_ms, reduces_duration_ms, elapsed_time_ms, launched_maps, launched_reduces) " +
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            "maps_duration_ms, reduces_duration_ms, elapsed_time_ms, launched_maps, launched_reduces, " +
+            "start_time_ms, finish_time_ms) " +
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (MrJobMetricRow r : rows) {
             int i = 1;
@@ -1062,6 +1085,8 @@ public class CategoryJdbcSink {
             setDouble(ps, i++, r.getElapsedTimeMs());
             setDouble(ps, i++, r.getLaunchedMaps());
             setDouble(ps, i++, r.getLaunchedReduces());
+            if (r.getStartTimeMs() > 0) ps.setLong(i++, r.getStartTimeMs()); else ps.setNull(i++, java.sql.Types.BIGINT);
+            if (r.getFinishTimeMs() > 0) ps.setLong(i++, r.getFinishTimeMs()); else ps.setNull(i++, java.sql.Types.BIGINT);
             ps.addBatch();
         }
         ps.executeBatch();
@@ -1075,8 +1100,11 @@ public class CategoryJdbcSink {
             "hdfs_bytes_read, hdfs_bytes_written, file_bytes_read, file_bytes_written, " +
             "map_input_records, map_output_records, map_output_bytes, " +
             "reduce_input_records, reduce_output_records, reduce_shuffle_bytes, spilled_records, " +
-            "cpu_time_ms, gc_time_ms) " +
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            "cpu_time_ms, gc_time_ms, " +
+            "duration_ms, success_count, failure_count, " +
+            "hdfs_read_ops, hdfs_write_ops, hdfs_large_read_ops, " +
+            "file_read_ops, file_write_ops, file_large_read_ops) " +
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (MrTaskMetricRow r : rows) {
             int i = 1;
@@ -1100,6 +1128,15 @@ public class CategoryJdbcSink {
             setDouble(ps, i++, r.getSpilledRecords());
             setDouble(ps, i++, r.getCpuTimeMs());
             setDouble(ps, i++, r.getGcTimeMs());
+            setDouble(ps, i++, r.getDurationMs());
+            setDouble(ps, i++, r.getSuccessCount());
+            setDouble(ps, i++, r.getFailureCount());
+            setDouble(ps, i++, r.getHdfsReadOps());
+            setDouble(ps, i++, r.getHdfsWriteOps());
+            setDouble(ps, i++, r.getHdfsLargeReadOps());
+            setDouble(ps, i++, r.getFileReadOps());
+            setDouble(ps, i++, r.getFileWriteOps());
+            setDouble(ps, i++, r.getFileLargeReadOps());
             ps.addBatch();
         }
         ps.executeBatch();
@@ -1135,6 +1172,37 @@ public class CategoryJdbcSink {
                 LOG.log(Level.FINE, "Index migration skipped: " + e.getMessage());
             }
         }
+        // v3: Add new MR task metric columns
+        String[] mrTaskMigrations = {
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS duration_ms DOUBLE",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS success_count DOUBLE",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS failure_count DOUBLE",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_read_ops DOUBLE",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_write_ops DOUBLE",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_large_read_ops DOUBLE",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS file_read_ops DOUBLE",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS file_write_ops DOUBLE",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS file_large_read_ops DOUBLE"
+        };
+        for (String sql : mrTaskMigrations) {
+            try {
+                stmt.execute(sql);
+            } catch (SQLException e) {
+                LOG.log(Level.FINE, "Migration skipped (column likely exists): " + e.getMessage());
+            }
+        }
+        // v4: Add start/finish time to mr_job_metrics
+        String[] mrJobTimeMigrations = {
+            "ALTER TABLE mr_job_metrics ADD COLUMN IF NOT EXISTS start_time_ms BIGINT",
+            "ALTER TABLE mr_job_metrics ADD COLUMN IF NOT EXISTS finish_time_ms BIGINT"
+        };
+        for (String sql : mrJobTimeMigrations) {
+            try {
+                stmt.execute(sql);
+            } catch (SQLException e) {
+                LOG.log(Level.FINE, "Migration skipped (column likely exists): " + e.getMessage());
+            }
+        }
     }
 
     private void migrateClickHouseSchema(Statement stmt) {
@@ -1144,6 +1212,37 @@ public class CategoryJdbcSink {
             "ALTER TABLE hive_table_io_metrics ADD COLUMN IF NOT EXISTS execution_engine LowCardinality(Nullable(String))"
         };
         for (String sql : migrations) {
+            try {
+                stmt.execute(sql);
+            } catch (SQLException e) {
+                LOG.log(Level.FINE, "Migration skipped (column likely exists): " + e.getMessage());
+            }
+        }
+        // v3: Add new MR task metric columns
+        String[] mrTaskChMigrations = {
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS duration_ms Nullable(Float64)",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS success_count Nullable(Float64)",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS failure_count Nullable(Float64)",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_read_ops Nullable(Float64)",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_write_ops Nullable(Float64)",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_large_read_ops Nullable(Float64)",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS file_read_ops Nullable(Float64)",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS file_write_ops Nullable(Float64)",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS file_large_read_ops Nullable(Float64)"
+        };
+        for (String sql : mrTaskChMigrations) {
+            try {
+                stmt.execute(sql);
+            } catch (SQLException e) {
+                LOG.log(Level.FINE, "Migration skipped (column likely exists): " + e.getMessage());
+            }
+        }
+        // v4: Add start/finish time to mr_job_metrics
+        String[] mrJobTimeChMigrations = {
+            "ALTER TABLE mr_job_metrics ADD COLUMN IF NOT EXISTS start_time_ms Nullable(Int64)",
+            "ALTER TABLE mr_job_metrics ADD COLUMN IF NOT EXISTS finish_time_ms Nullable(Int64)"
+        };
+        for (String sql : mrJobTimeChMigrations) {
             try {
                 stmt.execute(sql);
             } catch (SQLException e) {

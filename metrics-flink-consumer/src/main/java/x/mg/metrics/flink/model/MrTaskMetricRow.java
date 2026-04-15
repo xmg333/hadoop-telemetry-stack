@@ -28,9 +28,29 @@ public class MrTaskMetricRow {
     private Double cpuTimeMs;
     private Double gcTimeMs;
 
+    // Duration and result metrics
+    private Double durationMs;
+    private Double successCount;
+    private Double failureCount;
+
+    // File operation metrics
+    private Double hdfsReadOps;
+    private Double hdfsWriteOps;
+    private Double hdfsLargeReadOps;
+    private Double fileReadOps;
+    private Double fileWriteOps;
+    private Double fileLargeReadOps;
+
     public static MrTaskMetricRow fromLabels(long timestampMs, Map<String, String> labels) {
         MrTaskMetricRow row = new MrTaskMetricRow();
-        row.timestampMs = timestampMs;
+        // Use actual job finish time if available, otherwise fall back to OTel export time
+        String finishTimeStr = labels.get("mr.job.finish_time_ms");
+        if (finishTimeStr != null && !finishTimeStr.isEmpty()) {
+            try { row.timestampMs = Long.parseLong(finishTimeStr); }
+            catch (NumberFormatException e) { row.timestampMs = timestampMs; }
+        } else {
+            row.timestampMs = timestampMs;
+        }
         row.taskId = labels.getOrDefault("mr.task.id", "unknown");
         row.taskType = labels.getOrDefault("mr.task.type", "unknown");
         row.jobId = labels.getOrDefault("mr.job.id", "unknown");
@@ -55,6 +75,15 @@ public class MrTaskMetricRow {
             case "spilled_records": spilledRecords = value; break;
             case "cpu_time_ms": cpuTimeMs = value; break;
             case "gc_time_ms": gcTimeMs = value; break;
+            case "duration_ms": durationMs = value; break;
+            case "success_count": successCount = value; break;
+            case "failure_count": failureCount = value; break;
+            case "hdfs_read_ops": hdfsReadOps = value; break;
+            case "hdfs_write_ops": hdfsWriteOps = value; break;
+            case "hdfs_large_read_ops": hdfsLargeReadOps = value; break;
+            case "file_read_ops": fileReadOps = value; break;
+            case "file_write_ops": fileWriteOps = value; break;
+            case "file_large_read_ops": fileLargeReadOps = value; break;
         }
     }
 
@@ -78,4 +107,13 @@ public class MrTaskMetricRow {
     public Double getSpilledRecords() { return spilledRecords; }
     public Double getCpuTimeMs() { return cpuTimeMs; }
     public Double getGcTimeMs() { return gcTimeMs; }
+    public Double getDurationMs() { return durationMs; }
+    public Double getSuccessCount() { return successCount; }
+    public Double getFailureCount() { return failureCount; }
+    public Double getHdfsReadOps() { return hdfsReadOps; }
+    public Double getHdfsWriteOps() { return hdfsWriteOps; }
+    public Double getHdfsLargeReadOps() { return hdfsLargeReadOps; }
+    public Double getFileReadOps() { return fileReadOps; }
+    public Double getFileWriteOps() { return fileWriteOps; }
+    public Double getFileLargeReadOps() { return fileLargeReadOps; }
 }

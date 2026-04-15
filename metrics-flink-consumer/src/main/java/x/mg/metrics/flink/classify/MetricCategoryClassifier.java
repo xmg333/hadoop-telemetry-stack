@@ -128,6 +128,19 @@ public class MetricCategoryClassifier {
         // MR task metrics (resource)
         put("mr.task.cpu_time_ms",                          MetricCategory.MR_TASK, "cpu_time_ms",                  false);
         put("mr.task.gc_time_ms",                           MetricCategory.MR_TASK, "gc_time_ms",                   false);
+
+        // MR task metrics (duration & result)
+        put("mr.task.duration_ms",                          MetricCategory.MR_TASK, "duration_ms",                  true);
+        put("mr.task.success",                              MetricCategory.MR_TASK, "success_count",                false);
+        put("mr.task.failure",                              MetricCategory.MR_TASK, "failure_count",                false);
+
+        // MR task metrics (file operations)
+        put("mr.task.io.hdfs_read_ops",                     MetricCategory.MR_TASK, "hdfs_read_ops",                false);
+        put("mr.task.io.hdfs_write_ops",                    MetricCategory.MR_TASK, "hdfs_write_ops",               false);
+        put("mr.task.io.hdfs_large_read_ops",               MetricCategory.MR_TASK, "hdfs_large_read_ops",          false);
+        put("mr.task.io.file_read_ops",                     MetricCategory.MR_TASK, "file_read_ops",                false);
+        put("mr.task.io.file_write_ops",                    MetricCategory.MR_TASK, "file_write_ops",               false);
+        put("mr.task.io.file_large_read_ops",               MetricCategory.MR_TASK, "file_large_read_ops",          false);
     }
 
     private static void put(String metricName, MetricCategory category, String columnName, boolean histogram) {
@@ -193,10 +206,16 @@ public class MetricCategoryClassifier {
                         labels.getOrDefault("hive.query.output_table", "unknown")));
                 break;
             case MR_JOB:
-                sb.append('|').append(labels.get("mr.job.id"));
+                // Use only job_id as key (NOT timestamp).
+                // MR collector emits metrics for completed jobs; OTLP export time differs
+                // from actual job finish time. Using job_id ensures all metrics for one job
+                // aggregate into one row with the correct finish_time_ms as timestamp.
+                sb.setLength(0); // clear timestamp prefix
+                sb.append(labels.get("mr.job.id"));
                 break;
             case MR_TASK:
-                sb.append('|').append(labels.get("mr.task.id"))
+                sb.setLength(0); // clear timestamp prefix
+                sb.append(labels.get("mr.task.id"))
                   .append('|').append(labels.getOrDefault("mr.task.type", "unknown"))
                   .append('|').append(labels.get("mr.job.id"));
                 break;
