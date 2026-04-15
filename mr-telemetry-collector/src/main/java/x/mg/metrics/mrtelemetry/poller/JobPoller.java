@@ -112,7 +112,7 @@ public class JobPoller {
                                 String taskCountersJson = client.getTaskCounters(job.id, task.id);
                                 Map<String, Long> counters = extractor.extractTaskCounters(taskCountersJson);
                                 recorder.recordTask(task.id, task.type, job.id, job.name,
-                                        job.user, job.state, counters);
+                                        job.user, job.state, job.finishTime, counters);
                             } catch (Exception e) {
                                 LOG.log(Level.FINE, "Failed to get counters for task " + task.id
                                         + " in job " + job.id + ": " + e.getMessage());

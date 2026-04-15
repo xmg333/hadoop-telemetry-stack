@@ -168,6 +168,7 @@ public class MRMetricRecorder {
      */
     public void recordTask(String taskId, String taskType, String jobId,
                            String jobName, String user, String state,
+                           long finishTime,
                            Map<String, Long> counters) {
         if (counters == null || counters.isEmpty()) return;
         try {
@@ -179,6 +180,8 @@ public class MRMetricRecorder {
                     .put(AttributeKey.stringKey("mr.job.name"), jobName != null ? jobName : "")
                     .put(AttributeKey.stringKey("mr.job.user"), user != null ? user : "")
                     .put(AttributeKey.stringKey("mr.job.state"), state != null ? state : "")
+                    .put(AttributeKey.longKey("mr.job.finish_time_ms"), finishTime)
+                    .put(AttributeKey.longKey("mr.job.start_time_ms"), 0L) // task-level: no individual task start time available
                     .build();
 
             safeAdd(taskMapInputRecordsCounter, counters.get("mr.task.io.map_input_records"), attrs);
@@ -212,6 +215,9 @@ public class MRMetricRecorder {
         if (m.getUser() != null) b.put(AttributeKey.stringKey("mr.job.user"), m.getUser());
         if (m.getState() != null) b.put(AttributeKey.stringKey("mr.job.state"), m.getState());
         if (m.getQueue() != null) b.put(AttributeKey.stringKey("mr.job.queue"), m.getQueue());
+        // Carry actual job start/finish time so Flink consumer can store it instead of OTel export time
+        b.put(AttributeKey.longKey("mr.job.finish_time_ms"), m.getFinishTime());
+        b.put(AttributeKey.longKey("mr.job.start_time_ms"), m.getStartTime());
         return b.build();
     }
 }
