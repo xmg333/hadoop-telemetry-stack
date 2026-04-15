@@ -111,9 +111,9 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
         val tableMetric = new SqlTableIOMetrics
         tableMetric.setOperation("scan")
         tableMetric.setTableName(s.tableIdentifier.map(_.unquotedString).getOrElse("unknown"))
-        tableMetric.setBytes(metricValue(s, "numBytesRead"))
+        tableMetric.setBytes(metricValue(s, "filesSize"))
         tableMetric.setRows(metricValue(s, "numOutputRows"))
-        tableMetric.setFilesRead(metricValue(s, "numFilesRead"))
+        tableMetric.setFilesRead(metricValue(s, "numFiles"))
         tableMetric.setTimeMs(metricValue(s, "scanTime"))
         tm.add(tableMetric)
 
@@ -121,9 +121,9 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
         val tableMetric = new SqlTableIOMetrics
         tableMetric.setOperation("scan")
         tableMetric.setTableName(extractBatchScanTableName(s))
-        tableMetric.setBytes(metricValue(s, "numBytesRead"))
+        tableMetric.setBytes(metricValue(s, "filesSize"))
         tableMetric.setRows(metricValue(s, "numOutputRows"))
-        tableMetric.setFilesRead(metricValue(s, "numFilesRead"))
+        tableMetric.setFilesRead(metricValue(s, "numFiles"))
         tableMetric.setTimeMs(metricValue(s, "scanTime"))
         tm.add(tableMetric)
 
