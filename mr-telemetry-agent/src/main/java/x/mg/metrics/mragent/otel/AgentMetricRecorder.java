@@ -4,6 +4,7 @@ import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.metrics.LongCounter;
+import io.opentelemetry.api.metrics.LongHistogram;
 import io.opentelemetry.api.metrics.Meter;
 import x.mg.metrics.mragent.counter.CounterMapping;
 import x.mg.metrics.mragent.counter.TaskIdentity;
@@ -23,6 +24,9 @@ public class AgentMetricRecorder {
 
     private final Meter meter;
     private final Map<String, LongCounter> counters = new ConcurrentHashMap<>();
+    private final LongHistogram durationHistogram;
+    private final LongCounter successCounter;
+    private final LongCounter failureCounter;
 
     public AgentMetricRecorder(OpenTelemetry openTelemetry) {
         this.meter = openTelemetry.getMeter(METER_NAME);
@@ -35,6 +39,23 @@ public class AgentMetricRecorder {
                     .setUnit(mapping.unit)
                     .build());
         }
+
+        // Task duration histogram
+        this.durationHistogram = meter.histogramBuilder("mr.task.duration_ms")
+            .ofLongs()
+            .setDescription("MR task execution duration")
+            .setUnit("ms")
+            .build();
+
+        // Task success/failure counters
+        this.successCounter = meter.counterBuilder("mr.task.success")
+            .setDescription("MR task completed successfully")
+            .setUnit("{tasks}")
+            .build();
+        this.failureCounter = meter.counterBuilder("mr.task.failure")
+            .setDescription("MR task failed with exception")
+            .setUnit("{tasks}")
+            .build();
     }
 
     /**
@@ -62,5 +83,25 @@ public class AgentMetricRecorder {
             .put("mr.job.id", identity.getJobId())
             .put("mr.job.name", identity.getJobName());
         return builder.build();
+    }
+
+    /**
+     * Record task execution duration as a histogram.
+     */
+    public void recordDuration(long durationMs, String taskType, TaskIdentity identity) {
+        Attributes attrs = buildAttributes(taskType, identity);
+        durationHistogram.record(durationMs, attrs);
+    }
+
+    /**
+     * Record task completion result (success or failure).
+     */
+    public void recordTaskResult(boolean success, String taskType, TaskIdentity identity) {
+        Attributes attrs = buildAttributes(taskType, identity);
+        if (success) {
+            successCounter.add(1, attrs);
+        } else {
+            failureCounter.add(1, attrs);
+        }
     }
 }

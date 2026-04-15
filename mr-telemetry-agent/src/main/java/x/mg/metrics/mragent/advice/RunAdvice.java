@@ -6,8 +6,8 @@ import x.mg.metrics.mragent.AgentContext;
 /**
  * ByteBuddy inline advice that wraps Mapper.run()/Reducer.run() calls.
  *
- * On enter: captures the Context reference, starts the periodic sampler.
- * On exit:  stops the sampler, reports final counters.
+ * On enter: captures the Context reference, starts the periodic sampler, records start time.
+ * On exit:  stops the sampler, reports final counters, records duration and task result.
  *
  * IMPORTANT: This class must never throw from advice methods.
  * All exceptions are caught to prevent agent failures from affecting MR tasks.
@@ -17,24 +17,29 @@ import x.mg.metrics.mragent.AgentContext;
 public class RunAdvice {
 
     @Advice.OnMethodEnter
-    public static void onEnter(
+    public static long onEnter(
             @Advice.Argument(0) Object context,
             @Advice.Origin String methodSignature) {
+        long startTime = System.currentTimeMillis();
         try {
             AgentContext.getOrInit().onRunEnter(context, methodSignature);
         } catch (Throwable t) {
             // Must never throw from advice - swallow all errors
             System.err.println("[mr-telemetry-agent] MR Agent advice enter failed: " + t.getMessage());
         }
+        return startTime;
     }
 
     @Advice.OnMethodExit(onThrowable = Throwable.class)
     public static void onExit(
             @Advice.Argument(0) Object context,
             @Advice.Origin String methodSignature,
-            @Advice.Thrown Throwable throwable) {
+            @Advice.Thrown Throwable throwable,
+            @Advice.Enter long startTime) {
         try {
-            AgentContext.getOrInit().onRunExit(context, methodSignature);
+            long durationMs = System.currentTimeMillis() - startTime;
+            boolean success = (throwable == null);
+            AgentContext.getOrInit().onRunExit(context, methodSignature, durationMs, success);
         } catch (Throwable t) {
             System.err.println("[mr-telemetry-agent] MR Agent advice exit failed: " + t.getMessage());
         }

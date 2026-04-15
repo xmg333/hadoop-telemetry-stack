@@ -89,4 +89,28 @@ class AgentMetricRecorderTest {
         // Unknown metric names should be silently ignored
         assertDoesNotThrow(() -> recorder.recordDeltas(deltas, "map", identity));
     }
+
+    @Test
+    void testRecordDuration() {
+        AgentMetricRecorder recorder = createRecorder();
+
+        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job");
+        assertDoesNotThrow(() -> recorder.recordDuration(5000L, "map", identity));
+    }
+
+    @Test
+    void testRecordTaskResultSuccess() {
+        AgentMetricRecorder recorder = createRecorder();
+
+        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job");
+        assertDoesNotThrow(() -> recorder.recordTaskResult(true, "map", identity));
+    }
+
+    @Test
+    void testRecordTaskResultFailure() {
+        AgentMetricRecorder recorder = createRecorder();
+
+        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job");
+        assertDoesNotThrow(() -> recorder.recordTaskResult(false, "reduce", identity));
+    }
 }

@@ -47,6 +47,10 @@ public class TaskSampler {
         });
     }
 
+    public TaskIdentity getIdentity() {
+        return identity;
+    }
+
     public void start() {
         if (running.compareAndSet(false, true)) {
             // Initial sample

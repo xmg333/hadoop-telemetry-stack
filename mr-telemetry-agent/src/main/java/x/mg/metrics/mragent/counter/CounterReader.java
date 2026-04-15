@@ -31,7 +31,9 @@ public class CounterReader {
             Object unwrapped = unwrapContext(context);
             Map<String, Long> result = new HashMap<>();
 
+            // Read TaskCounter values via getCounter(groupName, counterName)
             for (CounterMapping mapping : CounterMapping.ALL) {
+                if (!CounterMapping.TASK_COUNTER.equals(mapping.groupName)) continue;
                 try {
                     long value = readCounterNewApi(unwrapped, mapping.groupName, mapping.counterName);
                     if (value > 0) {
@@ -41,10 +43,61 @@ public class CounterReader {
                     // Individual counter read failure should not block others
                 }
             }
+
+            // Read FileSystemCounter values from FileSystem.Statistics
+            // (Counters object doesn't flush FS stats until task completion)
+            readFileSystemStats(result);
+
             return result;
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Failed to read counters: " + e.getMessage());
             return Collections.emptyMap();
+        }
+    }
+
+    /**
+     * Read file system statistics directly from FileSystem.getAllStatistics().
+     * FileSystemCounter values in Hadoop's Counters object are only flushed at
+     * task completion, so they appear as 0 during task execution.
+     * Reading from FileSystem.Statistics gives real-time values.
+     */
+    private void readFileSystemStats(Map<String, Long> result) {
+        try {
+            // FileSystem.getAllStatistics() returns List<FileSystem.Statistics>
+            Class<?> fsClass = Class.forName("org.apache.hadoop.fs.FileSystem");
+            Method getAllStats = fsClass.getMethod("getAllStatistics");
+            @SuppressWarnings("unchecked")
+            Iterable<Object> stats = (Iterable<Object>) getAllStats.invoke(null);
+
+            for (Object stat : stats) {
+                Method getScheme = stat.getClass().getMethod("getScheme");
+                String scheme = ((String) getScheme.invoke(stat)).toUpperCase();
+
+                Method getBytesRead = stat.getClass().getMethod("getBytesRead");
+                long bytesRead = ((Number) getBytesRead.invoke(stat)).longValue();
+
+                Method getBytesWritten = stat.getClass().getMethod("getBytesWritten");
+                long bytesWritten = ((Number) getBytesWritten.invoke(stat)).longValue();
+
+                Method getReadOps = stat.getClass().getMethod("getReadOps");
+                long readOps = ((Number) getReadOps.invoke(stat)).longValue();
+
+                Method getLargeReadOps = stat.getClass().getMethod("getLargeReadOps");
+                long largeReadOps = ((Number) getLargeReadOps.invoke(stat)).longValue();
+
+                Method getWriteOps = stat.getClass().getMethod("getWriteOps");
+                long writeOps = ((Number) getWriteOps.invoke(stat)).longValue();
+
+                String prefix = scheme.equals("FILE") ? "file" : scheme.toLowerCase();
+
+                if (bytesRead > 0) result.put("mr.task.io." + prefix + "_bytes_read", bytesRead);
+                if (bytesWritten > 0) result.put("mr.task.io." + prefix + "_bytes_written", bytesWritten);
+                if (readOps > 0) result.put("mr.task.io." + prefix + "_read_ops", readOps);
+                if (writeOps > 0) result.put("mr.task.io." + prefix + "_write_ops", writeOps);
+                if (largeReadOps > 0) result.put("mr.task.io." + prefix + "_large_read_ops", largeReadOps);
+            }
+        } catch (Exception e) {
+            System.err.println("[mr-telemetry-agent] FS stats failed: " + e.getMessage());
         }
     }
 
@@ -107,9 +160,6 @@ public class CounterReader {
 
     /**
      * Unwrap Hadoop 3.x WrappedMapper/WrappedReducer context objects.
-     *
-     * WrappedMapper$Context and WrappedReducer$Context in Hadoop 3.x delegate
-     * getCounter(String, String) directly, so we can often use them as-is.
      * Falls back to looking for inner mapContext/reduceContext fields.
      */
     private Object unwrapContext(Object context) throws Exception {
@@ -119,11 +169,6 @@ public class CounterReader {
             return context;
         } catch (NoSuchMethodException e) {
             // continue unwrapping
-        }
-
-        // Check for getCounters() (Hadoop 2.x style)
-        if (hasMethod(context.getClass(), "getCounters")) {
-            return context;
         }
 
         // Look for mapContext/reduceContext field (WrappedMapper/WrappedReducer)

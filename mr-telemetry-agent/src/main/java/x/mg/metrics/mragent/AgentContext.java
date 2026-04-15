@@ -66,12 +66,20 @@ public class AgentContext {
         currentSampler.start();
     }
 
-    public void onRunExit(Object context, String methodSignature) {
-        LOG.info("Task run exit: signature=" + methodSignature);
+    public void onRunExit(Object context, String methodSignature, long durationMs, boolean success) {
+        LOG.info("Task run exit: signature=" + methodSignature
+            + ", duration=" + durationMs + "ms, success=" + success);
 
         if (currentSampler != null) {
+            String taskType = detectTaskType(methodSignature);
+            TaskIdentity identity = currentSampler.getIdentity();
+
             currentSampler.stop();
             currentSampler = null;
+
+            // Record task duration and result
+            metricRecorder.recordDuration(durationMs, taskType, identity);
+            metricRecorder.recordTaskResult(success, taskType, identity);
         }
         // Force flush metrics immediately — YARN containers may be SIGKILL'd
         // before shutdown hooks run, so we can't rely on shutdown hook alone.

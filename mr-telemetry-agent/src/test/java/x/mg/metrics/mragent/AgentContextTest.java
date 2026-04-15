@@ -46,6 +46,6 @@ class AgentContextTest {
         AgentContext ctx = AgentContext.getOrInit();
         // Should not throw even with null context (graceful handling)
         assertDoesNotThrow(() -> ctx.onRunEnter(null, "Mapper.run(Context)"));
-        assertDoesNotThrow(() -> ctx.onRunExit(null, "Mapper.run(Context)"));
+        assertDoesNotThrow(() -> ctx.onRunExit(null, "Mapper.run(Context)", 1000L, true));
     }
 }
