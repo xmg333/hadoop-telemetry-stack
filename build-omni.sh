@@ -7,6 +7,10 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+echo "=== Phase 0: Install root POM ==="
+mvn install -N -DskipTests
+
+echo ""
 echo "=== Phase 1: Install common module (Java, profile-independent) ==="
 mvn install -pl spark-telemetry-common -DskipTests
 
