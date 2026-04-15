@@ -120,28 +120,47 @@ public class HiveTelemetryHook implements ExecuteWithHookContext {
         try {
             // getCounters() returns Map<GroupName, Map<CounterName, Long>>
             Map<String, Map<String, Long>> counterGroups = plan.getCounters();
-            if (counterGroups == null) return;
+            if (counterGroups == null) {
+                LOG.fine("QueryPlan.getCounters() returned null for query: " + m.getQueryId());
+                return;
+            }
+
+            LOG.fine("Found " + counterGroups.size() + " counter groups for query: " + m.getQueryId());
 
             // Flatten all counter groups and look for common counter names
-            for (Map<String, Long> group : counterGroups.values()) {
+            for (Map.Entry<String, Map<String, Long>> entry : counterGroups.entrySet()) {
+                Map<String, Long> group = entry.getValue();
                 if (group == null) continue;
 
                 Long val;
+                // Input bytes - try multiple counter names across Hive/MR versions
                 val = group.get("HDFS_BYTES_READ");
                 if (val == null) val = group.get("BYTES_READ");
+                if (val == null) val = group.get("FILE_BYTES_READ");
                 if (val != null && val > m.getInputBytes()) m.setInputBytes(val);
 
+                // Output bytes
                 val = group.get("HDFS_BYTES_WRITTEN");
                 if (val == null) val = group.get("BYTES_WRITTEN");
+                if (val == null) val = group.get("FILE_BYTES_WRITTEN");
                 if (val != null && val > m.getOutputBytes()) m.setOutputBytes(val);
 
+                // Output rows
                 val = group.get("RECORDS_OUT_INTERMEDIATE");
                 if (val == null) val = group.get("RECORDS_WRITTEN");
+                if (val == null) val = group.get("MAP_OUTPUT_RECORDS");
+                if (val == null) val = group.get("REDUCE_OUTPUT_RECORDS");
                 if (val != null && val > m.getOutputRows()) m.setOutputRows(val);
 
+                // Input rows
                 val = group.get("RECORDS_READ");
+                if (val == null) val = group.get("MAP_INPUT_RECORDS");
+                if (val == null) val = group.get("REDUCE_INPUT_RECORDS");
                 if (val != null && val > m.getInputRows()) m.setInputRows(val);
             }
+
+            LOG.fine("Extracted counters for " + m.getQueryId() + ": inBytes=" + m.getInputBytes()
+                + " outBytes=" + m.getOutputBytes() + " inRows=" + m.getInputRows() + " outRows=" + m.getOutputRows());
         } catch (Exception e) {
             // getCounters() may throw in some execution modes (Tez, LLAP)
             LOG.log(Level.FINE, "Could not extract counters: " + e.getMessage());
