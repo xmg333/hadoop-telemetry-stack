@@ -7,52 +7,24 @@
   "graphTooltip": 1,
   "links": [
     {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": true,
       "title": "Overview",
-      "tooltip": "Telemetry Overview dashboard",
-      "type": "link",
-      "url": "/d/telemetry-overview"
+      "url": "/d/telemetry-overview",
+      "type": "dashboard"
     },
     {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": true,
-      "title": "MR Telemetry",
-      "tooltip": "MR Telemetry dashboard",
-      "type": "link",
-      "url": "/d/mr-telemetry"
+      "title": "MapReduce",
+      "url": "/d/mr-telemetry",
+      "type": "dashboard"
     },
     {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": true,
-      "title": "Hive + MR",
-      "tooltip": "Hive MR Telemetry dashboard",
-      "type": "link",
-      "url": "/d/hive-mr-telemetry"
+      "title": "Hive on MR",
+      "url": "/d/hive-mr-telemetry",
+      "type": "dashboard"
     },
     {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": true,
-      "title": "Hive + Spark",
-      "tooltip": "Hive Spark Telemetry dashboard",
-      "type": "link",
-      "url": "/d/hive-spark-telemetry"
+      "title": "Hive on Spark",
+      "url": "/d/hive-spark-telemetry",
+      "type": "dashboard"
     }
   ],
   "panels": [
@@ -1901,7 +1873,7 @@
       ]
     }
   ],
-  "refresh": "30s",
+  "refresh": "60s",
   "schemaVersion": 39,
   "tags": [
     "spark",
@@ -1940,7 +1912,7 @@
     ]
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-3h",
     "to": "now"
   },
   "timezone": "utc",

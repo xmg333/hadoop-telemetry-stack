@@ -27,7 +27,7 @@
       "type": "dashboard"
     }
   ],
-  "refresh": "30s",
+  "refresh": "60s",
   "schemaVersion": 39,
   "tags": [
     "overview",
@@ -37,7 +37,7 @@
     "list": []
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-3h",
     "to": "now"
   },
   "timezone": "utc",

@@ -6,7 +6,34 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "title": "Overview",
+      "url": "/d/telemetry-overview",
+      "type": "dashboard"
+    },
+    {
+      "title": "Spark",
+      "url": "/d/spark-telemetry",
+      "type": "dashboard"
+    },
+    {
+      "title": "MapReduce",
+      "url": "/d/mr-telemetry",
+      "type": "dashboard"
+    },
+    {
+      "title": "Hive on MR",
+      "url": "/d/hive-mr-telemetry",
+      "type": "dashboard"
+    },
+    {
+      "title": "Hive on Spark",
+      "url": "/d/hive-spark-telemetry",
+      "type": "dashboard"
+    }
+  ],
+  "refresh": "60s",
   "panels": [
     {
       "id": 1,
@@ -2495,7 +2522,7 @@
     ]
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-3h",
     "to": "now"
   },
   "timezone": "utc",
