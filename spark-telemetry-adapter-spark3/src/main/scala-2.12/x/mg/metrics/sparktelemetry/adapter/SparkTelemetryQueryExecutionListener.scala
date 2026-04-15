@@ -111,9 +111,9 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
         val tableMetric = new SqlTableIOMetrics
         tableMetric.setOperation("scan")
         tableMetric.setTableName(s.tableIdentifier.map(_.unquotedString).getOrElse("unknown"))
-        tableMetric.setBytes(metricValue(s, "filesSize"))
+        tableMetric.setBytes(metricValue(s, "filesSize", "numBytesRead"))
         tableMetric.setRows(metricValue(s, "numOutputRows"))
-        tableMetric.setFilesRead(metricValue(s, "numFiles"))
+        tableMetric.setFilesRead(metricValue(s, "numFiles", "numFilesRead"))
         tableMetric.setTimeMs(metricValue(s, "scanTime"))
         tm.add(tableMetric)
 
@@ -121,9 +121,9 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
         val tableMetric = new SqlTableIOMetrics
         tableMetric.setOperation("scan")
         tableMetric.setTableName(extractBatchScanTableName(s))
-        tableMetric.setBytes(metricValue(s, "filesSize"))
+        tableMetric.setBytes(metricValue(s, "filesSize", "numBytesRead"))
         tableMetric.setRows(metricValue(s, "numOutputRows"))
-        tableMetric.setFilesRead(metricValue(s, "numFiles"))
+        tableMetric.setFilesRead(metricValue(s, "numFiles", "numFilesRead"))
         tableMetric.setTimeMs(metricValue(s, "scanTime"))
         tm.add(tableMetric)
 
@@ -167,6 +167,17 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
 
   private def metricValue(plan: SparkPlan, name: String): Long = {
     plan.metrics.get(name).map(_.value).getOrElse(0L)
+  }
+
+  /** Try multiple metric names in order (first non-zero wins); for cross-version compatibility. */
+  private def metricValue(plan: SparkPlan, name: String, fallbacks: String*): Long = {
+    val v = plan.metrics.get(name).map(_.value).getOrElse(0L)
+    if (v > 0) return v
+    fallbacks.foreach { n =>
+      val fv = plan.metrics.get(n).map(_.value).getOrElse(0L)
+      if (fv > 0) return fv
+    }
+    0L
   }
 
   private def extractBatchScanTableName(scan: BatchScanExec): String = {
