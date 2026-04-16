@@ -41,11 +41,11 @@ git clone <repo-url> && cd spark-telemetry-listener
 chmod +x build-omni.sh && ./build-omni.sh
 
 # 产物位置
-ls spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*.jar
+ls spark/spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*.jar
 
 # 单独构建各组件（可选）
-mvn clean package -pl hive-telemetry-hook,hive-telemetry-hook-dist -am -DskipTests      # Hive Hook
-mvn clean package -pl metrics-flink-consumer,metrics-flink-consumer-dist -am -DskipTests  # Flink Consumer
+mvn clean package -pl hive/hive-telemetry-hook,hive/hive-telemetry-hook-dist -am -DskipTests      # Hive Hook
+mvn clean package -pl flink/metrics-flink-consumer,flink/metrics-flink-consumer-dist -am -DskipTests  # Flink Consumer
 ```
 
 ## 2. 基础设施部署
@@ -136,7 +136,7 @@ flink run -c x.mg.metrics.flinkconsumer.FlinkConsumerJob \
   metrics-flink-consumer-dist-1.0.0-SNAPSHOT.jar /path/to/flink-consumer.conf
 ```
 
-Flink Consumer 启动后自动建表（11 张表），无需手动初始化 schema。
+Flink Consumer 启动后自动建表（15 张表），无需手动初始化 schema。
 
 ### 2.5 Grafana
 

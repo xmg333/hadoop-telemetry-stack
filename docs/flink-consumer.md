@@ -12,7 +12,7 @@ CREATE USER 'metrics'@'%' IDENTIFIED BY 'metrics';
 GRANT ALL PRIVILEGES ON metrics_db.* TO 'metrics'@'%';
 ```
 
-启动时自动创建 9 张表，无需手动建表。
+启动时自动创建 15 张表，无需手动建表。
 
 #### ClickHouse
 
@@ -101,6 +101,12 @@ flink run -c x.mg.metrics.flink.Main metrics-flink-consumer.jar flink-consumer.c
 | `stage_histogram_buckets` | Stage 级直方图桶分布 |
 | `job_histogram_buckets` | Job 级直方图桶分布 |
 | `stage_governance` | Stage 治理指标（预聚合） |
+| `sql_query_metrics` | Spark SQL 执行指标（join/shuffle bytes 等） |
+| `sql_query_table_metrics` | Spark SQL 表级 IO 指标 |
+| `hive_query_metrics` | Hive 查询执行指标（duration/success/IO） |
+| `hive_table_io_metrics` | Hive 查询表级 IO 指标 |
+| `mr_job_metrics` | MR Collector 作业级指标 |
+| `mr_task_metrics` | MR Agent 任务级指标 |
 
 ### task_metrics
 

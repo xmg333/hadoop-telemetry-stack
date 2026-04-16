@@ -69,7 +69,11 @@ mvn clean package -Pspark-4 -DskipTests    # Spark 4.x
 
 ```
 spark/spark-telemetry-common/             # 核心库：配置、模型、OTel SDK、生命周期管理
-spark/spark-telemetry-adapter-spark{2,3,4}/  # 各 Spark 版本适配层（Scala）
+spark/spark-telemetry-adapter-spark2/     # Scala 2.11 适配层，Spark 2.4
+spark/spark-telemetry-adapter-spark3/     # Scala 2.12 适配层，Spark 3.5
+spark/spark-telemetry-adapter-spark30/    # Scala 2.12 适配层，Spark 3.0
+spark/spark-telemetry-adapter-spark32/    # Scala 2.12 适配层，Spark 3.2
+spark/spark-telemetry-adapter-spark4/     # Scala 2.13 适配层，Spark 4.0
 spark/spark-telemetry-dist-spark{2,3,4}/  # 各版本 Shaded Fat JAR
 spark/spark-telemetry-omni-facade/        # Omnipackage Java 门面（自动检测 Spark 版本）
 spark/spark-telemetry-adapters-relocated/ # 适配器重定位（v2/v3/v4 包隔离）

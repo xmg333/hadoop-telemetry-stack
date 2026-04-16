@@ -23,7 +23,7 @@ chmod +x build-omni.sh && ./build-omni.sh
 mvn test
 
 # Run a single test class
-mvn test -pl spark-telemetry-common -Dtest=TelemetryConfigTest
+mvn test -pl spark/spark-telemetry-common -Dtest=TelemetryConfigTest
 
 # Run integration tests (failsafe plugin, Spark 3 profile only)
 mvn verify -Pspark-3
@@ -39,21 +39,30 @@ This is a **transparent Spark telemetry plugin** that captures Spark task/stage 
 ### Module Structure
 
 ```
-spark-telemetry-common/       # Java-only core: config, models, OTel SDK setup, lifecycle
-spark-telemetry-adapter-spark2/   # Scala 2.11 adapter for Spark 2.4 (spark.extraListeners)
-spark-telemetry-adapter-spark3/   # Scala 2.12 adapter for Spark 3.5 (SparkPlugin API)
-spark-telemetry-adapter-spark4/   # Scala 2.13 adapter for Spark 4.0 (SparkPlugin API)
-spark-telemetry-dist-spark{2,3,4}/ # Shaded fat JARs for each Spark version
-spark-telemetry-omni-facade/      # Pure Java facade for omnipackage (auto-detect + delegate)
-spark-telemetry-adapters-relocated/ # Intermediate: relocates adapters to v2/v3/v4 packages via shade
-spark-telemetry-dist-omni/        # Unified distribution: Spark 2/3/4 + MR Collector + MR Agent in one JAR
-mr-telemetry-collector/        # Standalone MR job metric collector (Java)
-mr-telemetry-dist/             # Shaded fat JAR for MR collector
-hive-telemetry-hook/           # Hive query telemetry hook via ExecuteWithHookContext (Java)
-hive-telemetry-hook-dist/      # Shaded fat JAR for Hive hook
-metrics-flink-consumer/        # Flink job consuming OTLP protobuf from Kafka → MySQL/ClickHouse
-metrics-flink-consumer-dist/   # Shaded fat JAR for Flink consumer
-integration-tests/             # IT/E2E tests (Spark 3 profile only)
+spark/
+├── spark-telemetry-common/           # Java-only core: config, models, OTel SDK setup, lifecycle
+├── spark-telemetry-adapter-spark2/   # Scala 2.11 adapter for Spark 2.4 (spark.extraListeners)
+├── spark-telemetry-adapter-spark3/   # Scala 2.12 adapter for Spark 3.5 (SparkPlugin API)
+├── spark-telemetry-adapter-spark30/  # Scala 2.12 adapter for Spark 3.0 (SparkPlugin API)
+├── spark-telemetry-adapter-spark32/  # Scala 2.12 adapter for Spark 3.2 (SparkPlugin API)
+├── spark-telemetry-adapter-spark4/   # Scala 2.13 adapter for Spark 4.0 (SparkPlugin API)
+├── spark-telemetry-dist-spark{2,3,4}/ # Shaded fat JARs for each Spark version
+├── spark-telemetry-omni-facade/      # Pure Java facade for omnipackage (auto-detect + delegate)
+├── spark-telemetry-adapters-relocated/ # Intermediate: relocates adapters to v2/v3/v4 packages via shade
+└── spark-telemetry-dist-omni/        # Unified distribution: Spark 2/3/4 + MR Collector + MR Agent in one JAR
+mapreduce-collector/
+├── mr-telemetry-collector/           # Standalone MR job metric collector (Java)
+└── mr-telemetry-dist/               # Shaded fat JAR for MR collector
+mapreduce-agent/
+├── mr-telemetry-agent/              # MR task-level agent via ByteBuddy instrumentation (Java)
+└── mr-telemetry-agent-dist/         # Shaded fat JAR for MR agent
+hive/
+├── hive-telemetry-hook/             # Hive query telemetry hook via ExecuteWithHookContext (Java)
+└── hive-telemetry-hook-dist/        # Shaded fat JAR for Hive hook
+flink/
+├── metrics-flink-consumer/          # Flink job consuming OTLP protobuf from Kafka → MySQL/ClickHouse
+└── metrics-flink-consumer-dist/     # Shaded fat JAR for Flink consumer
+integration-tests/                   # IT/E2E tests (Spark 3 profile only)
 ```
 
 ### Data Flow (Spark Plugin)
@@ -103,7 +112,7 @@ The omnipackage (`spark-telemetry-dist-omni`) produces a single JAR supporting S
 
 ### Configuration (Three-Tier Merge)
 
-Config is loaded by `TelemetryConfig` with priority: Spark conf overrides (`spark.telemetry.*`) > HOCON file (`telemetry.conf`) > built-in defaults. See `telemetry.conf.example` and `mr-collector.conf.example` for all available options.
+Config is loaded by `TelemetryConfig` with priority: Spark conf overrides (`spark.telemetry.*`) > HOCON file (`telemetry.conf`) > built-in defaults. See `conf/examples/telemetry.conf.example` and `conf/examples/mr-collector.conf.example` for all available options.
 
 **Important**: Spark conf keys must include the full internal path, including `.otel.` segment. The mapping converts `spark.telemetry.X` to `spark-telemetry.X`:
 - Correct: `spark.telemetry.otel.exporter.endpoint=http://host:4317`
@@ -142,13 +151,16 @@ Data flow: `Hive Query → HiveTelemetryHook (POST_EXEC) → OTel SDK → OTLP g
 - `hive.query.input_bytes` / `hive.query.output_bytes` / `hive.query.input_rows` / `hive.query.output_rows` (LongCounter)
 - `hive.query.input_tables` / `hive.query.output_tables` (LongCounter, per-table data points with `hive.query.input_table` / `hive.query.output_table` attributes)
 
-**Flink Consumer tables** (2 new tables in MySQL/ClickHouse):
-- `hive_query_metrics`: query_id, operation, user_name, success, duration_ms, IO metrics
-- `hive_table_io_metrics`: query_id, table_name, table_type (input/output), operation, user_name
+**Flink Consumer tables** (15 tables in MySQL/ClickHouse):
+- **Spark**: task_metrics, stage_metrics, job_metrics, jvm_memory_metrics, jvm_gc_metrics
+- **Histograms**: task_histogram_buckets, stage_histogram_buckets, job_histogram_buckets
+- **Governance**: stage_governance, sql_query_metrics, sql_query_table_metrics
+- **Hive**: hive_query_metrics, hive_table_io_metrics
+- **MR**: mr_job_metrics, mr_task_metrics
 
 ```bash
 # Build Hive hook
-mvn clean package -pl hive-telemetry-hook,hive-telemetry-hook-dist -am -DskipTests
+mvn clean package -pl hive/hive-telemetry-hook,hive/hive-telemetry-hook-dist -am -DskipTests
 
 # Deploy: copy shaded JAR to HiveServer2 auxlib, configure hive-site.xml:
 # <property>
@@ -163,11 +175,11 @@ mvn clean package -pl hive-telemetry-hook,hive-telemetry-hook-dist -am -DskipTes
 
 ### Flink Metrics Consumer
 
-Flink 1.18 job that reads OTLP protobuf metrics from Kafka and writes to MySQL or ClickHouse with 11-table wide-row schema. Includes histogram bucket support and stage governance pre-aggregation.
+Flink 1.18 job that reads OTLP protobuf metrics from Kafka and writes to MySQL or ClickHouse with 15-table wide-row schema. Includes histogram bucket support and stage governance pre-aggregation.
 
 Data flow: `Kafka (OTLP Protobuf) → Flink Job → MySQL / ClickHouse`
 
-- **Database schema**: 11 tables — `task_metrics`, `stage_metrics`, `job_metrics`, `jvm_memory_metrics`, `jvm_gc_metrics`, `task_histogram_buckets`, `stage_histogram_buckets`, `job_histogram_buckets`, `stage_governance`, `hive_query_metrics`, `hive_table_io_metrics`
+- **Database schema**: 15 tables — `task_metrics`, `stage_metrics`, `job_metrics`, `jvm_memory_metrics`, `jvm_gc_metrics`, `task_histogram_buckets`, `stage_histogram_buckets`, `job_histogram_buckets`, `stage_governance`, `sql_query_metrics`, `sql_query_table_metrics`, `hive_query_metrics`, `hive_table_io_metrics`, `mr_job_metrics`, `mr_task_metrics`
 - **Configuration**: HOCON file `flink-consumer.conf` (see `flink-consumer.conf.example`)
 - **Sink types**: `mysql` (default) or `clickhouse`, switched via `flink-consumer.sink.type`
 - **Flink version**: 1.18.0 (last version supporting Java 8)
@@ -175,10 +187,10 @@ Data flow: `Kafka (OTLP Protobuf) → Flink Job → MySQL / ClickHouse`
 
 ```bash
 # Build Flink consumer
-mvn clean package -pl metrics-flink-consumer,metrics-flink-consumer-dist -am -DskipTests
+mvn clean package -pl flink/metrics-flink-consumer,flink/metrics-flink-consumer-dist -am -DskipTests
 
 # Run (standalone, needs Kafka + MySQL running)
-java -jar metrics-flink-consumer-dist/target/metrics-flink-consumer-dist-1.0.0-SNAPSHOT.jar flink-consumer.conf
+java -jar flink/metrics-flink-consumer-dist/target/metrics-flink-consumer-dist-1.0.0-SNAPSHOT.jar flink-consumer.conf
 ```
 
 ### Shading
@@ -199,7 +211,7 @@ Distribution modules use `maven-shade-plugin` to create self-contained JARs. OTe
 
 ### Deployment
 
-`k8s/` contains Kubernetes manifests for a test environment: Hadoop cluster (NN, DN, RM, NM, HistoryServer), OTel Collector, and Kafka. `otel-collector-config/` has the OTel Collector pipeline config.
+`deploy/k8s/` contains Kubernetes manifests for a test environment: Hadoop cluster (NN, DN, RM, NM, HistoryServer), OTel Collector, and Kafka. `deploy/otel-collector/` has the OTel Collector pipeline config. `deploy/grafana/` has Grafana dashboard JSON files. `deploy/sql/` has database migration scripts.
 
 ## K8s Integration Test Environment
 
@@ -219,7 +231,7 @@ All services run as bare Ubuntu pods with software installed via `kubectl cp` + 
 
 ```bash
 # Deploy all K8s resources
-./k8s/deploy.sh
+./deploy/k8s/deploy.sh
 
 # After pods are running, install software in each pod:
 # 1. Copy tarballs: kubectl cp <file> <pod>:/tmp/
@@ -251,7 +263,7 @@ OTEL_IP=$(kubectl get pods -l app=otel-collector -o jsonpath='{.items[0].status.
 HADOOP3_IP=$(kubectl get pod hadoop3 -o jsonpath='{.status.podIP}')
 
 # 3. Test Spark plugin (Spark 3)
-kubectl cp spark-telemetry-dist-spark3/target/*.jar spark3:/opt/spark-telemetry-plugin.jar
+kubectl cp spark/spark-telemetry-dist-spark3/target/*.jar spark3:/opt/spark-telemetry-plugin.jar
 kubectl exec spark3 -- bash -c '
   export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
   export SPARK_HOME=/opt/spark
@@ -266,7 +278,7 @@ kubectl exec spark3 -- bash -c '
 '
 
 # 4. Test MR Collector (Hadoop 3)
-kubectl cp mr-telemetry-dist/target/*.jar hadoop3:/tmp/mr-collector.jar
+kubectl cp mapreduce-collector/mr-telemetry-dist/target/*.jar hadoop3:/tmp/mr-collector.jar
 # Create mr-collector.conf with correct IPs, then:
 kubectl exec hadoop3 -- java -jar /tmp/mr-collector.jar /tmp/mr-collector.conf
 ```
@@ -276,7 +288,7 @@ kubectl exec hadoop3 -- java -jar /tmp/mr-collector.jar /tmp/mr-collector.conf
 ```bash
 # 1. Build omnipackage
 ./build-omni.sh
-OMNI_JAR=$(ls spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*.jar)
+OMNI_JAR=$(ls spark/spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*.jar)
 
 # 2. Get pod IPs
 OTEL_IP=$(kubectl get pods -l app=otel-collector -o jsonpath='{.items[0].status.podIP}')
@@ -317,13 +329,13 @@ kubectl exec $(kubectl get pods -l app=kafka -o jsonpath='{.items[0].metadata.na
   -- /opt/kafka/bin/kafka-dump-log.sh --files /tmp/kafka-logs/telemetry-metrics-0/00000000000000000000.log
 
 # 7. Test Flink Consumer (Kafka → MySQL)
-kubectl apply -f k8s/mysql/mysql-pod.yaml
+kubectl apply -f deploy/k8s/mysql/mysql-pod.yaml
 kubectl wait --for=condition=ready pod/mysql --timeout=120s
 MYSQL_IP=$(kubectl get pod mysql -o jsonpath='{.status.podIP}')
 KAFKA_IP=$(kubectl get pods -l app=kafka -o jsonpath='{.items[0].status.podIP}')
 # Build + copy JAR
-mvn clean package -pl metrics-flink-consumer,metrics-flink-consumer-dist -am -DskipTests
-kubectl cp metrics-flink-consumer-dist/target/metrics-flink-consumer-dist-1.0.0-SNAPSHOT.jar spark3:/tmp/flink-consumer.jar
+mvn clean package -pl flink/metrics-flink-consumer,flink/metrics-flink-consumer-dist -am -DskipTests
+kubectl cp flink/metrics-flink-consumer-dist/target/metrics-flink-consumer-dist-1.0.0-SNAPSHOT.jar spark3:/tmp/flink-consumer.jar
 # Create config and run (timeout controls how long it runs)
 kubectl exec spark3 -- bash -c '
   export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -334,7 +346,7 @@ kubectl exec mysql -- mysql -u metrics -pmetrics metrics_db -e \
   "SELECT metric_name, COUNT(*) FROM metric_samples GROUP BY metric_name;"
 
 # 8. Test Flink Consumer (Kafka → ClickHouse)
-kubectl apply -f k8s/clickhouse/clickhouse-pod.yaml
+kubectl apply -f deploy/k8s/clickhouse/clickhouse-pod.yaml
 kubectl wait --for=condition=ready pod/clickhouse --timeout=120s
 CH_IP=$(kubectl get pod clickhouse -o jsonpath='{.status.podIP}')
 kubectl exec clickhouse -- clickhouse-client -q "CREATE DATABASE IF NOT EXISTS metrics_db"

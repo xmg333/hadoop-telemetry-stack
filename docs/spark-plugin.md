@@ -8,10 +8,10 @@
 
 ```bash
 # 方式 A：HDFS
-hdfs dfs -put spark-telemetry-dist-spark3/target/spark-telemetry-plugin.jar /spark/libs/
+hdfs dfs -put spark/spark-telemetry-dist-spark3/target/spark-telemetry-dist-spark3-*.jar /spark/libs/
 
 # 方式 B：本地路径
-scp spark-telemetry-dist-spark3/target/spark-telemetry-plugin.jar node:/opt/spark/libs/
+scp spark/spark-telemetry-dist-spark3/target/spark-telemetry-dist-spark3-*.jar node:/opt/spark/libs/
 ```
 
 #### 配置
