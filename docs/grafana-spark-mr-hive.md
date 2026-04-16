@@ -11,11 +11,13 @@
 本仪表盘整合了 Spark 仪表盘和 Hive 分析的全部面板，并增加 MR 相关统计，适合需要全局视角的场景。
 
 ## 前置条件
-- 数据源：全部 11 张独立指标表
-- Grafana 变量：
-  - `$app_id` — Spark 应用 ID（多选，含 All），从 `task_metrics` 获取
-  - `$hive_operation` — Hive 操作类型（多选，含 All），从 `hive_query_metrics` 获取
-  - `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
+
+数据源：全部 11 张独立指标表
+
+Grafana 变量：
+:   `$app_id` — Spark 应用 ID（多选，含 All），从 `task_metrics` 获取
+:   `$hive_operation` — Hive 操作类型（多选，含 All），从 `hive_query_metrics` 获取
+:   `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
 
 ## 面板说明
 
@@ -151,6 +153,7 @@ ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
 **列说明**:
+
 | 列名 | 含义 | 单位 |
 |------|------|------|
 | `query_id` | Hive 查询唯一 ID | - |

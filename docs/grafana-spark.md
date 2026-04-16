@@ -10,11 +10,14 @@
 - SQL 查询和表 IO 详情如何？
 
 ## 前置条件
-- 数据源：`task_metrics`、`stage_metrics`、`job_metrics`、`jvm_memory_metrics`、`jvm_gc_metrics`、`sql_query_metrics`、`sql_query_table_metrics`、`stage_governance`、`task_histogram_buckets`
-- Grafana 变量：
-  - `$app_id` — Spark 应用 ID（多选，含 All）
-  - `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
-- 变量查询：`SELECT DISTINCT app_id FROM task_metrics ORDER BY app_id`
+
+数据源：`task_metrics`、`stage_metrics`、`job_metrics`、`jvm_memory_metrics`、`jvm_gc_metrics`、`sql_query_metrics`、`sql_query_table_metrics`、`stage_governance`、`task_histogram_buckets`
+
+Grafana 变量：
+:   `$app_id` — Spark 应用 ID（多选，含 All）
+:   `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
+
+变量查询：`SELECT DISTINCT app_id FROM task_metrics ORDER BY app_id`
 
 ## 面板说明
 
@@ -154,6 +157,7 @@ ORDER BY timestamp_ms DESC LIMIT 100
 ```
 
 **列说明**:
+
 | 列名 | 含义 |
 |------|------|
 | `job_success` | 任务状态（SUCCESS 绿色 / FAILED 红色） |
@@ -248,6 +252,7 @@ ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
 **列说明**:
+
 | 列名 | 含义 | 单位 |
 |------|------|------|
 | `task_success` | OK（绿色）/ FAIL（红色） | - |

@@ -8,11 +8,14 @@
 - 具体查询的详情和表 IO 血缘如何？
 
 ## 前置条件
-- 数据源：`hive_query_metrics`、`hive_table_io_metrics`（过滤 `execution_engine='spark'`）
-- Grafana 变量：
-  - `$hive_operation` — Hive 操作类型（多选，含 All）
-  - `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
-- 变量查询：`SELECT DISTINCT operation FROM hive_query_metrics WHERE execution_engine='spark' AND operation IS NOT NULL ORDER BY operation`
+
+数据源：`hive_query_metrics`、`hive_table_io_metrics`（过滤 `execution_engine='spark'`）
+
+Grafana 变量：
+:   `$hive_operation` — Hive 操作类型（多选，含 All）
+:   `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
+
+变量查询：`SELECT DISTINCT operation FROM hive_query_metrics WHERE execution_engine='spark' AND operation IS NOT NULL ORDER BY operation`
 
 ## 面板说明
 
@@ -95,6 +98,7 @@ ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
 **列说明**:
+
 | 列名 | 含义 | 单位 |
 |------|------|------|
 | `query_id` | Hive 查询唯一 ID | - |
@@ -116,6 +120,7 @@ ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
 **列说明**:
+
 | 列名 | 含义 |
 |------|------|
 | `table_type` | INPUT（蓝色）/ OUTPUT（绿色） |

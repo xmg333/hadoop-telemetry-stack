@@ -1,4 +1,4 @@
-site_name: Spark Telemetry Listener
+site_name: Yarn Telemetry
 site_description: 透明的大数据可观测性方案 — Spark / MR / Hive 指标采集
 repo_url: https://codeup.aliyun.com/68c25bfda72fbe62724140bd/yarn-telemetry
 
@@ -42,7 +42,6 @@ markdown_extensions:
   - toc:
       permalink: true
   - tables
-  - sane_lists
   - def_list
   - pymdownx.superfences:
       custom_fences:

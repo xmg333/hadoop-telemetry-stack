@@ -8,12 +8,17 @@
 - Task 级别的耗时分布和 IO 详情如何？
 
 ## 前置条件
-- 数据源：`mr_job_metrics`、`mr_task_metrics`
-- Grafana 变量：
-  - `$mr_job_id` — MR Job ID（多选，含 All）
-  - `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
-- 变量查询：`SELECT DISTINCT job_id FROM (SELECT DISTINCT job_id FROM mr_job_metrics UNION SELECT DISTINCT job_id FROM mr_task_metrics) t ORDER BY job_id`
-- **注意**：Task 级别面板需要部署 MR Agent（ByteBuddy 字节码增强），仅靠 MR Collector（History Server 轮询）无法获取 Task 级数据
+
+数据源：`mr_job_metrics`、`mr_task_metrics`
+
+Grafana 变量：
+:   `$mr_job_id` — MR Job ID（多选，含 All）
+:   `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
+
+变量查询：`SELECT DISTINCT job_id FROM (SELECT DISTINCT job_id FROM mr_job_metrics UNION SELECT DISTINCT job_id FROM mr_task_metrics) t ORDER BY job_id`
+
+!!! warning "注意"
+    Task 级别面板需要部署 MR Agent（ByteBuddy 字节码增强），仅靠 MR Collector（History Server 轮询）无法获取 Task 级数据
 
 ## 面板说明
 
@@ -98,6 +103,7 @@ ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
 **列说明**:
+
 | 列名 | 含义 | 单位 |
 |------|------|------|
 | `state` | Job 状态（SUCCEEDED / FAILED / KILLED） | - |
@@ -171,6 +177,7 @@ ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
 **列说明**:
+
 | 列名 | 含义 | 单位 |
 |------|------|------|
 | `map_output_bytes` | Map 输出字节数 | bytes |
