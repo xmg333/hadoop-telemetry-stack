@@ -113,6 +113,145 @@ jar tf spark/spark-telemetry-dist-omni/target/*.jar | grep "^io/opentelemetry/"
 
 ---
 
+## 一键部署脚本
+
+构建完成后，使用部署脚本将 Omnipackage 安装到 Spark / Hive / MR 环境，并将 Grafana 面板导入 Grafana 实例。
+
+### Omnipackage 安装脚本
+
+`deploy/install-omni.sh` 将 Omnipackage JAR 复制到各组件的类路径目录，并生成对应的配置文件。支持重复运行，自动替换旧版本 JAR。
+
+**安装位置：**
+
+| 组件 | JAR 安装路径 |
+|------|-------------|
+| Spark | `$SPARK_HOME/jars/spark-telemetry-omni.jar` |
+| Hive | `$HIVE_HOME/lib/spark-telemetry-omni.jar` |
+| MR Collector | `$HADOOP_HOME/share/hadoop/mapreduce-telemetry/spark-telemetry-omni.jar` |
+
+**用法：**
+
+```bash
+# 基本安装（指定各组件目录和 OTel Collector 地址）
+./deploy/install-omni.sh \
+  --spark-home=/opt/spark \
+  --hive-home=/opt/hive \
+  --hadoop-home=/opt/hadoop \
+  --otel-endpoint=http://otel-collector:4317 \
+  -y
+
+# 只安装 Spark 和 Hive，跳过 MR Collector
+./deploy/install-omni.sh \
+  --spark-home=/opt/spark \
+  --hive-home=/opt/hive \
+  --skip-mr -y
+
+# Spark 2.x 环境（使用 extraListeners 而非 SparkPlugin API）
+./deploy/install-omni.sh \
+  --spark2 \
+  --spark-home=/opt/spark-2.4 \
+  --hadoop-home=/opt/hadoop \
+  --otel-endpoint=http://otel-collector:4317 \
+  -y
+
+# 预览模式（不执行任何操作，仅显示将要执行的命令）
+./deploy/install-omni.sh \
+  --dry-run \
+  --spark-home=/opt/spark \
+  --hive-home=/opt/hive \
+  --hadoop-home=/opt/hadoop
+
+# 备份旧 JAR 后再替换
+./deploy/install-omni.sh \
+  --backup \
+  --spark-home=/opt/spark \
+  --hive-home=/opt/hive \
+  -y
+```
+
+**参数说明：**
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--spark-home` | `$SPARK_HOME` | Spark 安装目录 |
+| `--hadoop-home` | `$HADOOP_HOME` | Hadoop 安装目录 |
+| `--hive-home` | `$HIVE_HOME` | Hive 安装目录 |
+| `--otel-endpoint` | `http://localhost:4317` | OTel Collector gRPC 端点 |
+| `--spark-service` | `spark-application` | Spark OTel 服务名 |
+| `--hive-service` | `hive-server2` | Hive OTel 服务名 |
+| `--mr-service` | `mr-telemetry-collector` | MR Collector OTel 服务名 |
+| `--mr-history-url` | `http://localhost:19888` | MR History Server URL |
+| `--config-dir` | `./telemetry-configs` | 生成的配置文件输出目录 |
+| `--skip-spark` | - | 跳过 Spark 安装 |
+| `--skip-mr` | - | 跳过 MR Collector 安装 |
+| `--skip-hive` | - | 跳过 Hive 安装 |
+| `--spark2` | - | 使用 Spark 2.x 配置（extraListeners） |
+| `--backup` | - | 替换前备份旧 JAR |
+| `--dry-run` | - | 仅预览，不执行 |
+| `-y` / `--yes` | - | 跳过确认提示 |
+
+**生成的配置文件：**
+
+脚本在 `--config-dir` 指定的目录下生成以下文件：
+
+| 文件 | 说明 |
+|------|------|
+| `spark-telemetry.conf` | Spark 插件 HOCON 配置 |
+| `spark-telemetry.conf.snippet` | 需要添加到 `spark-defaults.conf` 的配置片段 |
+| `hive-telemetry.conf` | Hive Hook HOCON 配置 |
+| `hive-telemetry-site.xml.snippet` | 需要添加到 `hive-site.xml` 的配置片段 |
+| `mr-collector.conf` | MR Collector HOCON 配置 |
+| `start-mr-collector.sh` | MR Collector 启动脚本 |
+| `mr-telemetry-collector.service` | systemd 服务文件（可选） |
+| `INSTALL_SUMMARY.txt` | 安装摘要 |
+
+安装完成后，按照提示将配置片段添加到对应的配置文件中，并重启服务。
+
+### Grafana 面板部署脚本
+
+`deploy/deploy-grafana.sh` 将 `deploy/grafana/` 目录下的所有仪表盘 JSON 批量导入到 Grafana 实例，通过账号密码认证。支持重复导入，自动覆盖更新。
+
+**用法：**
+
+```bash
+# 部署所有面板到 Grafana
+./deploy/deploy-grafana.sh \
+  --grafana-url=http://grafana:3000 \
+  --user=admin \
+  --password=admin
+
+# 指定目标文件夹名
+./deploy/deploy-grafana.sh \
+  --grafana-url=http://grafana:3000 \
+  --user=admin \
+  --password=secret \
+  --folder=Production
+
+# 预览模式（不实际上传）
+./deploy/deploy-grafana.sh \
+  --grafana-url=http://grafana:3000 \
+  --user=admin \
+  --password=admin \
+  --dry-run
+```
+
+**参数说明：**
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--grafana-url` | （必填） | Grafana 基础 URL |
+| `--user` | （必填） | Grafana 管理员用户名 |
+| `--password` | （必填） | Grafana 管理员密码 |
+| `--folder` | `Telemetry` | Grafana 中的目标文件夹名 |
+| `--dashboard-dir` | `deploy/grafana` | 仪表盘 JSON 文件目录 |
+| `--dry-run` | - | 仅预览，不上传 |
+
+**前置依赖：** `curl`、`python3`
+
+脚本会自动在 Grafana 中创建目标文件夹（如不存在），然后逐一上传 `deploy/grafana/` 下所有 `.json` 文件。每次运行都会覆盖更新已有面板，适合 CI/CD 集成。
+
+---
+
 ## OTel Collector 配置
 
 ### 最小配置

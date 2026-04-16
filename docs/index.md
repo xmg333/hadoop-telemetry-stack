@@ -4,30 +4,24 @@
 
 ## 系统架构
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  采集层                                                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Spark Plugin │  │ MR Collector │  │  MR Agent    │      │
-│  │ (Task/Stage/ │  │ (History Svr)│  │ (字节码增强)  │      │
-│  │  JVM Metrics)│  │              │  │              │      │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
-│         └──────── OTLP gRPC ────────┬───────┘              │
-└─────────────────────────────────────┼───────────────────────┘
-                                      ▼
-                        ┌─────────────────────────┐
-                        │     OTel Collector       │
-                        └────────────┬────────────┘
-                                     │ Kafka (OTLP Protobuf)
-                                     ▼
-                        ┌─────────────────────────┐
-                        │  Flink Metrics Consumer  │
-                        └────────────┬────────────┘
-                                     ▼
-                        ┌─────────────────────────┐
-                        │  MySQL / ClickHouse      │
-                        │  + Grafana 可视化         │
-                        └─────────────────────────┘
+```mermaid
+graph TD
+    subgraph 采集层
+        SP["Spark Plugin<br/>(Task/Stage/JVM Metrics)"]
+        MR["MR Collector<br/>(History Server)"]
+        MA["MR Agent<br/>(字节码增强)"]
+    end
+
+    SP -- OTLP gRPC --> OTel
+    MR -- OTLP gRPC --> OTel
+    MA -- OTLP gRPC --> OTel
+
+    OTel["OTel Collector"]
+    Flink["Flink Metrics Consumer"]
+    DB[("MySQL / ClickHouse<br/>+ Grafana 可视化")]
+
+    OTel -- "Kafka (OTLP Protobuf)" --> Flink
+    Flink --> DB
 ```
 
 ## 核心组件
@@ -63,6 +57,19 @@ chmod +x build-omni.sh && ./build-omni.sh
 mvn clean package -DskipTests              # Spark 3.x（默认）
 mvn clean package -Pspark-2 -DskipTests    # Spark 2.x
 mvn clean package -Pspark-4 -DskipTests    # Spark 4.x
+```
+
+### 部署
+
+```bash
+# 安装 Omnipackage 到 Spark / Hive / MR
+./deploy/install-omni.sh \
+  --spark-home=/opt/spark --hive-home=/opt/hive --hadoop-home=/opt/hadoop \
+  --otel-endpoint=http://otel-collector:4317 -y
+
+# 导入 Grafana 面板
+./deploy/deploy-grafana.sh \
+  --grafana-url=http://grafana:3000 --user=admin --password=admin
 ```
 
 ## 模块结构
@@ -137,7 +144,7 @@ integration-tests/                  # 集成测试（Spark 3）
 
 ## Grafana 可视化
 
-`deploy/grafana/` 目录提供预构建仪表盘 JSON 文件：
+`deploy/grafana/` 目录提供预构建仪表盘 JSON 文件，可通过 `deploy/deploy-grafana.sh` 一键导入：
 
 | 文件 | 面板名 | 说明 |
 |------|--------|------|
