@@ -147,6 +147,31 @@ public class MetricCategoryClassifier {
         MAPPINGS.put(metricName, new MetricMapping(category, columnName, histogram));
     }
 
+    /**
+     * Get the engine name for a metric category.
+     * Used by MetricEventRow to populate the engine column in the wide table.
+     */
+    public static String getEngine(MetricCategory category) {
+        switch (category) {
+            case TASK:
+            case STAGE:
+            case JOB:
+            case JVM_MEMORY:
+            case JVM_GC:
+            case SQL_EXECUTION:
+            case SQL_TABLE_IO:
+                return "SPARK";
+            case MR_JOB:
+            case MR_TASK:
+                return "MR";
+            case HIVE_QUERY:
+            case HIVE_TABLE_IO:
+                return "HIVE";
+            default:
+                return "UNKNOWN";
+        }
+    }
+
     public static MetricMapping classify(String metricName) {
         return MAPPINGS.get(metricName);
     }

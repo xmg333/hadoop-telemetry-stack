@@ -1,0 +1,120 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "refresh": "60s",
+  "schemaVersion": 39,
+  "tags": ["cost", "attribution", "telemetry"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timezone": "utc",
+  "title": "Cost Attribution",
+  "uid": "cost-attribution",
+  "panels": [
+    {
+      "title": "User CPU Ranking",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "targets": [
+        {
+          "rawSql": "SELECT user_name, SUM(cpu_time_ms)/3600000 AS cpu_hours, SUM(gc_time_ms)/3600000 AS gc_hours, SUM(duration_ms)/3600000 AS wall_clock_hours, COUNT(*) AS event_count FROM metric_events WHERE event_type IN ('TASK','MR_TASK') AND cpu_time_ms IS NOT NULL AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY user_name ORDER BY cpu_hours DESC LIMIT 20",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"mappings": []},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "cpu_hours"}, "properties": [{"id": "decimals", "value": 2}]},
+          {"matcher": {"id": "byName", "options": "gc_hours"}, "properties": [{"id": "decimals", "value": 2}]},
+          {"matcher": {"id": "byName", "options": "wall_clock_hours"}, "properties": [{"id": "decimals", "value": 2}]}
+        ]
+      },
+      "options": {"showHeader": true, "footer": {"show": false}},
+      "id": 1
+    },
+    {
+      "title": "Queue Resource Comparison",
+      "type": "barchart",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "targets": [
+        {
+          "rawSql": "SELECT queue, engine, SUM(cpu_time_ms)/3600000 AS cpu_hours, SUM(io_bytes_read+io_bytes_written)/1073741824 AS io_gb, COUNT(DISTINCT app_id) AS app_count FROM metric_events WHERE event_type IN ('TASK','MR_JOB','MR_TASK') AND queue IS NOT NULL AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY queue, engine ORDER BY cpu_hours DESC",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "xTickLabelRotation": 0,
+        "groupWidth": 0.7,
+        "barWidth": 0.5,
+        "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "calcs": []}
+      },
+      "id": 2
+    },
+    {
+      "title": "Application Resource Ranking",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "targets": [
+        {
+          "rawSql": "SELECT app_name, engine, SUM(cpu_time_ms)/3600000 AS cpu_hours, SUM(gc_time_ms)/3600000 AS gc_hours, SUM(io_bytes_read)/1073741824 AS read_gb, SUM(io_bytes_written)/1073741824 AS write_gb, SUM(memory_bytes_spilled)/1073741824 AS spill_gb, COUNT(*) AS task_count FROM metric_events WHERE event_type IN ('TASK','MR_TASK') AND app_name IS NOT NULL AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY app_name, engine ORDER BY cpu_hours DESC LIMIT 10",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"mappings": []},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "cpu_hours"}, "properties": [{"id": "decimals", "value": 2}]},
+          {"matcher": {"id": "byName", "options": "gc_hours"}, "properties": [{"id": "decimals", "value": 2}]},
+          {"matcher": {"id": "byName", "options": "read_gb"}, "properties": [{"id": "decimals", "value": 2}]},
+          {"matcher": {"id": "byName", "options": "write_gb"}, "properties": [{"id": "decimals", "value": 2}]},
+          {"matcher": {"id": "byName", "options": "spill_gb"}, "properties": [{"id": "decimals", "value": 2}]}
+        ]
+      },
+      "options": {"showHeader": true, "footer": {"show": false}},
+      "id": 3
+    },
+    {
+      "title": "Daily Resource Trend",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "targets": [
+        {
+          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, engine, SUM(cpu_time_ms)/3600000 AS cpu_hours FROM metric_events WHERE event_type IN ('TASK','MR_TASK','MR_JOB') AND cpu_time_ms IS NOT NULL AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY 1, engine ORDER BY 1,2",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"fillOpacity": 10, "lineWidth": 1},
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {"mode": "multi", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "calcs": []}
+      },
+      "id": 4
+    }
+  ]
+}

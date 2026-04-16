@@ -1,0 +1,165 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "refresh": "60s",
+  "schemaVersion": 39,
+  "tags": ["reliability", "failure", "telemetry"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timezone": "utc",
+  "title": "Reliability Analysis",
+  "uid": "reliability",
+  "panels": [
+    {
+      "title": "Success Rate Trend",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "targets": [
+        {
+          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, engine, ROUND(SUM(CASE WHEN status='true' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0),1) AS success_rate_pct FROM metric_events WHERE event_type IN ('TASK','MR_TASK','HIVE_QUERY','JOB','MR_JOB') AND status IS NOT NULL AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY 1,engine ORDER BY 1,2",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "color": {"mode": "palette-classic"},
+          "custom": {"fillOpacity": 10, "lineWidth": 1},
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {"mode": "multi", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "calcs": []}
+      },
+      "id": 1
+    },
+    {
+      "title": "Recent Failed Events",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "targets": [
+        {
+          "rawSql": "SELECT engine, event_type, app_name, app_id, stage_id, task_id, job_id, duration_ms, gc_time_ms, FROM_UNIXTIME(timestamp_ms/1000) AS event_time FROM metric_events WHERE status='false' AND event_type IN ('TASK','MR_TASK','HIVE_QUERY','JOB','MR_JOB') AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) ORDER BY timestamp_ms DESC LIMIT 50",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"mappings": []},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "duration_ms"}, "properties": [{"id": "unit", "value": "ms"}]},
+          {"matcher": {"id": "byName", "options": "gc_time_ms"}, "properties": [{"id": "unit", "value": "ms"}]}
+        ]
+      },
+      "options": {"showHeader": true, "footer": {"show": false}},
+      "id": 2
+    },
+    {
+      "title": "GC vs Failure Correlation",
+      "type": "barchart",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "targets": [
+        {
+          "rawSql": "SELECT CASE WHEN gc_time_ms/NULLIF(duration_ms,0)>0.3 THEN 'GC>30%' WHEN gc_time_ms/NULLIF(duration_ms,0)>0.1 THEN 'GC 10-30%' ELSE 'GC<10%' END AS gc_bucket, status, COUNT(*) AS cnt FROM metric_events WHERE event_type IN ('TASK','MR_TASK') AND gc_time_ms IS NOT NULL AND duration_ms>0 AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY gc_bucket,status ORDER BY gc_bucket,status",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "xTickLabelRotation": 0,
+        "groupWidth": 0.7,
+        "barWidth": 0.5,
+        "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "calcs": []}
+      },
+      "id": 3
+    },
+    {
+      "title": "Hive Failure by Operation",
+      "type": "barchart",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "targets": [
+        {
+          "rawSql": "SELECT operation, SUM(CASE WHEN status='false' THEN 1 ELSE 0 END) AS fail, SUM(CASE WHEN status='true' THEN 1 ELSE 0 END) AS success FROM metric_events WHERE event_type='HIVE_QUERY' AND operation IS NOT NULL AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY operation ORDER BY fail DESC",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "xTickLabelRotation": 0,
+        "groupWidth": 0.7,
+        "barWidth": 0.5,
+        "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "calcs": []}
+      },
+      "id": 4
+    },
+    {
+      "title": "Speculative Task Rate",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 12, "x": 0, "y": 24},
+      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "targets": [
+        {
+          "rawSql": "SELECT ROUND(SUM(CASE WHEN task_speculative='true' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0),1) AS value FROM metric_events WHERE event_type='TASK' AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000)",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 5},
+              {"color": "red", "value": 15}
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "id": 5
+    }
+  ]
+}

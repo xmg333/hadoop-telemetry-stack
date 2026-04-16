@@ -17,6 +17,22 @@ nav:
     - Spark Plugin: spark-plugin.md
     - MR Telemetry: mr-telemetry.md
     - Flink Consumer: flink-consumer.md
+  - Grafana 仪表盘:
+    - 基础透视:
+        - 平台总览: grafana-overview.md
+        - Spark 引擎透视: grafana-spark.md
+        - MapReduce 引擎透视: grafana-mr.md
+        - Hive on MR 查询透视: grafana-hive-mr.md
+        - Hive on Spark 查询透视: grafana-hive-spark.md
+        - 全引擎综合透视: grafana-spark-mr-hive.md
+    - 业务分析:
+        - 成本归属与资源排行: grafana-cost-attribution.md
+        - 性能异常与瓶颈分析: grafana-performance-analysis.md
+        - 数据吞吐与 IO 分析: grafana-io-analysis.md
+        - 可靠性与失败分析: grafana-reliability.md
+        - Hive 查询与数据血缘: grafana-hive-analysis.md
+        - 容量规划与资源利用率: grafana-capacity.md
+        - 综合效率评分: grafana-efficiency.md
   - 运维:
     - 部署指南: deployment-guide.md
     - Grafana 问题排查: grafana-problem.md
@@ -26,6 +42,8 @@ markdown_extensions:
   - toc:
       permalink: true
   - tables
+  - sane_lists
+  - def_list
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid

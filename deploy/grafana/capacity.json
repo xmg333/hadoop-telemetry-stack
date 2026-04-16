@@ -1,0 +1,121 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "refresh": "60s",
+  "schemaVersion": 39,
+  "tags": ["capacity", "planning", "telemetry"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timezone": "utc",
+  "title": "Capacity Planning",
+  "uid": "capacity",
+  "panels": [
+    {
+      "title": "Hourly Task Concurrency",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "targets": [
+        {
+          "rawSql": "SELECT (FLOOR(timestamp_ms/3600000)*3600) AS time, engine, COUNT(*) AS task_count, COUNT(DISTINCT app_id) AS app_count FROM metric_events WHERE event_type IN ('TASK','MR_TASK') AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY 1,engine ORDER BY 1,2",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"fillOpacity": 10, "lineWidth": 1},
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {"mode": "multi", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "calcs": []}
+      },
+      "id": 1
+    },
+    {
+      "title": "JVM Memory Trend",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "targets": [
+        {
+          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, app_id, AVG(heap_used)/1073741824 AS avg_heap_gb, MAX(heap_used)/1073741824 AS max_heap_gb FROM metric_events WHERE event_type='JVM_MEMORY' AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY 1,app_id ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"fillOpacity": 10, "lineWidth": 1},
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {"mode": "multi", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "calcs": []}
+      },
+      "id": 2
+    },
+    {
+      "title": "GC Activity",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "targets": [
+        {
+          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, gc_name, SUM(gc_count) AS total_gc_count, SUM(gc_time_ms) AS total_gc_time_ms FROM metric_events WHERE event_type='JVM_GC' AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY 1,gc_name ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"fillOpacity": 10, "lineWidth": 1},
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {"mode": "multi", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "calcs": []}
+      },
+      "id": 3
+    },
+    {
+      "title": "Daily Job Throughput",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "targets": [
+        {
+          "rawSql": "SELECT DATE(FROM_UNIXTIME(timestamp_ms/1000)) AS time, engine, COUNT(*) AS job_count, AVG(duration_ms) AS avg_duration_ms FROM metric_events WHERE event_type IN ('JOB','MR_JOB','HIVE_QUERY') AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY 1,engine ORDER BY 1,2",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"fillOpacity": 10, "lineWidth": 1},
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {"mode": "multi", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "calcs": []}
+      },
+      "id": 4
+    }
+  ]
+}

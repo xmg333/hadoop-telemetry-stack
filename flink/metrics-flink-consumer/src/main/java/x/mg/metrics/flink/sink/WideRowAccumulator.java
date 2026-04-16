@@ -21,6 +21,9 @@ public class WideRowAccumulator {
     private final Map<String, MrJobMetricRow> mrJobRows = new ConcurrentHashMap<>();
     private final Map<String, MrTaskMetricRow> mrTaskRows = new ConcurrentHashMap<>();
 
+    // Unified wide-table accumulator (metric_events)
+    private final Map<String, MetricEventRow> metricEventRows = new ConcurrentHashMap<>();
+
     private final List<HistogramBucket> taskBuckets = Collections.synchronizedList(new ArrayList<>());
     private final List<HistogramBucket> stageBuckets = Collections.synchronizedList(new ArrayList<>());
     private final List<HistogramBucket> jobBuckets = Collections.synchronizedList(new ArrayList<>());
@@ -130,6 +133,13 @@ public class WideRowAccumulator {
                 totalSamplesSkipped++;
                 return;
         }
+
+        // Also accumulate into the unified wide-table (metric_events)
+        String eventKey = MetricCategoryClassifier.extractGroupKey(cat, sample.getLabels(), sample.getTimestampMs());
+        metricEventRows.computeIfAbsent(eventKey,
+            k -> MetricEventRow.fromLabels(sample.getTimestampMs(), cat, sample.getLabels()))
+            .setMetricColumn(mapping.getColumnName(), sample.getValue());
+
         totalSamplesAccepted++;
     }
 
@@ -172,6 +182,13 @@ public class WideRowAccumulator {
         result.stageBuckets = new ArrayList<>(stageBuckets);
         result.jobBuckets = new ArrayList<>(jobBuckets);
 
+        // Normalize and drain unified wide-table rows
+        List<MetricEventRow> normalizedEventRows = new ArrayList<>(metricEventRows.values());
+        for (MetricEventRow row : normalizedEventRows) {
+            row.normalizeAggregatedMetrics();
+        }
+        result.metricEventRows = normalizedEventRows;
+
         // Compute governance for completed stages
         List<StageGovernanceRow> governanceRows = new ArrayList<>();
         for (String stageKey : completedStages) {
@@ -200,6 +217,7 @@ public class WideRowAccumulator {
         taskBuckets.clear();
         stageBuckets.clear();
         jobBuckets.clear();
+        metricEventRows.clear();
 
         return result;
     }
@@ -248,6 +266,7 @@ public class WideRowAccumulator {
         public List<HistogramBucket> stageBuckets;
         public List<HistogramBucket> jobBuckets;
         public List<StageGovernanceRow> governanceRows;
+        public List<MetricEventRow> metricEventRows;
 
         public int totalCount() {
             int total = taskRows.size() + stageRows.size() + jobRows.size()
@@ -257,6 +276,7 @@ public class WideRowAccumulator {
                  + mrJobRows.size() + mrTaskRows.size()
                  + taskBuckets.size() + stageBuckets.size() + jobBuckets.size();
             if (governanceRows != null) total += governanceRows.size();
+            if (metricEventRows != null) total += metricEventRows.size();
             return total;
         }
     }
