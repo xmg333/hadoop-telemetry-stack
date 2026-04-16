@@ -102,6 +102,8 @@ class CounterReaderTest {
 
         MockConfiguration config = new MockConfiguration();
         config.set("mapreduce.job.name", "word-count");
+        config.set("mapreduce.job.user.name", "testuser");
+        config.set("mapreduce.job.queuename", "default");
 
         return new MockContext(counters, config,
             new MockTaskAttemptID("attempt_123456_m_000001_0"),
@@ -137,6 +139,8 @@ class CounterReaderTest {
         assertEquals("attempt_123456_m_000001_0", identity.getTaskId());
         assertEquals("job_123456", identity.getJobId());
         assertEquals("word-count", identity.getJobName());
+        assertEquals("testuser", identity.getUser());
+        assertEquals("default", identity.getQueue());
     }
 
     @Test

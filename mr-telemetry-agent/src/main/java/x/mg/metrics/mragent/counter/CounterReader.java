@@ -125,6 +125,8 @@ public class CounterReader {
             String taskId = "unknown";
             String jobId = "unknown";
             String jobName = "unknown";
+            String user = "unknown";
+            String queue = "unknown";
 
             try {
                 Method m = unwrapped.getClass().getMethod("getTaskAttemptID");
@@ -146,12 +148,14 @@ public class CounterReader {
                 if (config != null) {
                     Method getMethod = config.getClass().getMethod("get", String.class, String.class);
                     jobName = (String) getMethod.invoke(config, "mapreduce.job.name", "unknown");
+                    user = (String) getMethod.invoke(config, "mapreduce.job.user.name", "unknown");
+                    queue = (String) getMethod.invoke(config, "mapreduce.job.queuename", "unknown");
                 }
             } catch (NoSuchMethodException e) {
                 LOG.log(Level.FINE, "getConfiguration not found on " + unwrapped.getClass().getName());
             }
 
-            return new TaskIdentity(taskId, jobId, jobName);
+            return new TaskIdentity(taskId, jobId, jobName, user, queue);
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Failed to extract task identity: " + e.getMessage());
             return TaskIdentity.UNKNOWN;

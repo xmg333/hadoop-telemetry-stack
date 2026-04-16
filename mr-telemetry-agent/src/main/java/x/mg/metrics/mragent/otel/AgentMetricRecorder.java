@@ -66,13 +66,18 @@ public class AgentMetricRecorder {
      * @param identity task/job identity
      */
     public void recordDeltas(Map<String, Long> deltas, String taskType, TaskIdentity identity) {
-        Attributes attrs = buildAttributes(taskType, identity);
+        try {
+            Attributes attrs = buildAttributes(taskType, identity);
 
-        for (Map.Entry<String, Long> entry : deltas.entrySet()) {
-            LongCounter counter = counters.get(entry.getKey());
-            if (counter != null && entry.getValue() > 0) {
-                counter.add(entry.getValue(), attrs);
+            for (Map.Entry<String, Long> entry : deltas.entrySet()) {
+                LongCounter counter = counters.get(entry.getKey());
+                if (counter != null && entry.getValue() > 0) {
+                    counter.add(entry.getValue(), attrs);
+                }
             }
+        } catch (Exception e) {
+            // Silent failure: OTel Collector connection issues should not affect MR task execution
+            LOG.log(Level.FINE, "Failed to record counter deltas: " + e.getMessage());
         }
     }
 
@@ -81,7 +86,9 @@ public class AgentMetricRecorder {
             .put("mr.task.type", taskType)
             .put("mr.task.id", identity.getTaskId())
             .put("mr.job.id", identity.getJobId())
-            .put("mr.job.name", identity.getJobName());
+            .put("mr.job.name", identity.getJobName())
+            .put("mr.job.user", identity.getUser())
+            .put("mr.job.queue", identity.getQueue());
         return builder.build();
     }
 
@@ -89,19 +96,27 @@ public class AgentMetricRecorder {
      * Record task execution duration as a histogram.
      */
     public void recordDuration(long durationMs, String taskType, TaskIdentity identity) {
-        Attributes attrs = buildAttributes(taskType, identity);
-        durationHistogram.record(durationMs, attrs);
+        try {
+            Attributes attrs = buildAttributes(taskType, identity);
+            durationHistogram.record(durationMs, attrs);
+        } catch (Exception e) {
+            LOG.log(Level.FINE, "Failed to record task duration: " + e.getMessage());
+        }
     }
 
     /**
      * Record task completion result (success or failure).
      */
     public void recordTaskResult(boolean success, String taskType, TaskIdentity identity) {
-        Attributes attrs = buildAttributes(taskType, identity);
-        if (success) {
-            successCounter.add(1, attrs);
-        } else {
-            failureCounter.add(1, attrs);
+        try {
+            Attributes attrs = buildAttributes(taskType, identity);
+            if (success) {
+                successCounter.add(1, attrs);
+            } else {
+                failureCounter.add(1, attrs);
+            }
+        } catch (Exception e) {
+            LOG.log(Level.FINE, "Failed to record task result: " + e.getMessage());
         }
     }
 }

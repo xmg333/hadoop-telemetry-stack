@@ -51,7 +51,7 @@ class AgentMetricRecorderTest {
         deltas.put("mr.task.io.map_input_records", 100L);
         deltas.put("mr.task.cpu_time_ms", 500L);
 
-        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job");
+        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job", "testuser", "default");
         assertDoesNotThrow(() -> recorder.recordDeltas(deltas, "map", identity));
     }
 
@@ -60,7 +60,7 @@ class AgentMetricRecorderTest {
         AgentMetricRecorder recorder = createRecorder();
 
         Map<String, Long> deltas = new HashMap<>();
-        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job");
+        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job", "testuser", "default");
 
         assertDoesNotThrow(() -> recorder.recordDeltas(deltas, "reduce", identity));
     }
@@ -72,7 +72,7 @@ class AgentMetricRecorderTest {
         Map<String, Long> deltas = new HashMap<>();
         deltas.put("mr.task.io.hdfs_bytes_read", 0L);
 
-        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job");
+        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job", "testuser", "default");
 
         assertDoesNotThrow(() -> recorder.recordDeltas(deltas, "map", identity));
     }
@@ -84,7 +84,7 @@ class AgentMetricRecorderTest {
         Map<String, Long> deltas = new HashMap<>();
         deltas.put("unknown.metric", 100L);
 
-        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job");
+        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job", "testuser", "default");
 
         // Unknown metric names should be silently ignored
         assertDoesNotThrow(() -> recorder.recordDeltas(deltas, "map", identity));
@@ -94,7 +94,7 @@ class AgentMetricRecorderTest {
     void testRecordDuration() {
         AgentMetricRecorder recorder = createRecorder();
 
-        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job");
+        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job", "testuser", "default");
         assertDoesNotThrow(() -> recorder.recordDuration(5000L, "map", identity));
     }
 
@@ -102,7 +102,7 @@ class AgentMetricRecorderTest {
     void testRecordTaskResultSuccess() {
         AgentMetricRecorder recorder = createRecorder();
 
-        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job");
+        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job", "testuser", "default");
         assertDoesNotThrow(() -> recorder.recordTaskResult(true, "map", identity));
     }
 
@@ -110,7 +110,7 @@ class AgentMetricRecorderTest {
     void testRecordTaskResultFailure() {
         AgentMetricRecorder recorder = createRecorder();
 
-        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job");
+        TaskIdentity identity = new TaskIdentity("task_001", "job_001", "test-job", "testuser", "default");
         assertDoesNotThrow(() -> recorder.recordTaskResult(false, "reduce", identity));
     }
 }
