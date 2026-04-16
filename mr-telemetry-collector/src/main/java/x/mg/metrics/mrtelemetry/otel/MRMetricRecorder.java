@@ -167,7 +167,7 @@ public class MRMetricRecorder {
      * Uses the same mr.task.* metric names as the Agent's CounterMapping.ALL.
      */
     public void recordTask(String taskId, String taskType, String jobId,
-                           String jobName, String user, String state,
+                           String jobName, String user, String queue, String state,
                            long finishTime,
                            Map<String, Long> counters) {
         if (counters == null || counters.isEmpty()) return;
@@ -179,6 +179,7 @@ public class MRMetricRecorder {
                     .put(AttributeKey.stringKey("mr.job.id"), jobId != null ? jobId : "")
                     .put(AttributeKey.stringKey("mr.job.name"), jobName != null ? jobName : "")
                     .put(AttributeKey.stringKey("mr.job.user"), user != null ? user : "")
+                    .put(AttributeKey.stringKey("mr.job.queue"), queue != null ? queue : "")
                     .put(AttributeKey.stringKey("mr.job.state"), state != null ? state : "")
                     .put(AttributeKey.longKey("mr.job.finish_time_ms"), finishTime)
                     .put(AttributeKey.longKey("mr.job.start_time_ms"), 0L) // task-level: no individual task start time available
