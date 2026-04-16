@@ -199,9 +199,9 @@
                 <maven.compiler.target>1.8</maven.compiler.target>
             </properties>
             <modules>
-                <module>spark-telemetry-common</module>
-                <module>spark-telemetry-adapter-spark2</module>
-                <module>spark-telemetry-dist-spark2</module>
+                <module>spark/spark-telemetry-common</module>
+                <module>spark/spark-telemetry-adapter-spark2</module>
+                <module>spark/spark-telemetry-dist-spark2</module>
             </modules>
         </profile>
 
@@ -215,8 +215,8 @@
                 <maven.compiler.target>1.8</maven.compiler.target>
             </properties>
             <modules>
-                <module>spark-telemetry-common</module>
-                <module>spark-telemetry-adapter-spark30</module>
+                <module>spark/spark-telemetry-common</module>
+                <module>spark/spark-telemetry-adapter-spark30</module>
             </modules>
         </profile>
 
@@ -230,8 +230,8 @@
                 <maven.compiler.target>1.8</maven.compiler.target>
             </properties>
             <modules>
-                <module>spark-telemetry-common</module>
-                <module>spark-telemetry-adapter-spark32</module>
+                <module>spark/spark-telemetry-common</module>
+                <module>spark/spark-telemetry-adapter-spark32</module>
             </modules>
         </profile>
 
@@ -248,18 +248,18 @@
                 <maven.compiler.target>1.8</maven.compiler.target>
             </properties>
             <modules>
-                <module>spark-telemetry-common</module>
-                <module>spark-telemetry-adapter-spark3</module>
-                <module>spark-telemetry-dist-spark3</module>
-                <module>mr-telemetry-collector</module>
-                <module>mr-telemetry-dist</module>
-                <module>mr-telemetry-agent</module>
-                <module>mr-telemetry-agent-dist</module>
+                <module>spark/spark-telemetry-common</module>
+                <module>spark/spark-telemetry-adapter-spark3</module>
+                <module>spark/spark-telemetry-dist-spark3</module>
+                <module>mapreduce-collector/mr-telemetry-collector</module>
+                <module>mapreduce-collector/mr-telemetry-dist</module>
+                <module>mapreduce-agent/mr-telemetry-agent</module>
+                <module>mapreduce-agent/mr-telemetry-agent-dist</module>
                 <module>integration-tests</module>
-                <module>metrics-flink-consumer</module>
-                <module>metrics-flink-consumer-dist</module>
-                <module>hive-telemetry-hook</module>
-                <module>hive-telemetry-hook-dist</module>
+                <module>flink/metrics-flink-consumer</module>
+                <module>flink/metrics-flink-consumer-dist</module>
+                <module>hive/hive-telemetry-hook</module>
+                <module>hive/hive-telemetry-hook-dist</module>
             </modules>
         </profile>
 
@@ -273,10 +273,10 @@
                 <maven.compiler.target>1.8</maven.compiler.target>
             </properties>
             <modules>
-                <module>spark-telemetry-common</module>
-                <module>spark-telemetry-omni-facade</module>
-                <module>spark-telemetry-adapters-relocated</module>
-                <module>spark-telemetry-dist-omni</module>
+                <module>spark/spark-telemetry-common</module>
+                <module>spark/spark-telemetry-omni-facade</module>
+                <module>spark/spark-telemetry-adapters-relocated</module>
+                <module>spark/spark-telemetry-dist-omni</module>
             </modules>
         </profile>
 
@@ -290,9 +290,9 @@
                 <maven.compiler.target>17</maven.compiler.target>
             </properties>
             <modules>
-                <module>spark-telemetry-common</module>
-                <module>spark-telemetry-adapter-spark4</module>
-                <module>spark-telemetry-dist-spark4</module>
+                <module>spark/spark-telemetry-common</module>
+                <module>spark/spark-telemetry-adapter-spark4</module>
+                <module>spark/spark-telemetry-dist-spark4</module>
             </modules>
         </profile>
     </profiles>

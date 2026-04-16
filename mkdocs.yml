@@ -1,0 +1,29 @@
+site_name: Spark Telemetry Listener
+site_description: 透明的大数据可观测性方案 — Spark / MR / Hive 指标采集
+repo_url: https://codeup.aliyun.com/68c25bfda72fbe62724140bd/yarn-telemetry
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs
+    - navigation.expand
+    - search.suggest
+
+nav:
+  - 首页: index.md
+  - 快速开始: quickstart.md
+  - 组件文档:
+    - Spark Plugin: spark-plugin.md
+    - MR Telemetry: mr-telemetry.md
+    - Flink Consumer: flink-consumer.md
+  - 运维:
+    - 部署指南: deployment-guide.md
+    - Grafana 问题排查: grafana-problem.md
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true
+  - tables
