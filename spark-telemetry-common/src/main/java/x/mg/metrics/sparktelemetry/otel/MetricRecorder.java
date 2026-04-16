@@ -432,6 +432,9 @@ public class MetricRecorder {
     private Attributes buildTaskAttributes(SparkMetricEvent event) {
         AttributesBuilder builder = Attributes.builder();
         if (event.getApplicationId() != null) builder.put("spark.app.id", event.getApplicationId());
+        if (event.getApplicationName() != null) builder.put("spark.app.name", event.getApplicationName());
+        if (event.getUser() != null && !event.getUser().isEmpty()) builder.put("spark.user", event.getUser());
+        if (event.getQueue() != null && !event.getQueue().isEmpty()) builder.put("spark.yarn.queue", event.getQueue());
         if (event.getExecutorId() != null) builder.put("spark.executor.id", event.getExecutorId());
         builder.put("spark.stage.id", event.getStageId());
         builder.put("spark.task.id", event.getTaskId());
@@ -448,6 +451,9 @@ public class MetricRecorder {
     private Attributes buildStageAttributes(SparkMetricEvent event) {
         AttributesBuilder builder = Attributes.builder();
         if (event.getApplicationId() != null) builder.put("spark.app.id", event.getApplicationId());
+        if (event.getApplicationName() != null) builder.put("spark.app.name", event.getApplicationName());
+        if (event.getUser() != null && !event.getUser().isEmpty()) builder.put("spark.user", event.getUser());
+        if (event.getQueue() != null && !event.getQueue().isEmpty()) builder.put("spark.yarn.queue", event.getQueue());
         if (event.getExecutorId() != null) builder.put("spark.executor.id", event.getExecutorId());
         builder.put("spark.stage.id", event.getStageId());
         return builder.build();
@@ -456,6 +462,9 @@ public class MetricRecorder {
     private Attributes buildJobAttributes(SparkMetricEvent event) {
         AttributesBuilder builder = Attributes.builder();
         if (event.getApplicationId() != null) builder.put("spark.app.id", event.getApplicationId());
+        if (event.getApplicationName() != null) builder.put("spark.app.name", event.getApplicationName());
+        if (event.getUser() != null && !event.getUser().isEmpty()) builder.put("spark.user", event.getUser());
+        if (event.getQueue() != null && !event.getQueue().isEmpty()) builder.put("spark.yarn.queue", event.getQueue());
         builder.put("spark.job.id", event.getJobId());
         builder.put("spark.job.success", event.isJobSuccessful());
         return builder.build();
@@ -467,6 +476,9 @@ public class MetricRecorder {
 
         Attributes attrs = Attributes.builder()
                 .put("spark.app.id", event.getApplicationId() != null ? event.getApplicationId() : "unknown")
+                .put("spark.app.name", event.getApplicationName() != null ? event.getApplicationName() : "")
+                .put("spark.user", event.getUser() != null ? event.getUser() : "")
+                .put("spark.yarn.queue", event.getQueue() != null ? event.getQueue() : "")
                 .put("spark.sql.execution_id", String.valueOf(sql.getExecutionId()))
                 .build();
 
@@ -489,10 +501,16 @@ public class MetricRecorder {
         if (tableMetrics == null || tableMetrics.isEmpty()) return;
 
         String appId = event.getApplicationId() != null ? event.getApplicationId() : "unknown";
+        String appName = event.getApplicationName() != null ? event.getApplicationName() : "";
+        String user = event.getUser() != null ? event.getUser() : "";
+        String queue = event.getQueue() != null ? event.getQueue() : "";
 
         for (SqlTableIOMetrics tm : tableMetrics) {
             Attributes attrs = Attributes.builder()
                     .put("spark.app.id", appId)
+                    .put("spark.app.name", appName)
+                    .put("spark.user", user)
+                    .put("spark.yarn.queue", queue)
                     .put("spark.sql.execution_id", String.valueOf(tm.getExecutionId()))
                     .put("spark.sql.table_name", tm.getTableName() != null ? tm.getTableName() : "unknown")
                     .put("spark.sql.operation", tm.getOperation() != null ? tm.getOperation() : "unknown")
@@ -508,6 +526,9 @@ public class MetricRecorder {
     private Attributes buildSystemAttributes(SparkMetricEvent event) {
         AttributesBuilder builder = Attributes.builder();
         if (event.getApplicationId() != null) builder.put("spark.app.id", event.getApplicationId());
+        if (event.getApplicationName() != null) builder.put("spark.app.name", event.getApplicationName());
+        if (event.getUser() != null && !event.getUser().isEmpty()) builder.put("spark.user", event.getUser());
+        if (event.getQueue() != null && !event.getQueue().isEmpty()) builder.put("spark.yarn.queue", event.getQueue());
         if (event.getExecutorId() != null) builder.put("spark.executor.id", event.getExecutorId());
         return builder.build();
     }

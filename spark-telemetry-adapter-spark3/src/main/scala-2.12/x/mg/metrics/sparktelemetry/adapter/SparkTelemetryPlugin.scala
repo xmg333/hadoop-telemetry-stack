@@ -86,10 +86,7 @@ class TelemetryDriverPlugin extends DriverPlugin with org.apache.spark.internal.
     if (listener != null) {
       // Listener will be cleaned up with SparkContext
     }
-    // Force flush before reset to ensure pending metrics are exported
-    if (TelemetryLifecycle.isInitialized) {
-      TelemetryLifecycle.getInstance.flush()
-    }
+    // reset() drains async flushes, does final synchronous flush, then closes OTel SDK
     TelemetryLifecycle.reset()
   }
 }
@@ -117,9 +114,6 @@ class TelemetryExecutorPlugin extends ExecutorPlugin {
   override def shutdown(): Unit = {
     if (metricsSink != null) {
       metricsSink.stop()
-    }
-    if (TelemetryLifecycle.isInitialized) {
-      TelemetryLifecycle.getInstance.flush()
     }
     TelemetryLifecycle.reset()
   }

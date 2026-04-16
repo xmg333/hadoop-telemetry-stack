@@ -41,6 +41,8 @@ class SparkTelemetryListener(confMap: Map[String, String]) extends SparkListener
           val appId = env.conf.getAppId
           event.setApplicationId(if (appId != null && appId.nonEmpty) appId else env.conf.get("spark.app.name", "unknown"))
           event.setApplicationName(env.conf.get("spark.app.name", ""))
+          event.setUser(lifecycle.getUser)
+          event.setQueue(lifecycle.getQueue)
         }
       }
     } catch {
@@ -143,6 +145,8 @@ class SparkTelemetryListener(confMap: Map[String, String]) extends SparkListener
         if (env.conf != null) {
           event.setApplicationId(env.conf.getAppId)
           event.setApplicationName(env.conf.get("spark.app.name", ""))
+          event.setUser(lifecycle.getUser)
+          event.setQueue(lifecycle.getQueue)
         }
       }
     } catch {
@@ -211,6 +215,8 @@ class SparkTelemetryListener(confMap: Map[String, String]) extends SparkListener
         if (env.conf != null) {
           event.setApplicationId(env.conf.getAppId)
           event.setApplicationName(env.conf.get("spark.app.name", ""))
+          event.setUser(lifecycle.getUser)
+          event.setQueue(lifecycle.getQueue)
         }
       }
     } catch {
@@ -238,6 +244,8 @@ class SparkTelemetryListener(confMap: Map[String, String]) extends SparkListener
           if (env.conf != null) {
             event.setApplicationId(env.conf.getAppId)
             event.setApplicationName(env.conf.get("spark.app.name", ""))
+            event.setUser(lifecycle.getUser)
+            event.setQueue(lifecycle.getQueue)
           }
         }
       } catch {

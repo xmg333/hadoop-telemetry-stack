@@ -74,8 +74,9 @@ public class OtelRegistry {
                     + ", interval=" + intervalMs + "ms"
                     + ", service=" + config.getServiceName());
         } catch (Exception e) {
-            LOG.log(Level.SEVERE, "Failed to initialize OTel SDK", e);
-            throw new RuntimeException("OTel SDK initialization failed", e);
+            LOG.log(Level.WARNING, "OTel Collector connection failed, metrics will not be exported: " + e.getMessage(), e);
+            // Silent failure: do not throw exception to avoid breaking Spark plugin loading.
+            // The OTel SDK will retry connection on next export interval.
         }
     }
 
@@ -122,7 +123,8 @@ public class OtelRegistry {
                     LOG.warning("OTel SDK forceFlush returned failure");
                 }
             } catch (Exception e) {
-                LOG.log(Level.WARNING, "Error during OTel SDK forceFlush", e);
+                // Stream reset during shutdown is expected when Spark tears down connections
+                LOG.log(Level.FINE, "Error during OTel SDK forceFlush", e);
             }
         }
     }
@@ -132,20 +134,21 @@ public class OtelRegistry {
      * Flushes pending metrics before closing.
      */
     public synchronized void stop() {
-        if (meterProvider != null) {
+        if (openTelemetrySdk != null) {
             try {
                 // Flush pending metrics before shutdown to avoid losing data from short tasks
-                forceFlush();
-                meterProvider.close();
+                if (meterProvider != null) {
+                    forceFlush();
+                }
+                // close() on OpenTelemetrySdk closes all components including SdkMeterProvider.
+                // Only call this once to avoid "Multiple close calls" warning.
+                openTelemetrySdk.close();
                 LOG.info("OTel SDK shutdown complete");
             } catch (Exception e) {
                 LOG.log(Level.WARNING, "Error during OTel SDK shutdown", e);
             }
-            meterProvider = null;
-        }
-        if (openTelemetrySdk != null) {
-            openTelemetrySdk.close();
             openTelemetrySdk = null;
+            meterProvider = null;
         }
     }
 }

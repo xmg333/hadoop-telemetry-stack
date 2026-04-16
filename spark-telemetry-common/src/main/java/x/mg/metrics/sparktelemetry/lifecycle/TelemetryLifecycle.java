@@ -9,6 +9,7 @@ import x.mg.metrics.sparktelemetry.otel.OtelRegistry;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -26,6 +27,9 @@ public class TelemetryLifecycle {
     private final TelemetryConfig config;
     private final OtelRegistry otelRegistry;
     private final MetricRecorder metricRecorder;
+    private final String appName;
+    private final String user;
+    private final String queue;
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final AtomicBoolean stopped = new AtomicBoolean(false);
     private final ExecutorService flushExecutor = Executors.newSingleThreadExecutor(r -> {
@@ -34,8 +38,11 @@ public class TelemetryLifecycle {
         return t;
     });
 
-    private TelemetryLifecycle(TelemetryConfig config) {
+    private TelemetryLifecycle(TelemetryConfig config, Map<String, String> sparkConfOverrides) {
         this.config = config;
+        this.appName = sparkConfOverrides != null ? sparkConfOverrides.getOrDefault("spark.app.name", "") : "";
+        this.user = sparkConfOverrides != null ? sparkConfOverrides.getOrDefault("spark.user", "") : "";
+        this.queue = sparkConfOverrides != null ? sparkConfOverrides.getOrDefault("spark.yarn.queue", "") : "";
         this.otelRegistry = new OtelRegistry(config);
         this.otelRegistry.start();
         this.metricRecorder = new MetricRecorder(otelRegistry.getOpenTelemetry(), config);
@@ -52,7 +59,7 @@ public class TelemetryLifecycle {
         synchronized (LOCK) {
             if (instance == null || !instance.started.get()) {
                 TelemetryConfig config = new TelemetryConfig(sparkConfOverrides);
-                instance = new TelemetryLifecycle(config);
+                instance = new TelemetryLifecycle(config, sparkConfOverrides);
                 instance.started.set(true);
                 LOG.info("TelemetryLifecycle initialized");
             }
@@ -96,6 +103,18 @@ public class TelemetryLifecycle {
         return config;
     }
 
+    public String getAppName() {
+        return appName;
+    }
+
+    public String getUser() {
+        return user;
+    }
+
+    public String getQueue() {
+        return queue;
+    }
+
     /**
      * Force flush pending metrics to the OTel exporter (blocking).
      * Used during shutdown to ensure all metrics are exported.
@@ -128,7 +147,17 @@ public class TelemetryLifecycle {
     public void stop() {
         if (stopped.compareAndSet(false, true)) {
             LOG.info("Shutting down TelemetryLifecycle");
+            // Drain pending async flush tasks before final synchronous flush
             flushExecutor.shutdown();
+            try {
+                if (!flushExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    LOG.warning("Async flush executor did not terminate in 5s, forcing shutdown");
+                    flushExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                flushExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
             otelRegistry.stop();
             started.set(false);
         }

@@ -21,6 +21,8 @@ public class SparkMetricEvent {
     private long timestamp;
     private String applicationId;
     private String applicationName;
+    private String user;
+    private String queue;
     private String attemptId;
     private String executorId;
     private int stageId;
@@ -67,6 +69,12 @@ public class SparkMetricEvent {
 
     public String getApplicationName() { return applicationName; }
     public void setApplicationName(String applicationName) { this.applicationName = applicationName; }
+
+    public String getUser() { return user; }
+    public void setUser(String user) { this.user = user; }
+
+    public String getQueue() { return queue; }
+    public void setQueue(String queue) { this.queue = queue; }
 
     public String getAttemptId() { return attemptId; }
     public void setAttemptId(String attemptId) { this.attemptId = attemptId; }
