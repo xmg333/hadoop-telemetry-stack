@@ -1,0 +1,13 @@
+# Spark workloads for benchmarking (representative subset)
+# "small" scale profile
+
+micro/wordcount
+micro/sort
+micro/terasort
+micro/repartition
+sql/aggregation
+sql/join
+sql/scan
+ml/kmeans
+ml/lr
+websearch/pagerank

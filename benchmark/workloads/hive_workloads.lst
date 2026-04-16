@@ -1,0 +1,6 @@
+# Hive workloads for benchmarking
+# These run via Hive CLI (MR engine)
+
+sql/aggregation
+sql/join
+sql/scan

@@ -1,0 +1,6 @@
+# MR (MapReduce) workloads for benchmarking
+# "small" scale profile
+
+micro/wordcount
+micro/sort
+micro/terasort
