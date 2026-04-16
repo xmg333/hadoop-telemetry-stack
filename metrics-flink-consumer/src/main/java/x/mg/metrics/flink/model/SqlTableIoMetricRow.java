@@ -9,6 +9,9 @@ public class SqlTableIoMetricRow {
     private String executionId;
     private String tableName;
     private String operation;
+    private String appName;
+    private String userName;
+    private String queue;
 
     // Metrics
     private Double bytes;
@@ -25,6 +28,9 @@ public class SqlTableIoMetricRow {
         row.executionId = labels.getOrDefault("spark.sql.execution_id", "0");
         row.tableName = labels.getOrDefault("spark.sql.table_name", "unknown");
         row.operation = labels.getOrDefault("spark.sql.operation", "unknown");
+        row.appName = labels.getOrDefault("spark.app.name", "");
+        row.userName = labels.getOrDefault("spark.user", "");
+        row.queue = labels.getOrDefault("spark.yarn.queue", "");
         return row;
     }
 
@@ -43,6 +49,9 @@ public class SqlTableIoMetricRow {
     public String getExecutionId() { return executionId; }
     public String getTableName() { return tableName; }
     public String getOperation() { return operation; }
+    public String getAppName() { return appName; }
+    public String getUserName() { return userName; }
+    public String getQueue() { return queue; }
     public Double getBytes() { return bytes; }
     public Double getRows() { return rows; }
     public Double getFilesRead() { return filesRead; }

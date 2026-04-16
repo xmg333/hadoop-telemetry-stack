@@ -180,6 +180,9 @@ public class CategoryJdbcSink {
             "task_host VARCHAR(255), " +
             "task_locality VARCHAR(64), " +
             "task_speculative VARCHAR(16), " +
+            "app_name VARCHAR(255), " +
+            "user_name VARCHAR(255), " +
+            "queue VARCHAR(255), " +
             "duration_ms DOUBLE, " +
             "io_bytes_read DOUBLE, " +
             "io_bytes_written DOUBLE, " +
@@ -212,6 +215,9 @@ public class CategoryJdbcSink {
             "app_id VARCHAR(255) NOT NULL, " +
             "executor_id VARCHAR(64) NOT NULL, " +
             "stage_id INT NOT NULL, " +
+            "app_name VARCHAR(255), " +
+            "user_name VARCHAR(255), " +
+            "queue VARCHAR(255), " +
             "duration_ms DOUBLE, " +
             "num_tasks DOUBLE, " +
             "executor_run_time_ms DOUBLE, " +
@@ -228,6 +234,9 @@ public class CategoryJdbcSink {
             "app_id VARCHAR(255) NOT NULL, " +
             "job_id INT NOT NULL, " +
             "job_success VARCHAR(16), " +
+            "app_name VARCHAR(255), " +
+            "user_name VARCHAR(255), " +
+            "queue VARCHAR(255), " +
             "duration_ms DOUBLE, " +
             "num_stages DOUBLE, " +
             "INDEX idx_app_time (app_id, timestamp_ms))");
@@ -237,6 +246,9 @@ public class CategoryJdbcSink {
             "timestamp_ms BIGINT NOT NULL, " +
             "app_id VARCHAR(255) NOT NULL, " +
             "executor_id VARCHAR(64) NOT NULL, " +
+            "app_name VARCHAR(255), " +
+            "user_name VARCHAR(255), " +
+            "queue VARCHAR(255), " +
             "heap_used DOUBLE, " +
             "non_heap_used DOUBLE, " +
             "INDEX idx_app_time (app_id, timestamp_ms))");
@@ -247,6 +259,9 @@ public class CategoryJdbcSink {
             "app_id VARCHAR(255) NOT NULL, " +
             "executor_id VARCHAR(64) NOT NULL, " +
             "gc_name VARCHAR(128), " +
+            "app_name VARCHAR(255), " +
+            "user_name VARCHAR(255), " +
+            "queue VARCHAR(255), " +
             "gc_count DOUBLE, " +
             "gc_time_ms DOUBLE, " +
             "INDEX idx_app_time (app_id, timestamp_ms))");
@@ -325,6 +340,9 @@ public class CategoryJdbcSink {
             "timestamp_ms BIGINT NOT NULL, " +
             "app_id VARCHAR(255) NOT NULL, " +
             "execution_id VARCHAR(255) NOT NULL, " +
+            "app_name VARCHAR(255), " +
+            "user_name VARCHAR(255), " +
+            "queue VARCHAR(255), " +
             "duration_ms DOUBLE, " +
             "shuffle_bytes_read DOUBLE, " +
             "shuffle_bytes_written DOUBLE, " +
@@ -338,6 +356,9 @@ public class CategoryJdbcSink {
             "execution_id VARCHAR(255) NOT NULL, " +
             "table_name VARCHAR(512) NOT NULL, " +
             "operation VARCHAR(32) NOT NULL, " +
+            "app_name VARCHAR(255), " +
+            "user_name VARCHAR(255), " +
+            "queue VARCHAR(255), " +
             "bytes DOUBLE, " +
             "`rows` DOUBLE, " +
             "files_read DOUBLE, " +
@@ -423,6 +444,7 @@ public class CategoryJdbcSink {
             "job_name VARCHAR(512), " +
             "user_name VARCHAR(255), " +
             "state VARCHAR(32), " +
+            "queue VARCHAR(255), " +
             "hdfs_bytes_read DOUBLE, " +
             "hdfs_bytes_written DOUBLE, " +
             "file_bytes_read DOUBLE, " +
@@ -461,6 +483,9 @@ public class CategoryJdbcSink {
             "task_host Nullable(String), " +
             "task_locality Nullable(LowCardinality(String)), " +
             "task_speculative Nullable(LowCardinality(String)), " +
+            "app_name Nullable(String), " +
+            "user_name Nullable(String), " +
+            "queue Nullable(String), " +
             "duration_ms Nullable(Float64), " +
             "io_bytes_read Nullable(Float64), " +
             "io_bytes_written Nullable(Float64), " +
@@ -493,6 +518,9 @@ public class CategoryJdbcSink {
             "app_id String, " +
             "executor_id LowCardinality(String), " +
             "stage_id Int32, " +
+            "app_name Nullable(String), " +
+            "user_name Nullable(String), " +
+            "queue Nullable(String), " +
             "duration_ms Nullable(Float64), " +
             "num_tasks Nullable(Float64), " +
             "executor_run_time_ms Nullable(Float64), " +
@@ -510,6 +538,9 @@ public class CategoryJdbcSink {
             "app_id String, " +
             "job_id Int32, " +
             "job_success LowCardinality(String), " +
+            "app_name Nullable(String), " +
+            "user_name Nullable(String), " +
+            "queue Nullable(String), " +
             "duration_ms Nullable(Float64), " +
             "num_stages Nullable(Float64)" +
             ") ENGINE = MergeTree() " +
@@ -520,6 +551,9 @@ public class CategoryJdbcSink {
             "timestamp_ms DateTime64(3), " +
             "app_id String, " +
             "executor_id LowCardinality(String), " +
+            "app_name Nullable(String), " +
+            "user_name Nullable(String), " +
+            "queue Nullable(String), " +
             "heap_used Nullable(Float64), " +
             "non_heap_used Nullable(Float64)" +
             ") ENGINE = MergeTree() " +
@@ -531,6 +565,9 @@ public class CategoryJdbcSink {
             "app_id String, " +
             "executor_id LowCardinality(String), " +
             "gc_name LowCardinality(String), " +
+            "app_name Nullable(String), " +
+            "user_name Nullable(String), " +
+            "queue Nullable(String), " +
             "gc_count Nullable(Float64), " +
             "gc_time_ms Nullable(Float64)" +
             ") ENGINE = MergeTree() " +
@@ -613,6 +650,9 @@ public class CategoryJdbcSink {
             "timestamp_ms DateTime64(3), " +
             "app_id String, " +
             "execution_id String, " +
+            "app_name Nullable(String), " +
+            "user_name Nullable(String), " +
+            "queue Nullable(String), " +
             "duration_ms Nullable(Float64), " +
             "shuffle_bytes_read Nullable(Float64), " +
             "shuffle_bytes_written Nullable(Float64), " +
@@ -627,6 +667,9 @@ public class CategoryJdbcSink {
             "execution_id String, " +
             "table_name String, " +
             "operation LowCardinality(String), " +
+            "app_name Nullable(String), " +
+            "user_name Nullable(String), " +
+            "queue Nullable(String), " +
             "bytes Nullable(Float64), " +
             "rows Nullable(Float64), " +
             "files_read Nullable(Float64), " +
@@ -709,6 +752,7 @@ public class CategoryJdbcSink {
             "job_name Nullable(String), " +
             "user_name Nullable(String), " +
             "state LowCardinality(Nullable(String)), " +
+            "queue Nullable(String), " +
             "hdfs_bytes_read Nullable(Float64), " +
             "hdfs_bytes_written Nullable(Float64), " +
             "file_bytes_read Nullable(Float64), " +
@@ -739,21 +783,21 @@ public class CategoryJdbcSink {
     private int insertTaskMetrics(List<TaskMetricRow> rows) throws SQLException {
         String sql = isClickHouse
             ? "INSERT INTO task_metrics (timestamp_ms, app_id, executor_id, stage_id, task_id, task_success, " +
-              "task_host, task_locality, task_speculative, duration_ms, io_bytes_read, io_bytes_written, " +
+              "task_host, task_locality, task_speculative, app_name, user_name, queue, duration_ms, io_bytes_read, io_bytes_written, " +
               "io_records_read, io_records_written, shuffle_bytes_read, shuffle_bytes_written, " +
               "shuffle_fetch_wait_time_ms, disk_bytes_spilled, memory_bytes_spilled, executor_run_time_ms, " +
               "executor_cpu_time_ns, deserialize_time_ms, deserialize_cpu_time_ns, result_serialization_time_ms, " +
               "jvm_gc_time_ms, scheduler_delay_ms, result_size_bytes, peak_execution_memory_bytes, " +
               "shuffle_local_blocks_fetched, shuffle_records_read, shuffle_remote_bytes_read_to_disk, " +
-              "shuffle_remote_reqs_duration_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+              "shuffle_remote_reqs_duration_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
             : "INSERT INTO task_metrics (timestamp_ms, app_id, executor_id, stage_id, task_id, task_success, " +
-              "task_host, task_locality, task_speculative, duration_ms, io_bytes_read, io_bytes_written, " +
+              "task_host, task_locality, task_speculative, app_name, user_name, queue, duration_ms, io_bytes_read, io_bytes_written, " +
               "io_records_read, io_records_written, shuffle_bytes_read, shuffle_bytes_written, " +
               "shuffle_fetch_wait_time_ms, disk_bytes_spilled, memory_bytes_spilled, executor_run_time_ms, " +
               "executor_cpu_time_ns, deserialize_time_ms, deserialize_cpu_time_ns, result_serialization_time_ms, " +
               "jvm_gc_time_ms, scheduler_delay_ms, result_size_bytes, peak_execution_memory_bytes, " +
               "shuffle_local_blocks_fetched, shuffle_records_read, shuffle_remote_bytes_read_to_disk, " +
-              "shuffle_remote_reqs_duration_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+              "shuffle_remote_reqs_duration_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
         PreparedStatement ps = connection.prepareStatement(sql);
         for (TaskMetricRow r : rows) {
@@ -767,6 +811,9 @@ public class CategoryJdbcSink {
             ps.setString(i++, r.getTaskHost());
             ps.setString(i++, r.getTaskLocality());
             ps.setString(i++, r.getTaskSpeculative());
+            ps.setString(i++, r.getAppName());
+            ps.setString(i++, r.getUserName());
+            ps.setString(i++, r.getQueue());
             setDouble(ps, i++, r.getDurationMs());
             setDouble(ps, i++, r.getIoBytesRead());
             setDouble(ps, i++, r.getIoBytesWritten());
@@ -800,8 +847,8 @@ public class CategoryJdbcSink {
 
     private int insertStageMetrics(List<StageMetricRow> rows) throws SQLException {
         String sql = "INSERT INTO stage_metrics (timestamp_ms, app_id, executor_id, stage_id, " +
-            "duration_ms, num_tasks, executor_run_time_ms, executor_cpu_time_ns, jvm_gc_time_ms, " +
-            "peak_execution_memory_bytes, io_bytes_read, io_bytes_written) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
+            "app_name, user_name, queue, duration_ms, num_tasks, executor_run_time_ms, executor_cpu_time_ns, jvm_gc_time_ms, " +
+            "peak_execution_memory_bytes, io_bytes_read, io_bytes_written) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (StageMetricRow r : rows) {
             int i = 1;
@@ -809,6 +856,9 @@ public class CategoryJdbcSink {
             ps.setString(i++, r.getAppId());
             ps.setString(i++, r.getExecutorId());
             ps.setInt(i++, r.getStageId());
+            ps.setString(i++, r.getAppName());
+            ps.setString(i++, r.getUserName());
+            ps.setString(i++, r.getQueue());
             setDouble(ps, i++, r.getDurationMs());
             setDouble(ps, i++, r.getNumTasks());
             setDouble(ps, i++, r.getExecutorRunTimeMs());
@@ -827,7 +877,7 @@ public class CategoryJdbcSink {
 
     private int insertJobMetrics(List<JobMetricRow> rows) throws SQLException {
         String sql = "INSERT INTO job_metrics (timestamp_ms, app_id, job_id, job_success, " +
-            "duration_ms, num_stages) VALUES (?,?,?,?,?,?)";
+            "app_name, user_name, queue, duration_ms, num_stages) VALUES (?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (JobMetricRow r : rows) {
             int i = 1;
@@ -835,6 +885,9 @@ public class CategoryJdbcSink {
             ps.setString(i++, r.getAppId());
             ps.setInt(i++, r.getJobId());
             ps.setString(i++, r.getJobSuccess());
+            ps.setString(i++, r.getAppName());
+            ps.setString(i++, r.getUserName());
+            ps.setString(i++, r.getQueue());
             setDouble(ps, i++, r.getDurationMs());
             setDouble(ps, i++, r.getNumStages());
             ps.addBatch();
@@ -847,13 +900,16 @@ public class CategoryJdbcSink {
 
     private int insertJvmMemoryMetrics(List<JvmMemoryMetricRow> rows) throws SQLException {
         String sql = "INSERT INTO jvm_memory_metrics (timestamp_ms, app_id, executor_id, " +
-            "heap_used, non_heap_used) VALUES (?,?,?,?,?)";
+            "app_name, user_name, queue, heap_used, non_heap_used) VALUES (?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (JvmMemoryMetricRow r : rows) {
             int i = 1;
             setTimestamp(ps, i++, r.getTimestampMs());
             ps.setString(i++, r.getAppId());
             ps.setString(i++, r.getExecutorId());
+            ps.setString(i++, r.getAppName());
+            ps.setString(i++, r.getUserName());
+            ps.setString(i++, r.getQueue());
             setDouble(ps, i++, r.getHeapUsed());
             setDouble(ps, i++, r.getNonHeapUsed());
             ps.addBatch();
@@ -866,7 +922,7 @@ public class CategoryJdbcSink {
 
     private int insertJvmGcMetrics(List<JvmGcMetricRow> rows) throws SQLException {
         String sql = "INSERT INTO jvm_gc_metrics (timestamp_ms, app_id, executor_id, gc_name, " +
-            "gc_count, gc_time_ms) VALUES (?,?,?,?,?,?)";
+            "app_name, user_name, queue, gc_count, gc_time_ms) VALUES (?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (JvmGcMetricRow r : rows) {
             int i = 1;
@@ -874,6 +930,9 @@ public class CategoryJdbcSink {
             ps.setString(i++, r.getAppId());
             ps.setString(i++, r.getExecutorId());
             ps.setString(i++, r.getGcName());
+            ps.setString(i++, r.getAppName());
+            ps.setString(i++, r.getUserName());
+            ps.setString(i++, r.getQueue());
             setDouble(ps, i++, r.getGcCount());
             setDouble(ps, i++, r.getGcTimeMs());
             ps.addBatch();
@@ -886,13 +945,16 @@ public class CategoryJdbcSink {
 
     private int insertSqlQueryMetrics(List<SqlQueryMetricRow> rows) throws SQLException {
         String sql = "INSERT INTO sql_query_metrics (timestamp_ms, app_id, execution_id, " +
-            "duration_ms, shuffle_bytes_read, shuffle_bytes_written, join_count) VALUES (?,?,?,?,?,?,?)";
+            "app_name, user_name, queue, duration_ms, shuffle_bytes_read, shuffle_bytes_written, join_count) VALUES (?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (SqlQueryMetricRow r : rows) {
             int i = 1;
             setTimestamp(ps, i++, r.getTimestampMs());
             ps.setString(i++, r.getAppId());
             ps.setString(i++, r.getExecutionId());
+            ps.setString(i++, r.getAppName());
+            ps.setString(i++, r.getUserName());
+            ps.setString(i++, r.getQueue());
             setDouble(ps, i++, r.getDurationMs());
             setDouble(ps, i++, r.getShuffleBytesRead());
             setDouble(ps, i++, r.getShuffleBytesWritten());
@@ -907,7 +969,7 @@ public class CategoryJdbcSink {
 
     private int insertSqlTableIoMetrics(List<SqlTableIoMetricRow> rows) throws SQLException {
         String sql = "INSERT INTO sql_query_table_metrics (timestamp_ms, app_id, execution_id, " +
-            "table_name, operation, bytes, `rows`, files_read, time_ms) VALUES (?,?,?,?,?,?,?,?,?)";
+            "table_name, operation, app_name, user_name, queue, bytes, `rows`, files_read, time_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (SqlTableIoMetricRow r : rows) {
             int i = 1;
@@ -916,6 +978,9 @@ public class CategoryJdbcSink {
             ps.setString(i++, r.getExecutionId());
             ps.setString(i++, r.getTableName());
             ps.setString(i++, r.getOperation());
+            ps.setString(i++, r.getAppName());
+            ps.setString(i++, r.getUserName());
+            ps.setString(i++, r.getQueue());
             setDouble(ps, i++, r.getBytes());
             setDouble(ps, i++, r.getRows());
             setDouble(ps, i++, r.getFilesRead());
@@ -959,8 +1024,8 @@ public class CategoryJdbcSink {
     private void bindTaskBucket(PreparedStatement ps, HistogramBucket b) throws SQLException {
         int i = 1;
         setTimestamp(ps, i++, b.getTimestampMs());
-        ps.setString(i++, b.getLabels().get("spark.app.id"));
-        ps.setString(i++, b.getLabels().get("spark.executor.id"));
+        ps.setString(i++, b.getLabels().getOrDefault("spark.app.id", "unknown"));
+        ps.setString(i++, b.getLabels().getOrDefault("spark.executor.id", "unknown"));
         ps.setInt(i++, parseIntSafe(b.getLabels().get("spark.stage.id")));
         ps.setLong(i++, parseLongSafe(b.getLabels().get("spark.task.id")));
         ps.setString(i++, b.getLabels().get("spark.task.success"));
@@ -973,8 +1038,8 @@ public class CategoryJdbcSink {
     private void bindStageBucket(PreparedStatement ps, HistogramBucket b) throws SQLException {
         int i = 1;
         setTimestamp(ps, i++, b.getTimestampMs());
-        ps.setString(i++, b.getLabels().get("spark.app.id"));
-        ps.setString(i++, b.getLabels().get("spark.executor.id"));
+        ps.setString(i++, b.getLabels().getOrDefault("spark.app.id", "unknown"));
+        ps.setString(i++, b.getLabels().getOrDefault("spark.executor.id", "unknown"));
         ps.setInt(i++, parseIntSafe(b.getLabels().get("spark.stage.id")));
         ps.setString(i++, b.getMetricName());
         double le = b.getBucketLe();
@@ -985,7 +1050,7 @@ public class CategoryJdbcSink {
     private void bindJobBucket(PreparedStatement ps, HistogramBucket b) throws SQLException {
         int i = 1;
         setTimestamp(ps, i++, b.getTimestampMs());
-        ps.setString(i++, b.getLabels().get("spark.app.id"));
+        ps.setString(i++, b.getLabels().getOrDefault("spark.app.id", "unknown"));
         ps.setInt(i++, parseIntSafe(b.getLabels().get("spark.job.id")));
         ps.setString(i++, b.getLabels().get("spark.job.success"));
         ps.setString(i++, b.getMetricName());
@@ -1096,7 +1161,7 @@ public class CategoryJdbcSink {
     }
 
     private int insertMrTaskMetrics(List<MrTaskMetricRow> rows) throws SQLException {
-        String sql = "INSERT INTO mr_task_metrics (timestamp_ms, task_id, task_type, job_id, job_name, user_name, state, " +
+        String sql = "INSERT INTO mr_task_metrics (timestamp_ms, task_id, task_type, job_id, job_name, user_name, state, queue, " +
             "hdfs_bytes_read, hdfs_bytes_written, file_bytes_read, file_bytes_written, " +
             "map_input_records, map_output_records, map_output_bytes, " +
             "reduce_input_records, reduce_output_records, reduce_shuffle_bytes, spilled_records, " +
@@ -1104,7 +1169,7 @@ public class CategoryJdbcSink {
             "duration_ms, success_count, failure_count, " +
             "hdfs_read_ops, hdfs_write_ops, hdfs_large_read_ops, " +
             "file_read_ops, file_write_ops, file_large_read_ops) " +
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (MrTaskMetricRow r : rows) {
             int i = 1;
@@ -1115,6 +1180,7 @@ public class CategoryJdbcSink {
             ps.setString(i++, r.getJobName());
             ps.setString(i++, r.getUserName());
             ps.setString(i++, r.getState());
+            ps.setString(i++, r.getQueue());
             setDouble(ps, i++, r.getHdfsBytesRead());
             setDouble(ps, i++, r.getHdfsBytesWritten());
             setDouble(ps, i++, r.getFileBytesRead());
@@ -1203,6 +1269,38 @@ public class CategoryJdbcSink {
                 LOG.log(Level.FINE, "Migration skipped (column likely exists): " + e.getMessage());
             }
         }
+        // v5: Add app_name, user_name, queue to Spark tables; queue to mr_task_metrics
+        String[] sparkUserQueueMigrations = {
+            "ALTER TABLE task_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE task_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE task_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE stage_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE stage_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE stage_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE job_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE job_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE job_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE jvm_memory_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE jvm_memory_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE jvm_memory_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE jvm_gc_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE jvm_gc_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE jvm_gc_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE sql_query_table_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE sql_query_table_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE sql_query_table_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)"
+        };
+        for (String sql : sparkUserQueueMigrations) {
+            try {
+                stmt.execute(sql);
+            } catch (SQLException e) {
+                LOG.log(Level.FINE, "Migration skipped (column likely exists): " + e.getMessage());
+            }
+        }
     }
 
     private void migrateClickHouseSchema(Statement stmt) {
@@ -1243,6 +1341,38 @@ public class CategoryJdbcSink {
             "ALTER TABLE mr_job_metrics ADD COLUMN IF NOT EXISTS finish_time_ms Nullable(Int64)"
         };
         for (String sql : mrJobTimeChMigrations) {
+            try {
+                stmt.execute(sql);
+            } catch (SQLException e) {
+                LOG.log(Level.FINE, "Migration skipped (column likely exists): " + e.getMessage());
+            }
+        }
+        // v5: Add app_name, user_name, queue to Spark tables; queue to mr_task_metrics
+        String[] sparkUserQueueChMigrations = {
+            "ALTER TABLE task_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE task_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE task_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE stage_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE stage_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE stage_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE job_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE job_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE job_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE jvm_memory_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE jvm_memory_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE jvm_memory_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE jvm_gc_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE jvm_gc_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE jvm_gc_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE sql_query_table_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE sql_query_table_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE sql_query_table_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)"
+        };
+        for (String sql : sparkUserQueueChMigrations) {
             try {
                 stmt.execute(sql);
             } catch (SQLException e) {

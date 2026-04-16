@@ -8,6 +8,9 @@ public class StageMetricRow {
     private String appId;
     private String executorId;
     private int stageId;
+    private String appName;
+    private String userName;
+    private String queue;
 
     // Metrics
     private Double durationMs;
@@ -25,8 +28,11 @@ public class StageMetricRow {
         StageMetricRow row = new StageMetricRow();
         row.timestampMs = timestampMs;
         row.appId = labels.getOrDefault("spark.app.id", "unknown");
-        row.executorId = labels.get("spark.executor.id");
+        row.executorId = labels.getOrDefault("spark.executor.id", "unknown");
         row.stageId = parseInt(labels.get("spark.stage.id"), 0);
+        row.appName = labels.getOrDefault("spark.app.name", "");
+        row.userName = labels.getOrDefault("spark.user", "");
+        row.queue = labels.getOrDefault("spark.yarn.queue", "");
         return row;
     }
 
@@ -52,6 +58,9 @@ public class StageMetricRow {
     public String getAppId() { return appId; }
     public String getExecutorId() { return executorId; }
     public int getStageId() { return stageId; }
+    public String getAppName() { return appName; }
+    public String getUserName() { return userName; }
+    public String getQueue() { return queue; }
     public Double getDurationMs() { return durationMs; }
     public Double getNumTasks() { return numTasks; }
     public Double getExecutorRunTimeMs() { return executorRunTimeMs; }

@@ -8,6 +8,9 @@ public class JobMetricRow {
     private String appId;
     private int jobId;
     private String jobSuccess;
+    private String appName;
+    private String userName;
+    private String queue;
 
     // Metrics
     private Double durationMs;
@@ -21,6 +24,9 @@ public class JobMetricRow {
         row.appId = labels.getOrDefault("spark.app.id", "unknown");
         row.jobId = parseInt(labels.get("spark.job.id"), 0);
         row.jobSuccess = labels.get("spark.job.success");
+        row.appName = labels.getOrDefault("spark.app.name", "");
+        row.userName = labels.getOrDefault("spark.user", "");
+        row.queue = labels.getOrDefault("spark.yarn.queue", "");
         return row;
     }
 
@@ -40,6 +46,9 @@ public class JobMetricRow {
     public String getAppId() { return appId; }
     public int getJobId() { return jobId; }
     public String getJobSuccess() { return jobSuccess; }
+    public String getAppName() { return appName; }
+    public String getUserName() { return userName; }
+    public String getQueue() { return queue; }
     public Double getDurationMs() { return durationMs; }
     public Double getNumStages() { return numStages; }
 }

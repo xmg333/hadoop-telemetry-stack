@@ -13,6 +13,9 @@ public class TaskMetricRow {
     private String taskHost;
     private String taskLocality;
     private String taskSpeculative;
+    private String appName;
+    private String userName;
+    private String queue;
 
     // Core IO metrics
     private Double durationMs;
@@ -49,13 +52,16 @@ public class TaskMetricRow {
         TaskMetricRow row = new TaskMetricRow();
         row.timestampMs = timestampMs;
         row.appId = labels.getOrDefault("spark.app.id", "unknown");
-        row.executorId = labels.get("spark.executor.id");
+        row.executorId = labels.getOrDefault("spark.executor.id", "unknown");
         row.stageId = parseInt(labels.get("spark.stage.id"), 0);
         row.taskId = parseLong(labels.get("spark.task.id"), 0);
         row.taskSuccess = labels.get("spark.task.success");
         row.taskHost = labels.get("spark.task.host");
         row.taskLocality = labels.get("spark.task.locality");
         row.taskSpeculative = labels.get("spark.task.speculative");
+        row.appName = labels.getOrDefault("spark.app.name", "");
+        row.userName = labels.getOrDefault("spark.user", "");
+        row.queue = labels.getOrDefault("spark.yarn.queue", "");
         return row;
     }
 
@@ -108,6 +114,9 @@ public class TaskMetricRow {
     public String getTaskHost() { return taskHost; }
     public String getTaskLocality() { return taskLocality; }
     public String getTaskSpeculative() { return taskSpeculative; }
+    public String getAppName() { return appName; }
+    public String getUserName() { return userName; }
+    public String getQueue() { return queue; }
     public Double getDurationMs() { return durationMs; }
     public Double getIoBytesRead() { return ioBytesRead; }
     public Double getIoBytesWritten() { return ioBytesWritten; }

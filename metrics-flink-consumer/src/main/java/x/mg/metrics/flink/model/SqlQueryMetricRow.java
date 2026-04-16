@@ -7,6 +7,9 @@ public class SqlQueryMetricRow {
     private long timestampMs;
     private String appId;
     private String executionId;
+    private String appName;
+    private String userName;
+    private String queue;
 
     // Metrics
     private Double durationMs;
@@ -21,6 +24,9 @@ public class SqlQueryMetricRow {
         row.timestampMs = timestampMs;
         row.appId = labels.getOrDefault("spark.app.id", "unknown");
         row.executionId = labels.getOrDefault("spark.sql.execution_id", "0");
+        row.appName = labels.getOrDefault("spark.app.name", "");
+        row.userName = labels.getOrDefault("spark.user", "");
+        row.queue = labels.getOrDefault("spark.yarn.queue", "");
         return row;
     }
 
@@ -37,6 +43,9 @@ public class SqlQueryMetricRow {
     public long getTimestampMs() { return timestampMs; }
     public String getAppId() { return appId; }
     public String getExecutionId() { return executionId; }
+    public String getAppName() { return appName; }
+    public String getUserName() { return userName; }
+    public String getQueue() { return queue; }
     public Double getDurationMs() { return durationMs; }
     public Double getShuffleBytesRead() { return shuffleBytesRead; }
     public Double getShuffleBytesWritten() { return shuffleBytesWritten; }

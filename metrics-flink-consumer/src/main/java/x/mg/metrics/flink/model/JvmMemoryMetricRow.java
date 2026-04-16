@@ -7,6 +7,9 @@ public class JvmMemoryMetricRow {
     private long timestampMs;
     private String appId;
     private String executorId;
+    private String appName;
+    private String userName;
+    private String queue;
 
     // Metrics
     private Double heapUsed;
@@ -18,7 +21,10 @@ public class JvmMemoryMetricRow {
         JvmMemoryMetricRow row = new JvmMemoryMetricRow();
         row.timestampMs = timestampMs;
         row.appId = labels.getOrDefault("spark.app.id", "unknown");
-        row.executorId = labels.get("spark.executor.id");
+        row.executorId = labels.getOrDefault("spark.executor.id", "unknown");
+        row.appName = labels.getOrDefault("spark.app.name", "");
+        row.userName = labels.getOrDefault("spark.user", "");
+        row.queue = labels.getOrDefault("spark.yarn.queue", "");
         return row;
     }
 
@@ -32,6 +38,9 @@ public class JvmMemoryMetricRow {
     public long getTimestampMs() { return timestampMs; }
     public String getAppId() { return appId; }
     public String getExecutorId() { return executorId; }
+    public String getAppName() { return appName; }
+    public String getUserName() { return userName; }
+    public String getQueue() { return queue; }
     public Double getHeapUsed() { return heapUsed; }
     public Double getNonHeapUsed() { return nonHeapUsed; }
 }

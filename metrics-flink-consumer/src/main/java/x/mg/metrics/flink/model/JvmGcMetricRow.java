@@ -8,6 +8,9 @@ public class JvmGcMetricRow {
     private String appId;
     private String executorId;
     private String gcName;
+    private String appName;
+    private String userName;
+    private String queue;
 
     // Metrics
     private Double gcCount;
@@ -19,8 +22,11 @@ public class JvmGcMetricRow {
         JvmGcMetricRow row = new JvmGcMetricRow();
         row.timestampMs = timestampMs;
         row.appId = labels.getOrDefault("spark.app.id", "unknown");
-        row.executorId = labels.get("spark.executor.id");
-        row.gcName = labels.get("gc_name");
+        row.executorId = labels.getOrDefault("spark.executor.id", "unknown");
+        row.gcName = labels.getOrDefault("gc_name", "unknown");
+        row.appName = labels.getOrDefault("spark.app.name", "");
+        row.userName = labels.getOrDefault("spark.user", "");
+        row.queue = labels.getOrDefault("spark.yarn.queue", "");
         return row;
     }
 
@@ -35,6 +41,9 @@ public class JvmGcMetricRow {
     public String getAppId() { return appId; }
     public String getExecutorId() { return executorId; }
     public String getGcName() { return gcName; }
+    public String getAppName() { return appName; }
+    public String getUserName() { return userName; }
+    public String getQueue() { return queue; }
     public Double getGcCount() { return gcCount; }
     public Double getGcTimeMs() { return gcTimeMs; }
 }

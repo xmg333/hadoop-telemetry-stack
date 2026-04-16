@@ -10,6 +10,7 @@ public class MrTaskMetricRow {
     private String jobName;
     private String userName;
     private String state;
+    private String queue;
 
     // IO metrics
     private Double hdfsBytesRead;
@@ -57,6 +58,7 @@ public class MrTaskMetricRow {
         row.jobName = labels.getOrDefault("mr.job.name", "unknown");
         row.userName = labels.getOrDefault("mr.job.user", "unknown");
         row.state = labels.getOrDefault("mr.job.state", "unknown");
+        row.queue = labels.getOrDefault("mr.job.queue", "");
         return row;
     }
 
@@ -94,6 +96,7 @@ public class MrTaskMetricRow {
     public String getJobName() { return jobName; }
     public String getUserName() { return userName; }
     public String getState() { return state; }
+    public String getQueue() { return queue; }
     public Double getHdfsBytesRead() { return hdfsBytesRead; }
     public Double getHdfsBytesWritten() { return hdfsBytesWritten; }
     public Double getFileBytesRead() { return fileBytesRead; }
