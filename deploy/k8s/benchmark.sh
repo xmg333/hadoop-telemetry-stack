@@ -137,28 +137,28 @@ phase1_preflight() {
 
     # Check JARs exist
     local spark_jar
-    spark_jar=$(ls /home/xmg333/spark-telemetry-listener/spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*-SNAPSHOT.jar 2>/dev/null || true)
+    spark_jar=$(ls /home/xmg333/spark-telemetry-listener/spark/spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*-SNAPSHOT.jar 2>/dev/null || true)
     if [[ -z "$spark_jar" ]]; then
         fail "Spark omnipackage JAR not found. Run: ./build-omni.sh"
         exit 1
     fi
 
     local mr_jar
-    mr_jar=$(ls /home/xmg333/spark-telemetry-listener/mr-telemetry-dist/target/mr-telemetry-dist-*-SNAPSHOT.jar 2>/dev/null || true)
+    mr_jar=$(ls /home/xmg333/spark-telemetry-listener/mapreduce-collector/mr-telemetry-dist/target/mr-telemetry-dist-*-SNAPSHOT.jar 2>/dev/null || true)
     if [[ -z "$mr_jar" ]]; then
         fail "MR collector JAR not found. Run: mvn clean package -Pspark-3 -DskipTests"
         exit 1
     fi
 
     local flink_jar
-    flink_jar=$(ls /home/xmg333/spark-telemetry-listener/metrics-flink-consumer-dist/target/metrics-flink-consumer-dist-*-SNAPSHOT.jar 2>/dev/null || true)
+    flink_jar=$(ls /home/xmg333/spark-telemetry-listener/flink/metrics-flink-consumer-dist/target/metrics-flink-consumer-dist-*-SNAPSHOT.jar 2>/dev/null || true)
     if [[ -z "$flink_jar" ]]; then
         fail "Flink consumer JAR not found. Run: mvn clean package -Pspark-3 -DskipTests"
         exit 1
     fi
 
     local hive_jar
-    hive_jar=$(ls /home/xmg333/spark-telemetry-listener/hive-telemetry-hook-dist/target/hive-telemetry-hook-dist-*-SNAPSHOT.jar 2>/dev/null || true)
+    hive_jar=$(ls /home/xmg333/spark-telemetry-listener/hive/hive-telemetry-hook-dist/target/hive-telemetry-hook-dist-*-SNAPSHOT.jar 2>/dev/null || true)
     if [[ -z "$hive_jar" ]]; then
         warn "Hive hook JAR not found. Hive benchmark will be skipped. Run: mvn clean package -Pspark-3 -DskipTests"
     fi
@@ -183,7 +183,7 @@ phase2_environment() {
 
     # Deploy Spark omnipackage JAR
     log "Deploying Spark omnipackage JAR to spark3..."
-    kubectl cp spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*-SNAPSHOT.jar \
+    kubectl cp spark/spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*-SNAPSHOT.jar \
         "$SPARK3_POD":/opt/spark-telemetry-plugin.jar
 
     # Deploy Hadoop config to spark3 for YARN submission
@@ -227,12 +227,12 @@ rm -f /tmp/spark-examples.jar
 
     # Deploy Flink consumer JAR to spark3 (we reuse spark3 pod for Flink)
     log "Deploying Flink consumer JAR to spark3..."
-    kubectl cp metrics-flink-consumer-dist/target/metrics-flink-consumer-dist-*-SNAPSHOT.jar \
+    kubectl cp flink/metrics-flink-consumer-dist/target/metrics-flink-consumer-dist-*-SNAPSHOT.jar \
         "$SPARK3_POD":/tmp/flink-consumer.jar
 
     # Deploy MR collector JAR to hadoop3
     log "Deploying MR collector JAR to hadoop3..."
-    kubectl cp mr-telemetry-dist/target/mr-telemetry-dist-*-SNAPSHOT.jar \
+    kubectl cp mapreduce-collector/mr-telemetry-dist/target/mr-telemetry-dist-*-SNAPSHOT.jar \
         "$HADOOP3_POD":/tmp/mr-collector.jar
 
     # Write Flink consumer config on spark3
@@ -462,7 +462,7 @@ PYEOF'
     # Deploy Hive hook JAR and prepare Hive benchmark tables (if Hive available)
     if [[ "$HIVE_AVAILABLE" == "true" ]]; then
         local hive_jar
-        hive_jar=$(ls /home/xmg333/spark-telemetry-listener/hive-telemetry-hook-dist/target/hive-telemetry-hook-dist-*-SNAPSHOT.jar 2>/dev/null || true)
+        hive_jar=$(ls /home/xmg333/spark-telemetry-listener/hive/hive-telemetry-hook-dist/target/hive-telemetry-hook-dist-*-SNAPSHOT.jar 2>/dev/null || true)
         if [[ -n "$hive_jar" ]]; then
             log "Deploying Hive hook JAR to hadoop3..."
             kubectl cp "$hive_jar" "$HADOOP3_POD":/opt/hive/lib/hive-telemetry-hook.jar

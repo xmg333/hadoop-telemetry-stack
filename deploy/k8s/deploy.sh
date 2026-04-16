@@ -1,15 +1,25 @@
 #!/bin/bash
 set -e
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 echo "Deploying Hadoop3 cluster..."
-kubectl apply -f hadoop3/
+kubectl apply -f "$SCRIPT_DIR/hadoop3/"
 echo "Deploying Hadoop2 cluster..."
-kubectl apply -f hadoop2/
+kubectl apply -f "$SCRIPT_DIR/hadoop2/"
 echo "Deploying Spark3..."
-kubectl apply -f spark3/
+kubectl apply -f "$SCRIPT_DIR/spark3/"
 echo "Deploying Spark2..."
-kubectl apply -f spark2/
+kubectl apply -f "$SCRIPT_DIR/spark2/"
 echo "Deploying Kafka..."
-kubectl apply -f kafka/
+kubectl apply -f "$SCRIPT_DIR/kafka/"
 echo "Deploying OTel Collector..."
-kubectl apply -f otel-collector/
+kubectl apply -f "$SCRIPT_DIR/otel-collector/"
+echo "Deploying MySQL..."
+kubectl apply -f "$SCRIPT_DIR/mysql/"
+echo "Deploying ClickHouse..."
+kubectl apply -f "$SCRIPT_DIR/clickhouse/"
+echo "Deploying Hive..."
+kubectl apply -f "$SCRIPT_DIR/hive/"
+echo "Deploying Grafana..."
+kubectl apply -f "$SCRIPT_DIR/grafana/"
 echo "Done! Use 'kubectl get pods' to check status."

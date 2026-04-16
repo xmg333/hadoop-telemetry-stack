@@ -579,8 +579,8 @@ main() {
   print_banner
   confirm
 
-  # Create config output directory
-  run_cmd mkdir -p "$CONFIG_DIR"
+  # Create config output directory (always, even in dry-run — config generation needs it)
+  mkdir -p "$CONFIG_DIR"
 
   # Generate Spark config first (needed by install_spark)
   generate_spark_conf
