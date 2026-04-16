@@ -1,6 +1,9 @@
 # Maven build output
 target/
 
+# MkDocs build output
+site/
+
 # IDE
 .idea/
 *.iml
