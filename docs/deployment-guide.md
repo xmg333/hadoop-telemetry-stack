@@ -25,34 +25,24 @@ Spark Telemetry Listener 是一套透明的 Spark / MapReduce 可观测性方案
 
 ## 系统架构
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                         数据采集层                                    │
-│                                                                      │
-│  ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐ │
-│  │  Spark Plugin    │   │  MR Collector    │   │  MR Agent        │ │
-│  │  (Task/Stage/JVM)│   │  (History Server)│   │  (字节码增强)     │ │
-│  └────────┬─────────┘   └────────┬─────────┘   └────────┬─────────┘ │
-│           │ OTLP gRPC           │ OTLP gRPC           │ OTLP gRPC  │
-└───────────┼─────────────────────┼─────────────────────┼────────────┘
-            │                     │                     │
-            ▼                     ▼                     ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                         OTel Collector                               │
-│           (接收 OTLP → 调试输出 + Kafka 导出)                         │
-└──────────────────────────────┬───────────────────────────────────────┘
-                               │ Kafka (OTLP Protobuf)
-                               ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                    Flink Metrics Consumer                             │
-│           (Kafka → 批量写入 MySQL / ClickHouse)                       │
-└──────────────────────────────┬───────────────────────────────────────┘
-                               │
-                               ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│              MySQL / ClickHouse + Grafana                             │
-│           (时序存储 + 可视化仪表盘)                                     │
-└──────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph 数据采集层
+        SP["Spark Plugin<br/>(Task/Stage/JVM)"]
+        MR["MR Collector<br/>(History Server)"]
+        MA["MR Agent<br/>(字节码增强)"]
+    end
+
+    SP -- OTLP gRPC --> OTel
+    MR -- OTLP gRPC --> OTel
+    MA -- OTLP gRPC --> OTel
+
+    OTel["OTel Collector<br/>(接收 OTLP → 调试输出 + Kafka 导出)"]
+    Flink["Flink Metrics Consumer<br/>(Kafka → 批量写入 MySQL / ClickHouse)"]
+    DB[("MySQL / ClickHouse + Grafana<br/>(时序存储 + 可视化仪表盘)")]
+
+    OTel -- "Kafka (OTLP Protobuf)" --> Flink
+    Flink --> DB
 ```
 
 ---
