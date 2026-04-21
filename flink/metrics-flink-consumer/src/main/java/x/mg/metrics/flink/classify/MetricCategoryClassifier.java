@@ -130,7 +130,7 @@ public class MetricCategoryClassifier {
         put("mr.task.gc_time_ms",                           MetricCategory.MR_TASK, "gc_time_ms",                   false);
 
         // MR task metrics (duration & result)
-        put("mr.task.duration_ms",                          MetricCategory.MR_TASK, "duration_ms",                  true);
+        put("mr.task.duration_ms",                          MetricCategory.MR_TASK, "duration_ms",                  false);
         put("mr.task.success",                              MetricCategory.MR_TASK, "success_count",                false);
         put("mr.task.failure",                              MetricCategory.MR_TASK, "failure_count",                false);
 

@@ -1,8 +1,10 @@
 package x.mg.metrics.flink.model;
 
+import java.io.Serializable;
 import java.util.Map;
 
-public class MrTaskMetricRow {
+public class MrTaskMetricRow implements Serializable {
+    private static final long serialVersionUID = 1L;
     private long timestampMs;
     private String taskId;
     private String taskType;
@@ -57,7 +59,7 @@ public class MrTaskMetricRow {
         row.jobId = labels.getOrDefault("mr.job.id", "unknown");
         row.jobName = labels.getOrDefault("mr.job.name", "unknown");
         row.userName = labels.getOrDefault("mr.job.user", "unknown");
-        row.state = labels.getOrDefault("mr.job.state", "unknown");
+        row.state = labels.getOrDefault("mr.task.state", "unknown");
         row.queue = labels.getOrDefault("mr.job.queue", "");
         return row;
     }

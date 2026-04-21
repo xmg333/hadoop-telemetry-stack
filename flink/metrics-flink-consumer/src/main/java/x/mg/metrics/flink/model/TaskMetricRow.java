@@ -1,8 +1,10 @@
 package x.mg.metrics.flink.model;
 
+import java.io.Serializable;
 import java.util.Map;
 
-public class TaskMetricRow {
+public class TaskMetricRow implements Serializable {
+    private static final long serialVersionUID = 1L;
     // Dimensions
     private long timestampMs;
     private String appId;

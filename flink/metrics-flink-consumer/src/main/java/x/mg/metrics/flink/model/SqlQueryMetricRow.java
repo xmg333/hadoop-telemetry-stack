@@ -1,8 +1,10 @@
 package x.mg.metrics.flink.model;
 
+import java.io.Serializable;
 import java.util.Map;
 
-public class SqlQueryMetricRow {
+public class SqlQueryMetricRow implements Serializable {
+    private static final long serialVersionUID = 1L;
     // Dimensions
     private long timestampMs;
     private String appId;
@@ -17,6 +19,9 @@ public class SqlQueryMetricRow {
     private Double shuffleBytesWritten;
     private Double joinCount;
 
+    // Text
+    private String queryText;
+
     public SqlQueryMetricRow() {}
 
     public static SqlQueryMetricRow fromLabels(long timestampMs, Map<String, String> labels) {
@@ -27,6 +32,7 @@ public class SqlQueryMetricRow {
         row.appName = labels.getOrDefault("spark.app.name", "");
         row.userName = labels.getOrDefault("spark.user", "");
         row.queue = labels.getOrDefault("spark.yarn.queue", "");
+        row.queryText = labels.getOrDefault("spark.sql.query_text", null);
         return row;
     }
 
@@ -50,4 +56,5 @@ public class SqlQueryMetricRow {
     public Double getShuffleBytesRead() { return shuffleBytesRead; }
     public Double getShuffleBytesWritten() { return shuffleBytesWritten; }
     public Double getJoinCount() { return joinCount; }
+    public String getQueryText() { return queryText; }
 }

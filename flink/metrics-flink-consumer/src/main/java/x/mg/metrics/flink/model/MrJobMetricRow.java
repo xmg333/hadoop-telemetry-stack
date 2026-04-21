@@ -1,8 +1,10 @@
 package x.mg.metrics.flink.model;
 
+import java.io.Serializable;
 import java.util.Map;
 
-public class MrJobMetricRow {
+public class MrJobMetricRow implements Serializable {
+    private static final long serialVersionUID = 1L;
     private long timestampMs;
     private String jobId;
     private String jobName;

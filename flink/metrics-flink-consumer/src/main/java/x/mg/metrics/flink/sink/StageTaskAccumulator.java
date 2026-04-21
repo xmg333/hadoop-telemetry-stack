@@ -2,10 +2,12 @@ package x.mg.metrics.flink.sink;
 
 import x.mg.metrics.flink.model.StageGovernanceRow;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-public class StageTaskAccumulator {
+public class StageTaskAccumulator implements Serializable {
+    private static final long serialVersionUID = 1L;
     private static final double SMALL_FILE_THRESHOLD = 32 * 1024 * 1024; // 32MB
 
     private final String appId;
@@ -120,7 +122,8 @@ public class StageTaskAccumulator {
         return s != null ? s.sum : 0;
     }
 
-    public static class RunningStats {
+    public static class RunningStats implements Serializable {
+        private static final long serialVersionUID = 1L;
         double sum;
         double max = -1;
         double min = Long.MAX_VALUE;

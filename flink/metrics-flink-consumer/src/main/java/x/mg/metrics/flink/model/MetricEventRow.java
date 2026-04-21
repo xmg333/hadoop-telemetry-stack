@@ -2,6 +2,7 @@ package x.mg.metrics.flink.model;
 
 import x.mg.metrics.flink.classify.MetricCategory;
 
+import java.io.Serializable;
 import java.util.Map;
 
 /**
@@ -9,7 +10,8 @@ import java.util.Map;
  * Replaces 11 separate row models with a single class that uses
  * engine + event_type as discriminators and normalized common columns.
  */
-public class MetricEventRow {
+public class MetricEventRow implements Serializable {
+    private static final long serialVersionUID = 1L;
     // Identity (always populated)
     private long timestampMs;
     private String eventType;  // TASK, STAGE, JOB, JVM_MEMORY, JVM_GC, SQL_QUERY, SQL_TABLE_IO, HIVE_QUERY, HIVE_TABLE_IO, MR_JOB, MR_TASK
@@ -127,6 +129,9 @@ public class MetricEventRow {
     private Double ioRecordsRead;
     private Double ioRecordsWritten;
 
+    // SQL/Hive query text
+    private String queryText;
+
     // Catch-all
     private String labels;
 
@@ -190,6 +195,7 @@ public class MetricEventRow {
                 row.userName = labels.getOrDefault("spark.user", "");
                 row.queue = labels.getOrDefault("spark.yarn.queue", "");
                 row.executionId = labels.getOrDefault("spark.sql.execution_id", "unknown");
+                row.queryText = labels.getOrDefault("spark.sql.query_text", null);
                 break;
             case SQL_TABLE_IO:
                 row.appId = labels.getOrDefault("spark.app.id", "unknown");
@@ -206,6 +212,7 @@ public class MetricEventRow {
                 row.userName = labels.getOrDefault("hive.query.user", "unknown");
                 row.operation = labels.getOrDefault("hive.query.operation", "unknown");
                 row.executionEngine = labels.getOrDefault("hive.query.execution_engine", "unknown");
+                row.queryText = labels.getOrDefault("hive.query.sql_text", null);
                 break;
             case HIVE_TABLE_IO:
                 row.appId = labels.getOrDefault("hive.query.id", "unknown");
@@ -542,6 +549,7 @@ public class MetricEventRow {
     public Double getOutputRows() { return outputRows; }
     public Double getIoRecordsRead() { return ioRecordsRead; }
     public Double getIoRecordsWritten() { return ioRecordsWritten; }
+    public String getQueryText() { return queryText; }
     public String getLabels() { return labels; }
 
     // Internal getters for normalization

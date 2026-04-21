@@ -1,8 +1,10 @@
 package x.mg.metrics.flink.model;
 
+import java.io.Serializable;
 import java.util.Map;
 
-public class HiveQueryMetricRow {
+public class HiveQueryMetricRow implements Serializable {
+    private static final long serialVersionUID = 1L;
     private long timestampMs;
     private String queryId;
     private String operation;
@@ -18,6 +20,9 @@ public class HiveQueryMetricRow {
     private Double inputRows;
     private Double outputRows;
 
+    // Text
+    private String queryText;
+
     public static HiveQueryMetricRow fromLabels(long timestampMs, Map<String, String> labels) {
         HiveQueryMetricRow row = new HiveQueryMetricRow();
         row.timestampMs = timestampMs;
@@ -26,6 +31,7 @@ public class HiveQueryMetricRow {
         row.userName = labels.getOrDefault("hive.query.user", "unknown");
         row.success = labels.getOrDefault("hive.query.success", "unknown");
         row.executionEngine = labels.getOrDefault("hive.query.execution_engine", "unknown");
+        row.queryText = labels.getOrDefault("hive.query.sql_text", null);
         return row;
     }
 
@@ -54,4 +60,5 @@ public class HiveQueryMetricRow {
     public Double getOutputBytes() { return outputBytes; }
     public Double getInputRows() { return inputRows; }
     public Double getOutputRows() { return outputRows; }
+    public String getQueryText() { return queryText; }
 }

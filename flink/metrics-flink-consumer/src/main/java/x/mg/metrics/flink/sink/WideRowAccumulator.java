@@ -5,32 +5,33 @@ import x.mg.metrics.flink.classify.MetricCategoryClassifier;
 import x.mg.metrics.flink.classify.MetricMapping;
 import x.mg.metrics.flink.model.*;
 
+import java.io.Serializable;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
-public class WideRowAccumulator {
-    private final Map<String, TaskMetricRow> taskRows = new ConcurrentHashMap<>();
-    private final Map<String, StageMetricRow> stageRows = new ConcurrentHashMap<>();
-    private final Map<String, JobMetricRow> jobRows = new ConcurrentHashMap<>();
-    private final Map<String, JvmMemoryMetricRow> memoryRows = new ConcurrentHashMap<>();
-    private final Map<String, JvmGcMetricRow> gcRows = new ConcurrentHashMap<>();
-    private final Map<String, SqlQueryMetricRow> sqlQueryRows = new ConcurrentHashMap<>();
-    private final Map<String, SqlTableIoMetricRow> sqlTableIoRows = new ConcurrentHashMap<>();
-    private final Map<String, HiveQueryMetricRow> hiveQueryRows = new ConcurrentHashMap<>();
-    private final Map<String, HiveTableIoMetricRow> hiveTableIoRows = new ConcurrentHashMap<>();
-    private final Map<String, MrJobMetricRow> mrJobRows = new ConcurrentHashMap<>();
-    private final Map<String, MrTaskMetricRow> mrTaskRows = new ConcurrentHashMap<>();
+public class WideRowAccumulator implements Serializable {
+    private static final long serialVersionUID = 1L;
+    private final Map<String, TaskMetricRow> taskRows = new HashMap<>();
+    private final Map<String, StageMetricRow> stageRows = new HashMap<>();
+    private final Map<String, JobMetricRow> jobRows = new HashMap<>();
+    private final Map<String, JvmMemoryMetricRow> memoryRows = new HashMap<>();
+    private final Map<String, JvmGcMetricRow> gcRows = new HashMap<>();
+    private final Map<String, SqlQueryMetricRow> sqlQueryRows = new HashMap<>();
+    private final Map<String, SqlTableIoMetricRow> sqlTableIoRows = new HashMap<>();
+    private final Map<String, HiveQueryMetricRow> hiveQueryRows = new HashMap<>();
+    private final Map<String, HiveTableIoMetricRow> hiveTableIoRows = new HashMap<>();
+    private final Map<String, MrJobMetricRow> mrJobRows = new HashMap<>();
+    private final Map<String, MrTaskMetricRow> mrTaskRows = new HashMap<>();
 
     // Unified wide-table accumulator (metric_events)
-    private final Map<String, MetricEventRow> metricEventRows = new ConcurrentHashMap<>();
+    private final Map<String, MetricEventRow> metricEventRows = new HashMap<>();
 
-    private final List<HistogramBucket> taskBuckets = Collections.synchronizedList(new ArrayList<>());
-    private final List<HistogramBucket> stageBuckets = Collections.synchronizedList(new ArrayList<>());
-    private final List<HistogramBucket> jobBuckets = Collections.synchronizedList(new ArrayList<>());
+    private final List<HistogramBucket> taskBuckets = new ArrayList<>();
+    private final List<HistogramBucket> stageBuckets = new ArrayList<>();
+    private final List<HistogramBucket> jobBuckets = new ArrayList<>();
 
     // Governance: per-stage task metric accumulation (persists across flushes until stage completes)
-    private final Map<String, StageTaskAccumulator> stageTaskAccumulators = new ConcurrentHashMap<>();
-    private final Set<String> completedStages = Collections.synchronizedSet(new HashSet<>());
+    private final Map<String, StageTaskAccumulator> stageTaskAccumulators = new HashMap<>();
+    private final Set<String> completedStages = new HashSet<>();
 
     private long totalSamplesAccepted = 0;
     private long totalBucketsAccepted = 0;
@@ -250,7 +251,8 @@ public class WideRowAccumulator {
     public long getTotalBucketsAccepted() { return totalBucketsAccepted; }
     public long getTotalSamplesSkipped() { return totalSamplesSkipped; }
 
-    public static class FlushResult {
+    public static class FlushResult implements Serializable {
+        private static final long serialVersionUID = 1L;
         public List<TaskMetricRow> taskRows;
         public List<StageMetricRow> stageRows;
         public List<JobMetricRow> jobRows;

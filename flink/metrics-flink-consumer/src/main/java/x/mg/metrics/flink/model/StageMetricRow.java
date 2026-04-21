@@ -1,8 +1,10 @@
 package x.mg.metrics.flink.model;
 
+import java.io.Serializable;
 import java.util.Map;
 
-public class StageMetricRow {
+public class StageMetricRow implements Serializable {
+    private static final long serialVersionUID = 1L;
     // Dimensions
     private long timestampMs;
     private String appId;

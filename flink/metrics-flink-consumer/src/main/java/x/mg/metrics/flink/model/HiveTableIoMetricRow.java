@@ -1,8 +1,10 @@
 package x.mg.metrics.flink.model;
 
+import java.io.Serializable;
 import java.util.Map;
 
-public class HiveTableIoMetricRow {
+public class HiveTableIoMetricRow implements Serializable {
+    private static final long serialVersionUID = 1L;
     private long timestampMs;
     private String queryId;
     private String tableName;

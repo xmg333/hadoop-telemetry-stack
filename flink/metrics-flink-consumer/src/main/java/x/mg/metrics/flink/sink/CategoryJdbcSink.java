@@ -31,12 +31,19 @@ public class CategoryJdbcSink {
     private WideRowAccumulator accumulator;
 
     public CategoryJdbcSink(FlinkConsumerConfig config) {
-        this.jdbcUrl = config.getJdbcUrl();
-        this.jdbcUser = config.getJdbcUser();
-        this.jdbcPassword = config.getJdbcPassword();
-        this.batchSize = config.getBatchSize();
-        this.flushIntervalMs = config.getFlushIntervalMs();
-        this.isClickHouse = "clickhouse".equalsIgnoreCase(config.getSinkType());
+        this(config.getJdbcUrl(), config.getJdbcUser(), config.getJdbcPassword(),
+             config.getBatchSize(), config.getFlushIntervalMs(),
+             "clickhouse".equalsIgnoreCase(config.getSinkType()));
+    }
+
+    public CategoryJdbcSink(String jdbcUrl, String jdbcUser, String jdbcPassword,
+                            int batchSize, long flushIntervalMs, boolean isClickHouse) {
+        this.jdbcUrl = jdbcUrl;
+        this.jdbcUser = jdbcUser;
+        this.jdbcPassword = jdbcPassword;
+        this.batchSize = batchSize;
+        this.flushIntervalMs = flushIntervalMs;
+        this.isClickHouse = isClickHouse;
     }
 
     public void open() throws Exception {
@@ -140,10 +147,48 @@ public class CategoryJdbcSink {
             + " hive_tbl=" + (result.hiveTableIoRows != null ? result.hiveTableIoRows.size() : 0)
             + " mr_job=" + (result.mrJobRows != null ? result.mrJobRows.size() : 0)
             + " mr_task=" + (result.mrTaskRows != null ? result.mrTaskRows.size() : 0)
+            + " metric_events=" + (result.metricEventRows != null ? result.metricEventRows.size() : 0)
             + " buckets=" + (result.taskBuckets.size() + result.stageBuckets.size() + result.jobBuckets.size())
             + ") | total accepted: " + accumulator.getTotalSamplesAccepted() + " samples, "
             + accumulator.getTotalBucketsAccepted() + " buckets, "
             + accumulator.getTotalSamplesSkipped() + " skipped");
+    }
+
+    public int writeFlushResult(WideRowAccumulator.FlushResult result) throws Exception {
+        if (result.totalCount() == 0) return 0;
+
+        int flushed = 0;
+        if (!result.taskRows.isEmpty()) flushed += insertTaskMetrics(result.taskRows);
+        if (!result.stageRows.isEmpty()) flushed += insertStageMetrics(result.stageRows);
+        if (!result.jobRows.isEmpty()) flushed += insertJobMetrics(result.jobRows);
+        if (!result.memoryRows.isEmpty()) flushed += insertJvmMemoryMetrics(result.memoryRows);
+        if (!result.gcRows.isEmpty()) flushed += insertJvmGcMetrics(result.gcRows);
+        if (result.governanceRows != null && !result.governanceRows.isEmpty()) flushed += insertStageGovernance(result.governanceRows);
+        if (result.sqlQueryRows != null && !result.sqlQueryRows.isEmpty()) flushed += insertSqlQueryMetrics(result.sqlQueryRows);
+        if (result.sqlTableIoRows != null && !result.sqlTableIoRows.isEmpty()) flushed += insertSqlTableIoMetrics(result.sqlTableIoRows);
+        if (result.hiveQueryRows != null && !result.hiveQueryRows.isEmpty()) flushed += insertHiveQueryMetrics(result.hiveQueryRows);
+        if (result.hiveTableIoRows != null && !result.hiveTableIoRows.isEmpty()) flushed += insertHiveTableIoMetrics(result.hiveTableIoRows);
+        if (result.mrJobRows != null && !result.mrJobRows.isEmpty()) flushed += insertMrJobMetrics(result.mrJobRows);
+        if (result.mrTaskRows != null && !result.mrTaskRows.isEmpty()) flushed += insertMrTaskMetrics(result.mrTaskRows);
+        if (result.metricEventRows != null && !result.metricEventRows.isEmpty()) flushed += insertMetricEvents(result.metricEventRows);
+        if (!result.taskBuckets.isEmpty()) {
+            flushed += insertHistogramBuckets("task_histogram_buckets", result.taskBuckets,
+                "timestamp_ms, app_id, executor_id, stage_id, task_id, task_success, metric_name, bucket_le, bucket_count",
+                this::bindTaskBucket);
+        }
+        if (!result.stageBuckets.isEmpty()) {
+            flushed += insertHistogramBuckets("stage_histogram_buckets", result.stageBuckets,
+                "timestamp_ms, app_id, executor_id, stage_id, metric_name, bucket_le, bucket_count",
+                this::bindStageBucket);
+        }
+        if (!result.jobBuckets.isEmpty()) {
+            flushed += insertHistogramBuckets("job_histogram_buckets", result.jobBuckets,
+                "timestamp_ms, app_id, job_id, job_success, metric_name, bucket_le, bucket_count",
+                this::bindJobBucket);
+        }
+
+        LOG.info("Flushed " + flushed + " rows via writeFlushResult");
+        return flushed;
     }
 
     public void close() {
@@ -350,6 +395,7 @@ public class CategoryJdbcSink {
             "shuffle_bytes_read DOUBLE, " +
             "shuffle_bytes_written DOUBLE, " +
             "join_count DOUBLE, " +
+            "query_text TEXT, " +
             "INDEX idx_app_time (app_id, timestamp_ms))");
 
         stmt.execute("CREATE TABLE IF NOT EXISTS sql_query_table_metrics (" +
@@ -384,6 +430,7 @@ public class CategoryJdbcSink {
             "input_rows DOUBLE, " +
             "output_rows DOUBLE, " +
             "execution_engine VARCHAR(32), " +
+            "query_text TEXT, " +
             "INDEX idx_query_time (query_id, timestamp_ms), " +
             "INDEX idx_operation_time (operation, timestamp_ms), " +
             "INDEX idx_engine_time (execution_engine, timestamp_ms))");
@@ -565,6 +612,7 @@ public class CategoryJdbcSink {
             "output_rows DOUBLE, " +
             "io_records_read DOUBLE, " +
             "io_records_written DOUBLE, " +
+            "query_text TEXT, " +
             "INDEX idx_engine_type_time (engine, event_type, timestamp_ms), " +
             "INDEX idx_app_time (app_id, timestamp_ms), " +
             "INDEX idx_user_time (user_name, timestamp_ms), " +
@@ -756,7 +804,8 @@ public class CategoryJdbcSink {
             "duration_ms Nullable(Float64), " +
             "shuffle_bytes_read Nullable(Float64), " +
             "shuffle_bytes_written Nullable(Float64), " +
-            "join_count Nullable(Float64)" +
+            "join_count Nullable(Float64), " +
+            "query_text Nullable(String)" +
             ") ENGINE = MergeTree() " +
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (app_id, timestamp_ms)");
@@ -791,7 +840,8 @@ public class CategoryJdbcSink {
             "output_bytes Nullable(Float64), " +
             "input_rows Nullable(Float64), " +
             "output_rows Nullable(Float64), " +
-            "execution_engine LowCardinality(Nullable(String))" +
+            "execution_engine LowCardinality(Nullable(String)), " +
+            "query_text Nullable(String)" +
             ") ENGINE = MergeTree() " +
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (query_id, timestamp_ms)");
@@ -968,7 +1018,8 @@ public class CategoryJdbcSink {
             "input_rows Nullable(Float64), " +
             "output_rows Nullable(Float64), " +
             "io_records_read Nullable(Float64), " +
-            "io_records_written Nullable(Float64)" +
+            "io_records_written Nullable(Float64), " +
+            "query_text Nullable(String)" +
             ") ENGINE = MergeTree() " +
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (engine, event_type, timestamp_ms, app_id)");
@@ -1139,7 +1190,7 @@ public class CategoryJdbcSink {
 
     private int insertSqlQueryMetrics(List<SqlQueryMetricRow> rows) throws SQLException {
         String sql = "INSERT INTO sql_query_metrics (timestamp_ms, app_id, execution_id, " +
-            "app_name, user_name, queue, duration_ms, shuffle_bytes_read, shuffle_bytes_written, join_count) VALUES (?,?,?,?,?,?,?,?,?,?)";
+            "app_name, user_name, queue, duration_ms, shuffle_bytes_read, shuffle_bytes_written, join_count, query_text) VALUES (?,?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (SqlQueryMetricRow r : rows) {
             int i = 1;
@@ -1153,6 +1204,7 @@ public class CategoryJdbcSink {
             setDouble(ps, i++, r.getShuffleBytesRead());
             setDouble(ps, i++, r.getShuffleBytesWritten());
             setDouble(ps, i++, r.getJoinCount());
+            ps.setString(i++, r.getQueryText());
             ps.addBatch();
         }
         ps.executeBatch();
@@ -1256,7 +1308,7 @@ public class CategoryJdbcSink {
     private int insertHiveQueryMetrics(List<HiveQueryMetricRow> rows) throws SQLException {
         String sql = "INSERT INTO hive_query_metrics (timestamp_ms, query_id, operation, user_name, " +
             "success, duration_ms, success_count, failure_count, input_bytes, output_bytes, " +
-            "input_rows, output_rows, execution_engine) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            "input_rows, output_rows, execution_engine, query_text) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (HiveQueryMetricRow r : rows) {
             int i = 1;
@@ -1273,6 +1325,7 @@ public class CategoryJdbcSink {
             setDouble(ps, i++, r.getInputRows());
             setDouble(ps, i++, r.getOutputRows());
             ps.setString(i++, r.getExecutionEngine());
+            ps.setString(i++, r.getQueryText());
             ps.addBatch();
         }
         ps.executeBatch();
@@ -1495,6 +1548,15 @@ public class CategoryJdbcSink {
                 LOG.log(Level.FINE, "Migration skipped (column likely exists): " + e.getMessage());
             }
         }
+        // v6: Add query_text column
+        String[] queryTextMigrations = {
+            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS query_text TEXT",
+            "ALTER TABLE hive_query_metrics ADD COLUMN IF NOT EXISTS query_text TEXT",
+            "ALTER TABLE metric_events ADD COLUMN IF NOT EXISTS query_text TEXT"
+        };
+        for (String sql : queryTextMigrations) {
+            try { stmt.execute(sql); } catch (SQLException e) { LOG.log(Level.FINE, "Migration skipped: " + e.getMessage()); }
+        }
     }
 
     private void migrateClickHouseSchema(Statement stmt) {
@@ -1573,6 +1635,15 @@ public class CategoryJdbcSink {
                 LOG.log(Level.FINE, "Migration skipped (column likely exists): " + e.getMessage());
             }
         }
+        // v6: Add query_text column
+        String[] queryTextChMigrations = {
+            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS query_text Nullable(String)",
+            "ALTER TABLE hive_query_metrics ADD COLUMN IF NOT EXISTS query_text Nullable(String)",
+            "ALTER TABLE metric_events ADD COLUMN IF NOT EXISTS query_text Nullable(String)"
+        };
+        for (String sql : queryTextChMigrations) {
+            try { stmt.execute(sql); } catch (SQLException e) { LOG.log(Level.FINE, "Migration skipped: " + e.getMessage()); }
+        }
     }
 
     // ==================== Metric Events (wide table) ====================
@@ -1600,7 +1671,7 @@ public class CategoryJdbcSink {
             + "hdfs_read_ops, hdfs_write_ops, hdfs_large_read_ops, "
             + "file_read_ops, file_write_ops, file_large_read_ops, "
             + "operation, table_type, execution_engine, success_count, failure_count, "
-            + "input_rows, output_rows, io_records_read, io_records_written";
+            + "input_rows, output_rows, io_records_read, io_records_written, query_text";
 
         int colCount = columns.split(",").length;
         StringBuilder placeholders = new StringBuilder();
@@ -1702,6 +1773,7 @@ public class CategoryJdbcSink {
             setDouble(ps, i++, r.getOutputRows());
             setDouble(ps, i++, r.getIoRecordsRead());
             setDouble(ps, i++, r.getIoRecordsWritten());
+            ps.setString(i++, r.getQueryText());
             ps.addBatch();
         }
         ps.executeBatch();

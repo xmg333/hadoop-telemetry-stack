@@ -1,6 +1,9 @@
 package x.mg.metrics.flink.model;
 
-public class StageGovernanceRow {
+import java.io.Serializable;
+
+public class StageGovernanceRow implements Serializable {
+    private static final long serialVersionUID = 1L;
     // Dimensions
     private long timestampMs;
     private String appId;
