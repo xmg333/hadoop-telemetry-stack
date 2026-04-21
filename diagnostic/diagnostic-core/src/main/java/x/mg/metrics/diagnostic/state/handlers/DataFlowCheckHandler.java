@@ -42,13 +42,14 @@ public class DataFlowCheckHandler extends CheckHandler {
     };
 
     // Common /opt paths to probe for Hadoop/Hive installations
-    private static final String[] HADOOP_PROBE_PATHS = {"/opt/hadoop", "/opt/hadoop-3.2.0", "/opt/hadoop-3.4.3", "/opt/hadoop-2.7.0"};
+    private static final String[] HADOOP_PROBE_PATHS = {"/opt/hadoop", "/opt/hadoop-3.2.0", "/opt/hadoop-3.4.3", "/opt/hadoop-2.7.0", "/opt/hadoop-3.4.0"};
     private static final String[] HIVE_PROBE_PATHS = {"/opt/hive", "/opt/apache-hive-2.3.9-bin", "/opt/apache-hive-3.1.3-bin"};
     private static final String[] HIVE_HOOK_JAR_PROBES = {
         "/opt/hive-telemetry-hook.jar",
         "/opt/apache-hive-2.3.9-bin/lib/hive-telemetry-hook.jar",
         "/opt/apache-hive-3.1.3-bin/lib/hive-telemetry-hook.jar"
     };
+    private static final String[] HIBENCH_PROBE_PATHS = {"/root/hibench", "/opt/hibench", "/opt/HiBench", "/root/HiBench"};
 
     @Override
     public DiagnosticState execute(DiagnosticContext context) {
@@ -59,6 +60,7 @@ public class DataFlowCheckHandler extends CheckHandler {
         String javaHome = System.getenv("JAVA_HOME");
         String hadoopHome = detectHadoopHome();
         String hiveHome = detectHiveHome();
+        String hibenchHome = detectHiBenchHome();
         java.io.File hiveHookJar = findHiveHookJar();
 
         if (sparkHome == null || sparkHome.isEmpty()) {
@@ -195,6 +197,13 @@ public class DataFlowCheckHandler extends CheckHandler {
         } else {
             String reason = hiveHome == null ? "未检测到 Hive 安装" : "未找到 hive-telemetry-hook JAR";
             items.add(CheckItem.skip(reason + "，跳过 Hive 测试"));
+        }
+
+        // 8. 运行HiBench测试（如果可用）
+        if (hibenchHome != null && hadoopHome != null) {
+            runHiBenchTests(hibenchHome, hadoopHome, javaHome, items, terminal);
+        } else {
+            items.add(CheckItem.skip("未检测到 HiBench 或 Hadoop，跳过 HiBench 测试"));
         }
 
         CheckPrinter.print(terminal, items);
@@ -440,7 +449,8 @@ public class DataFlowCheckHandler extends CheckHandler {
                                         java.io.File examplesJar, java.io.File pluginJar) {
         List<String> cmd = new ArrayList<>();
         cmd.add(sparkHome + "/bin/spark-submit");
-        cmd.add("--master"); cmd.add("local[2]");
+        cmd.add("--master"); cmd.add("yarn");
+        cmd.add("--deploy-mode"); cmd.add("client");
         cmd.add("--class"); cmd.add("org.apache.spark.examples.SparkPi");
         cmd.add("--jars"); cmd.add(pluginJar.getAbsolutePath());
         cmd.add("--conf"); cmd.add("spark.plugins=x.mg.metrics.sparktelemetry.adapter.SparkTelemetryPlugin");
@@ -450,7 +460,7 @@ public class DataFlowCheckHandler extends CheckHandler {
         for (String flag : ALL_METRIC_FLAGS) cmd.add(flag);
         cmd.add(examplesJar.getAbsolutePath());
         cmd.add(String.valueOf(SPARKPI_SLICES));
-        return runCommand(cmd, sparkHome, javaHome);
+        return runCommand(cmd, sparkHome, null, javaHome);
     }
 
     private SubmitResult submitSparkSql(String sparkHome, String javaHome, String otelEndpoint,
@@ -496,7 +506,8 @@ public class DataFlowCheckHandler extends CheckHandler {
 
             List<String> cmd = new ArrayList<>();
             cmd.add(sparkHome + "/bin/spark-submit");
-            cmd.add("--master"); cmd.add("local[2]");
+            cmd.add("--master"); cmd.add("yarn");
+            cmd.add("--deploy-mode"); cmd.add("client");
             cmd.add("--jars"); cmd.add(pluginJar.getAbsolutePath());
             cmd.add("--conf"); cmd.add("spark.plugins=x.mg.metrics.sparktelemetry.adapter.SparkTelemetryPlugin");
             cmd.add("--conf"); cmd.add("spark.telemetry.otel.exporter.endpoint=" + otelEndpoint);
@@ -520,12 +531,20 @@ public class DataFlowCheckHandler extends CheckHandler {
     }
 
     private SubmitResult runCommand(List<String> cmd, String sparkHome, String hadoopHome, String javaHome) {
+        return runCommandWithEnv(cmd, sparkHome, hadoopHome, javaHome, null, null);
+    }
+
+    private SubmitResult runCommandWithEnv(List<String> cmd, String sparkHome, String hadoopHome, String javaHome,
+                                            String extraEnvKey, String extraEnvValue) {
         SubmitResult result = new SubmitResult();
         try {
             ProcessBuilder pb = new ProcessBuilder(cmd);
             if (javaHome != null) pb.environment().put("JAVA_HOME", javaHome);
             if (sparkHome != null) pb.environment().put("SPARK_HOME", sparkHome);
             if (hadoopHome != null) pb.environment().put("HADOOP_HOME", hadoopHome);
+            if (extraEnvKey != null && extraEnvValue != null) {
+                pb.environment().put(extraEnvKey, extraEnvValue);
+            }
             pb.redirectErrorStream(true);
 
             long start = System.currentTimeMillis();
@@ -651,6 +670,60 @@ public class DataFlowCheckHandler extends CheckHandler {
         return null;
     }
 
+    private String detectHiBenchHome() {
+        String env = System.getenv("HIBENCH_HOME");
+        if (env != null && !env.isEmpty() && new java.io.File(env, "bin/workloads").exists()) return env;
+        for (String path : HIBENCH_PROBE_PATHS) {
+            if (new java.io.File(path, "bin/workloads").exists()) return path;
+        }
+        return null;
+    }
+
+    private void runHiBenchTests(String hibenchHome, String hadoopHome, String javaHome,
+                                  List<CheckItem> items, Terminal terminal) {
+        // HiBench测试用例：WordCount, TeraSort, DFSIOE
+        String[] workloads = {"micro/wordcount", "micro/terasort", "micro/dfsioe"};
+        String[] workloadNames = {"WordCount", "TeraSort", "DFSIOE"};
+
+        items.add(CheckItem.ok("检测到 HiBench，准备运行测试..."));
+        CheckPrinter.print(terminal, items);
+        items.clear();
+
+        for (int i = 0; i < workloads.length; i++) {
+            String workload = workloads[i];
+            String name = workloadNames[i];
+
+            items.add(CheckItem.ok("提交 HiBench " + name + " 测试..."));
+            CheckPrinter.print(terminal, items);
+            items.clear();
+
+            SubmitResult result = submitHiBenchWorkload(hibenchHome, hadoopHome, javaHome, workload);
+            if (result.success) {
+                items.add(CheckItem.ok("HiBench " + name + " 成功 (耗时 " + result.durationMs + "ms)"));
+            } else {
+                items.add(CheckItem.warn("HiBench " + name + " 失败: " + result.error,
+                    "继续其他测试..."));
+            }
+        }
+    }
+
+    private SubmitResult submitHiBenchWorkload(String hibenchHome, String hadoopHome, String javaHome, String workload) {
+        // Run HiBench workload using its shell script
+        List<String> cmd = new ArrayList<>();
+        cmd.add("bash");
+        cmd.add("-c");
+        // Source Hadoop env and run HiBench
+        String script = "cd " + hibenchHome + " && " +
+            "export HADOOP_HOME=" + hadoopHome + " && " +
+            "export JAVA_HOME=" + (javaHome != null ? javaHome : System.getenv("JAVA_HOME")) + " && " +
+            "export HIBENCH_HOME=" + hibenchHome + " && " +
+            "./bin/workloads/" + workload + "/prepare/prepare.sh 2>&1 && " +
+            "./bin/workloads/" + workload + "/spark/run.sh 2>&1";
+        cmd.add(script);
+
+        return runCommand(cmd, null, hadoopHome, javaHome);
+    }
+
     private java.io.File findHiveHookJar() {
         for (String path : HIVE_HOOK_JAR_PROBES) {
             java.io.File f = new java.io.File(path);
@@ -743,6 +816,7 @@ public class DataFlowCheckHandler extends CheckHandler {
         }
 
         // Use pi — simple, no input data needed, works on any YARN cluster
+        // Force YARN mode (not local) to ensure counters are collected via HADOOP_OPTS
         List<String> cmd = new ArrayList<>();
         cmd.add(hadoopHome + "/bin/hadoop");
         cmd.add("jar");
@@ -751,7 +825,8 @@ public class DataFlowCheckHandler extends CheckHandler {
         cmd.add("2");
         cmd.add("100");
 
-        return runCommand(cmd, null, hadoopHome, javaHome);
+        // Use environment variable to set YARN mode (Hadoop 3.x compatible)
+        return runCommandWithEnv(cmd, null, hadoopHome, javaHome, "HADOOP_OPTS", "-Dmapreduce.framework.name=yarn");
     }
 
     private java.io.File findMrTestJar(String hadoopHome) {
