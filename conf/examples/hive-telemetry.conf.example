@@ -21,6 +21,8 @@ hive-telemetry {
     query.io = true
     # Per-table input/output tracking
     query.tables = true
+    # Maximum SQL text length to capture (characters, truncated if longer)
+    sql.max-length = 4096
   }
 
   filter {

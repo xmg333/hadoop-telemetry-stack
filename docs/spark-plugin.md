@@ -140,6 +140,8 @@ kubectl logs -l app=otel-collector --tail=100 | grep "spark\."
 | `spark.telemetry.metrics.task.info` | `true` | Category 3: 任务信息属性 |
 | `spark.telemetry.metrics.stage.detailed` | `false` | Category 4: 阶段详细指标 |
 | `spark.telemetry.metrics.job.lifecycle` | `false` | Category 5: 作业生命周期 |
+| `spark.telemetry.metrics.sql.query-execution` | `false` | Category 6: SQL 查询执行指标 |
+| `spark.telemetry.sql.max-length` | `4096` | SQL 文本最大截断长度（字符） |
 
 > **重要**：Spark 配置键必须包含完整内部路径，包括 `.otel.` 段。映射规则为 `spark.telemetry.X` → `spark-telemetry.X`：
 > - 正确：`spark.telemetry.otel.exporter.endpoint=http://host:4317`
@@ -180,6 +182,8 @@ spark-telemetry {
     task.info = true                  # Category 3
     stage.detailed = false            # Category 4
     job.lifecycle = false             # Category 5
+    sql.query-execution = false     # Category 6
+    sql.max-length = 4096           # SQL text truncation
   }
 
   filter {
@@ -275,3 +279,20 @@ spark-telemetry {
 | `spark.job.id` | 作业 | Job ID |
 | `spark.job.success` | 作业 | 作业是否成功 |
 | `gc_name` | GC | GC 收集器名称 |
+| `spark.sql.execution_id` | SQL 查询 | SQL 执行 ID（Spark 3.x+） |
+| `spark.sql.query_text` | SQL 查询 | SQL 查询文本（截断后） |
+
+### SQL 查询执行指标（Category 6，默认关闭）
+
+开启方式：`spark.telemetry.metrics.sql.query-execution=true`
+
+| 指标名 | 类型 | 单位 | 说明 |
+|--------|------|------|------|
+| `spark.sql.query.duration_ms` | Histogram | ms | SQL 查询执行时长 |
+| `spark.sql.query.shuffle.bytes_read` | Counter | By | Shuffle 读取字节数 |
+| `spark.sql.query.shuffle.bytes_written` | Counter | By | Shuffle 写入字节数 |
+| `spark.sql.query.join_count` | Counter | {joins} | Join 数量 |
+| `spark.sql.table.bytes` | Counter | By | 表级 IO 字节数 |
+| `spark.sql.table.rows` | Counter | {rows} | 表级 IO 行数 |
+| `spark.sql.table.files_read` | Counter | {files} | 扫描文件数 |
+| `spark.sql.table.time_ms` | Counter | ms | 表扫描耗时 |

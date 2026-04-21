@@ -24,7 +24,7 @@ spark-telemetry {
       enabled = true
       capture.task-end = true
       capture.stage-complete = true
-      capture.job-end = false
+      capture.job-end = true
     }
 
     # Dropwizard Metrics System (JVM GC, memory, buffer pools)
@@ -35,6 +35,11 @@ spark-telemetry {
       capture.buffer-pools = true
       capture.executor-memory = true
     }
+
+    # SQL query execution metrics (Category 6)
+    sql.query-execution = true
+    # Maximum SQL text length to capture (characters, truncated if longer)
+    sql.max-length = 4096
   }
 
   # Application name filtering (regex patterns)

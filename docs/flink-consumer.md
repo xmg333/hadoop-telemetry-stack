@@ -1,5 +1,21 @@
 # Flink Metrics Consumer — 部署与可视化参考
 
+## 架构
+
+Flink Consumer 基于 Flink DataStream API 构建，使用 Flink KafkaSource 消费 Kafka 中的 OTLP protobuf 指标数据，经反序列化、分类、宽行聚合后写入 MySQL 或 ClickHouse。
+
+```
+Kafka (OTLP Protobuf) → Flink KafkaSource → OtlpDeserializationSchema
+  → MetricRecordSplitFlatMap → MetricNameFilter → AccumulatingProcessFunction
+  → FlinkCategoryJdbcSink → MySQL / ClickHouse
+```
+
+核心算子：
+- **OtlpDeserializationSchema**: 将 Kafka 中的 OTLP protobuf 字节反序列化为 `MetricRecord`（含 `MetricSample` + `HistogramBucket`）
+- **MetricRecordSplitFlatMap**: 将 `MetricRecord` 拆分为独立的 `MetricItem`（单个 sample 或 bucket）
+- **AccumulatingProcessFunction**: Flink `ProcessFunction`，使用 `ValueState<WideRowAccumulator>` 管理聚合状态，基于 batch-size 阈值和 processing-time timer 触发 flush。支持 Flink checkpoint 故障恢复
+- **FlinkCategoryJdbcSink**: Flink `RichSinkFunction`，管理 JDBC 连接生命周期（`open()`/`close()`），将 `FlushResult` 写入 15 张分类表
+
 ## 部署
 
 ### 数据库准备
@@ -33,7 +49,7 @@ flink-consumer {
     topic = "telemetry-metrics"
     group.id = "flink-metrics-consumer"
     startup.mode = "earliest-offset"  # earliest-offset | latest-offset
-    checkpoint.path = "/tmp/flink-consumer-checkpoint.txt"
+    checkpoint.path = "/tmp/flink-consumer-checkpoint"  # Flink checkpoint 存储路径
   }
 
   sink {
@@ -70,11 +86,26 @@ flink-consumer {
 ### 运行
 
 ```bash
-# 独立运行（自包含 JAR）
+# 独立运行（自包含 JAR，使用 Flink LocalEnvironment）
 java -jar metrics-flink-consumer-dist.jar flink-consumer.conf
 
-# 提交到 Flink 集群
-flink run -c x.mg.metrics.flink.Main metrics-flink-consumer.jar flink-consumer.conf
+# 提交到 Flink 集群（推荐生产环境）
+/opt/flink-1.18.0/bin/flink run -c x.mg.metrics.flink.Main \
+  -m localhost:8081 \
+  metrics-flink-consumer-dist.jar flink-consumer.conf
+
+# 后台提交（断开 SSH 不中断）
+nohup /opt/flink-1.18.0/bin/flink run -c x.mg.metrics.flink.Main \
+  -m localhost:8081 \
+  metrics-flink-consumer-dist.jar flink-consumer.conf \
+  > /tmp/flink-submit.log 2>&1 &
+
+# 查看集群作业状态
+curl -s http://localhost:8081/jobs | python3 -c \
+  'import json,sys; [print(j["id"],j["status"]) for j in json.load(sys.stdin)["jobs"]]'
+
+# 取消作业
+/opt/flink-1.18.0/bin/flink cancel <job-id>
 ```
 
 ### 注意事项
@@ -83,8 +114,10 @@ flink run -c x.mg.metrics.flink.Main metrics-flink-consumer.jar flink-consumer.c
 - 所有标签已展开为显式类型化列，不使用 JSON 数据类型
 - `Double.POSITIVE_INFINITY`（OTLP 直方图桶）自动转换为 `Double.MAX_VALUE`
 - Flink 1.18.0（最后支持 Java 8 的版本）
-- Kafka offset 持久化到本地文件，保证 at-least-once 语义
+- Kafka offset 由 Flink checkpoint 管理，保证 at-least-once 语义。`checkpoint.path` 为 Flink checkpoint 存储目录（不再使用单文件偏移量持久化）
 - `app_id` 为空时自动回退为 `"unknown"`
+- 所有传入 Flink 算子的对象（model classes、config、filter）均已实现 `Serializable`
+- 聚合状态通过 `ValueState` 管理，支持 checkpoint 故障恢复
 
 ---
 
@@ -101,9 +134,9 @@ flink run -c x.mg.metrics.flink.Main metrics-flink-consumer.jar flink-consumer.c
 | `stage_histogram_buckets` | Stage 级直方图桶分布 |
 | `job_histogram_buckets` | Job 级直方图桶分布 |
 | `stage_governance` | Stage 治理指标（预聚合） |
-| `sql_query_metrics` | Spark SQL 执行指标（join/shuffle bytes 等） |
+| `sql_query_metrics` | Spark SQL 执行指标（join/shuffle bytes 等，含 query_text） |
 | `sql_query_table_metrics` | Spark SQL 表级 IO 指标 |
-| `hive_query_metrics` | Hive 查询执行指标（duration/success/IO） |
+| `hive_query_metrics` | Hive 查询执行指标（duration/success/IO，含 query_text） |
 | `hive_table_io_metrics` | Hive 查询表级 IO 指标 |
 | `mr_job_metrics` | MR Collector 作业级指标 |
 | `mr_task_metrics` | MR Agent 任务级指标 |
@@ -137,6 +170,22 @@ flink run -c x.mg.metrics.flink.Main metrics-flink-consumer.jar flink-consumer.c
 **维度列：** `timestamp_ms`, `app_id`, `executor_id`, `gc_name`
 
 **指标列：** `gc_count`, `gc_time_ms`
+
+### sql_query_metrics
+
+**维度列：** `timestamp_ms`, `app_id`, `execution_id`, `app_name`, `user_name`, `queue`
+
+**指标列：** `duration_ms`, `shuffle_bytes_read`, `shuffle_bytes_written`, `join_count`
+
+**文本列：** `query_text`（TEXT，SQL 查询文本，截断到最大 4096 字符）
+
+### hive_query_metrics
+
+**维度列：** `timestamp_ms`, `query_id`, `operation`, `user_name`, `success`, `execution_engine`
+
+**指标列：** `duration_ms`, `success_count`, `failure_count`, `input_bytes`, `output_bytes`, `input_rows`, `output_rows`
+
+**文本列：** `query_text`（TEXT，Hive SQL 查询文本，截断到最大 4096 字符）
 
 ### 直方图桶表
 

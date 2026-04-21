@@ -124,19 +124,35 @@ docker run -d --name clickhouse --network host \
 
 ### 2.4 Flink Consumer（Kafka → DB）
 
+基于 Flink DataStream API 的 Kafka 消费作业，使用 Flink KafkaSource + Checkpoint 管理 offset。
+
 ```bash
 # 创建配置文件 flink-consumer.conf
 # 参考 conf/flink/flink-consumer-mysql.conf 或 flink-consumer-clickhouse.conf
 
-# 独立运行（不需要 Flink 集群）
+# 独立运行（不需要 Flink 集群，使用 Flink LocalEnvironment）
 java -jar metrics-flink-consumer-dist-1.0.0-SNAPSHOT.jar /path/to/flink-consumer.conf
 
-# 或通过 Flink 集群提交
-flink run -c x.mg.metrics.flinkconsumer.FlinkConsumerJob \
-  metrics-flink-consumer-dist-1.0.0-SNAPSHOT.jar /path/to/flink-consumer.conf
+# 提交到 Flink 集群（推荐生产环境）
+/opt/flink-1.18.0/bin/flink run -c x.mg.metrics.flink.Main \
+  -m localhost:8081 \
+  /path/to/metrics-flink-consumer-dist-1.0.0-SNAPSHOT.jar /path/to/flink-consumer.conf
+
+# 后台提交（断开 SSH 不中断）
+nohup /opt/flink-1.18.0/bin/flink run -c x.mg.metrics.flink.Main \
+  -m localhost:8081 \
+  /path/to/metrics-flink-consumer-dist-1.0.0-SNAPSHOT.jar /path/to/flink-consumer.conf \
+  > /tmp/flink-submit.log 2>&1 &
+
+# 查看集群作业状态
+curl -s http://localhost:8081/jobs | python3 -c \
+  'import json,sys; [print(j["id"],j["status"]) for j in json.load(sys.stdin)["jobs"]]'
+
+# 取消作业
+/opt/flink-1.18.0/bin/flink cancel <job-id>
 ```
 
-Flink Consumer 启动后自动建表（15 张表），无需手动初始化 schema。
+Flink Consumer 启动后自动建表（15 张表），无需手动初始化 schema。Kafka offset 由 Flink checkpoint 管理，`checkpoint.path` 为 checkpoint 存储目录。
 
 ### 2.5 Grafana
 
@@ -227,7 +243,8 @@ spark.telemetry.metrics.task.shuffle-extended=true       # shuffle 详细指标
 spark.telemetry.metrics.task.info=true                   # task host/locality 信息
 spark.telemetry.metrics.stage.detailed=false             # stage 级指标（按需开启）
 spark.telemetry.metrics.job.lifecycle=false              # job 生命周期事件
-spark.telemetry.metrics.sql.query-execution=true         # SQL 执行指标（join/shuffle bytes）
+spark.telemetry.metrics.sql.query-execution=true         # SQL 执行指标（join/shuffle bytes/query text）
+spark.telemetry.sql.max-length=4096                      # SQL 文本最大截断长度（字符）
 ```
 
 > **注意**: conf key 必须包含完整路径含 `.otel.` 段。正确：`spark.telemetry.otel.exporter.endpoint`，
@@ -337,6 +354,10 @@ cp spark-telemetry-dist-omni-*.jar $HIVE_HOME/lib/
 <property>
   <name>hive.telemetry.otel.exporter.endpoint</name>
   <value>http://otel-collector:4317</value>
+</property>
+<property>
+  <name>hive.telemetry.sql.max-length</name>
+  <value>4096</value>
 </property>
 ```
 

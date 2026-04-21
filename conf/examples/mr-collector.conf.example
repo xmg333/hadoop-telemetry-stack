@@ -29,7 +29,7 @@ mr-telemetry {
 
   collection {
     job.counters = true
-    task.counters = false    # task-level granularity (can be high volume)
+    task.counters = true     # task-level granularity (can be high volume)
     job.details = true
   }
 }

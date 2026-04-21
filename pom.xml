@@ -232,6 +232,7 @@
             <modules>
                 <module>spark/spark-telemetry-common</module>
                 <module>spark/spark-telemetry-adapter-spark32</module>
+                <module>spark/spark-telemetry-dist-spark32</module>
             </modules>
         </profile>
 
@@ -260,6 +261,7 @@
                 <module>flink/metrics-flink-consumer-dist</module>
                 <module>hive/hive-telemetry-hook</module>
                 <module>hive/hive-telemetry-hook-dist</module>
+                <module>diagnostic</module>
             </modules>
         </profile>
 
