@@ -20,7 +20,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT app_name, engine, ROUND(AVG(cpu_time_ms/NULLIF(duration_ms,0)),2) AS cpu_eff, ROUND(AVG(gc_time_ms/NULLIF(duration_ms,0))*100,1) AS gc_pct, ROUND(AVG(shuffle_bytes_read/NULLIF(io_bytes_read,0))*100,1) AS shuffle_pct, ROUND(SUM(CASE WHEN status='false' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0),1) AS fail_pct, COUNT(*) AS task_count, SUM(cpu_time_ms)/3600000 AS cpu_hours FROM metric_events WHERE event_type IN ('TASK','MR_TASK') AND duration_ms>0 AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY app_name,engine ORDER BY cpu_hours DESC",
+          "rawSql": "SELECT app_name, engine, ROUND(AVG(cpu_time_ms/NULLIF(duration_ms,0)),2) AS cpu_eff, ROUND(AVG(gc_time_ms/NULLIF(duration_ms,0))*100,1) AS gc_pct, ROUND(AVG(shuffle_bytes_read/NULLIF(io_bytes_read,0))*100,1) AS shuffle_pct, ROUND(SUM(CASE WHEN status='false' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0),1) AS fail_pct, COUNT(*) AS task_count, SUM(cpu_time_ms)/3600000 AS cpu_hours FROM metric_events WHERE event_type IN ('TASK','MR_TASK') AND duration_ms>0 AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY app_name,engine ORDER BY cpu_hours DESC",
           "format": "table",
           "refId": "A"
         }
@@ -45,7 +45,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT queue, engine, ROUND(AVG(cpu_time_ms/NULLIF(duration_ms,0)),2) AS cpu_eff, ROUND(AVG(gc_time_ms/NULLIF(duration_ms,0))*100,1) AS gc_pct, SUM(cpu_time_ms)/3600000 AS cpu_hours, SUM(io_bytes_read+io_bytes_written)/1073741824 AS io_gb, COUNT(DISTINCT app_id) AS app_count FROM metric_events WHERE event_type IN ('TASK','MR_TASK','MR_JOB') AND queue IS NOT NULL AND duration_ms>0 AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY queue,engine ORDER BY cpu_hours DESC",
+          "rawSql": "SELECT queue, engine, ROUND(AVG(cpu_time_ms/NULLIF(duration_ms,0)),2) AS cpu_eff, ROUND(AVG(gc_time_ms/NULLIF(duration_ms,0))*100,1) AS gc_pct, SUM(cpu_time_ms)/3600000 AS cpu_hours, SUM(io_bytes_read+io_bytes_written)/1073741824 AS io_gb, COUNT(DISTINCT app_id) AS app_count FROM metric_events WHERE event_type IN ('TASK','MR_TASK','MR_JOB') AND queue IS NOT NULL AND duration_ms>0 AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY queue,engine ORDER BY cpu_hours DESC",
           "format": "table",
           "refId": "A"
         }
@@ -69,7 +69,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT app_id, COUNT(*) AS total_stages, SUM(CASE WHEN duration_skew_ratio>2 THEN 1 ELSE 0 END) AS skewed_duration, SUM(CASE WHEN io_read_skew_ratio>2 THEN 1 ELSE 0 END) AS skewed_io, SUM(CASE WHEN shuffle_read_skew_ratio>2 THEN 1 ELSE 0 END) AS skewed_shuffle, ROUND(AVG(cpu_efficiency),2) AS avg_cpu_eff, ROUND(AVG(gc_overhead_ratio)*100,1) AS avg_gc_pct, SUM(small_output_task_count) AS small_file_tasks FROM stage_governance WHERE timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY app_id ORDER BY skewed_duration DESC",
+          "rawSql": "SELECT app_id, COUNT(*) AS total_stages, SUM(CASE WHEN duration_skew_ratio>2 THEN 1 ELSE 0 END) AS skewed_duration, SUM(CASE WHEN io_read_skew_ratio>2 THEN 1 ELSE 0 END) AS skewed_io, SUM(CASE WHEN shuffle_read_skew_ratio>2 THEN 1 ELSE 0 END) AS skewed_shuffle, ROUND(AVG(cpu_efficiency),2) AS avg_cpu_eff, ROUND(AVG(gc_overhead_ratio)*100,1) AS avg_gc_pct, SUM(small_output_task_count) AS small_file_tasks FROM stage_governance WHERE timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY app_id ORDER BY skewed_duration DESC",
           "format": "table",
           "refId": "A"
         }

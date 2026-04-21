@@ -20,7 +20,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT user_name, SUM(cpu_time_ms)/3600000 AS cpu_hours, SUM(gc_time_ms)/3600000 AS gc_hours, SUM(duration_ms)/3600000 AS wall_clock_hours, COUNT(*) AS event_count FROM metric_events WHERE event_type IN ('TASK','MR_TASK') AND cpu_time_ms IS NOT NULL AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY user_name ORDER BY cpu_hours DESC LIMIT 20",
+          "rawSql": "SELECT user_name, SUM(cpu_time_ms)/3600000 AS cpu_hours, SUM(gc_time_ms)/3600000 AS gc_hours, SUM(duration_ms)/3600000 AS wall_clock_hours, COUNT(*) AS event_count FROM metric_events WHERE event_type IN ('TASK','MR_TASK') AND cpu_time_ms IS NOT NULL AND timestamp_ms>=($$__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY user_name ORDER BY cpu_hours DESC LIMIT 20",
           "format": "table",
           "refId": "A"
         }
@@ -43,7 +43,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT queue, engine, SUM(cpu_time_ms)/3600000 AS cpu_hours, SUM(io_bytes_read+io_bytes_written)/1073741824 AS io_gb, COUNT(DISTINCT app_id) AS app_count FROM metric_events WHERE event_type IN ('TASK','MR_JOB','MR_TASK') AND queue IS NOT NULL AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY queue, engine ORDER BY cpu_hours DESC",
+          "rawSql": "SELECT queue, engine, SUM(cpu_time_ms)/3600000 AS cpu_hours, SUM(io_bytes_read+io_bytes_written)/1073741824 AS io_gb, COUNT(DISTINCT app_id) AS app_count FROM metric_events WHERE event_type IN ('TASK','MR_JOB','MR_TASK') AND queue IS NOT NULL AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY queue, engine ORDER BY cpu_hours DESC",
           "format": "table",
           "refId": "A"
         }
@@ -72,7 +72,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT app_name, engine, SUM(cpu_time_ms)/3600000 AS cpu_hours, SUM(gc_time_ms)/3600000 AS gc_hours, SUM(io_bytes_read)/1073741824 AS read_gb, SUM(io_bytes_written)/1073741824 AS write_gb, SUM(memory_bytes_spilled)/1073741824 AS spill_gb, COUNT(*) AS task_count FROM metric_events WHERE event_type IN ('TASK','MR_TASK') AND app_name IS NOT NULL AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY app_name, engine ORDER BY cpu_hours DESC LIMIT 10",
+          "rawSql": "SELECT app_name, engine, SUM(cpu_time_ms)/3600000 AS cpu_hours, SUM(gc_time_ms)/3600000 AS gc_hours, SUM(io_bytes_read)/1073741824 AS read_gb, SUM(io_bytes_written)/1073741824 AS write_gb, SUM(memory_bytes_spilled)/1073741824 AS spill_gb, COUNT(*) AS task_count FROM metric_events WHERE event_type IN ('TASK','MR_TASK') AND app_name IS NOT NULL AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY app_name, engine ORDER BY cpu_hours DESC LIMIT 10",
           "format": "table",
           "refId": "A"
         }
@@ -97,7 +97,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, engine, SUM(cpu_time_ms)/3600000 AS cpu_hours FROM metric_events WHERE event_type IN ('TASK','MR_TASK','MR_JOB') AND cpu_time_ms IS NOT NULL AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY 1, engine ORDER BY 1,2",
+          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, engine, SUM(cpu_time_ms)/3600000 AS cpu_hours FROM metric_events WHERE event_type IN ('TASK','MR_TASK','MR_JOB') AND cpu_time_ms IS NOT NULL AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1, engine ORDER BY 1,2",
           "format": "time_series",
           "refId": "A"
         }
