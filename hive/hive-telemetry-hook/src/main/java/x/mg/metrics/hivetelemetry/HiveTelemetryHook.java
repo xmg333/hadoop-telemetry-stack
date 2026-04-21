@@ -72,6 +72,10 @@ public class HiveTelemetryHook implements ExecuteWithHookContext {
         }
 
         m.setOperationName(hookContext.getOperationName());
+        // Default operation to "QUERY" if not set (HookContext may return null in some cases)
+        if (m.getOperationName() == null || m.getOperationName().isEmpty()) {
+            m.setOperationName("QUERY");
+        }
         m.setUserName(hookContext.getUserName());
 
         // Execution engine
