@@ -57,7 +57,7 @@ spark-submit \
 
 ### Omnipackage 统一部署
 
-Omnipackage 将 Spark 2/3/4 + MR Collector + MR Agent 合并为单个 JAR，运行时自动检测 Spark 版本。
+Omnipackage 将 Spark 2/3/4 + MR Collector + MR Agent + Hive Hook 合并为单个 JAR，运行时自动检测 Spark 版本。
 
 配置方式与版本专用 JAR **完全一致**，直接替换 JAR 即可：
 
@@ -138,9 +138,9 @@ kubectl logs -l app=otel-collector --tail=100 | grep "spark\."
 | `spark.telemetry.metrics.task.execution` | `true` | Category 1: 任务执行指标 |
 | `spark.telemetry.metrics.task.shuffle-extended` | `true` | Category 2: 扩展 Shuffle 指标 |
 | `spark.telemetry.metrics.task.info` | `true` | Category 3: 任务信息属性 |
-| `spark.telemetry.metrics.stage.detailed` | `false` | Category 4: 阶段详细指标 |
-| `spark.telemetry.metrics.job.lifecycle` | `false` | Category 5: 作业生命周期 |
-| `spark.telemetry.metrics.sql.query-execution` | `false` | Category 6: SQL 查询执行指标 |
+| `spark.telemetry.metrics.stage.detailed` | `true` | Category 4: 阶段详细指标 |
+| `spark.telemetry.metrics.job.lifecycle` | `true` | Category 5: 作业生命周期 |
+| `spark.telemetry.metrics.sql.query-execution` | `true` | Category 6: SQL 查询执行指标 |
 | `spark.telemetry.sql.max-length` | `4096` | SQL 文本最大截断长度（字符） |
 
 > **重要**：Spark 配置键必须包含完整内部路径，包括 `.otel.` 段。映射规则为 `spark.telemetry.X` → `spark-telemetry.X`：
@@ -180,9 +180,9 @@ spark-telemetry {
     task.execution = true             # Category 1
     task.shuffle-extended = true      # Category 2
     task.info = true                  # Category 3
-    stage.detailed = false            # Category 4
-    job.lifecycle = false             # Category 5
-    sql.query-execution = false     # Category 6
+    stage.detailed = true             # Category 4
+    job.lifecycle = true              # Category 5
+    sql.query-execution = true        # Category 6
     sql.max-length = 4096           # SQL text truncation
   }
 

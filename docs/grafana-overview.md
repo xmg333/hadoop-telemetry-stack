@@ -10,7 +10,7 @@
 - 最近有哪些失败的任务？
 
 ## 前置条件
-- 数据源：11 张独立指标表（由 Flink Consumer 写入）
+- 数据源：15 张独立指标表（由 Flink Consumer 写入）
 - Grafana 变量：`$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
 - 时间范围过滤：所有查询均使用 `timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)`
 
@@ -154,6 +154,6 @@ ORDER BY time DESC LIMIT 50
 - **Spark / MR / Hive** — 全引擎综合仪表盘
 
 ## 注意事项
-- 本仪表盘查询 11 张独立表，不使用大宽表 `metric_events`
+- 本仪表盘查询 15 张独立表，不使用大宽表 `metric_events`
 - MR 任务级别的失败检测依赖 MR Agent 是否部署
 - Hive 查询统计不区分执行引擎（MR / Spark / Tez），需在 Hive 专属面板过滤

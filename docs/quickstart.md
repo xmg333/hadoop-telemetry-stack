@@ -15,7 +15,7 @@ graph TD
     FLINK["Flink Consumer<br/>(Kafka → DB)"]
     MYSQL["MySQL"]
     CH["ClickHouse"]
-    GRAFANA["Grafana (6面板)"]
+    GRAFANA["Grafana (13面板)"]
 
     SP -->|"OTLP gRPC :4317"| OTEL
     MA -->|"OTLP gRPC :4317"| OTEL
@@ -114,7 +114,7 @@ docker exec kafka /opt/kafka/bin/kafka-topics.sh --create \
 # MySQL
 docker run -d --name mysql --network host \
   -e MYSQL_ROOT_PASSWORD=root123 \
-  -e MYSQL_DATABASE=telemetry \
+  -e MYSQL_DATABASE=metrics_db \
   mysql:8.0
 
 # ClickHouse（可选）
@@ -152,7 +152,7 @@ curl -s http://localhost:8081/jobs | python3 -c \
 /opt/flink-1.18.0/bin/flink cancel <job-id>
 ```
 
-Flink Consumer 启动后自动建表（15 张表），无需手动初始化 schema。Kafka offset 由 Flink checkpoint 管理，`checkpoint.path` 为 checkpoint 存储目录。
+Flink Consumer 启动后自动建表（15 张分类表 + `metric_events` 统一宽表），无需手动初始化 schema。`metric_events` 宽表整合全部引擎数据用于跨引擎分析。Kafka offset 由 Flink checkpoint 管理，`checkpoint.path` 为 checkpoint 存储目录。
 
 ### 2.5 Grafana
 
@@ -234,7 +234,7 @@ spark.telemetry.otel.exporter.endpoint=http://otel-collector:4317
 
 # 推荐配置
 spark.telemetry.otel.service.name=my-spark-app          # 服务名，Grafana 过滤用
-spark.telemetry.otel.export.interval.ms=10000            # 导出间隔（默认30s）
+spark.telemetry.otel.export.interval.ms=10000            # 导出间隔（默认10s）
 spark.telemetry.config.path=/etc/telemetry.conf          # 配置文件路径
 
 # 指标开关（默认值如下）
@@ -338,10 +338,7 @@ MR Collector 采集的指标写入 `mr_job_metrics` 表：
 采集 HiveServer2 查询指标（执行引擎无关，支持 MR 和 Spark 引擎）。
 
 ```bash
-# 1. 将 JAR 放到 HiveServer2 auxlib
-cp hive-telemetry-hook-dist-*.jar $HIVE_HOME/lib/
-
-# 或使用 Omnipackage
+# 1. 将 Omnipackage JAR 放到 HiveServer2 auxlib
 cp spark-telemetry-dist-omni-*.jar $HIVE_HOME/lib/
 ```
 
@@ -397,7 +394,41 @@ SELECT COUNT(*) FROM mr_task_metrics;   -- MR Agent
 -- Hive 指标
 SELECT COUNT(*) FROM hive_query_metrics;
 SELECT COUNT(*) FROM hive_table_io_metrics;
+
+-- 统一宽表
+SELECT engine, event_type, COUNT(*) FROM metric_events GROUP BY engine, event_type;
 ```
+
+### 使用诊断工具
+
+构建并运行诊断工具，自动检查全部后端组件和应用配置：
+
+```bash
+# 构建诊断工具
+mvn clean package -pl diagnostic/diagnostic-core -am -DskipTests
+
+# 运行（交互式 CLI，JLine 终端）
+java -jar diagnostic/diagnostic-core/target/diagnostic-core-1.0.0-SNAPSHOT.jar
+
+# 指定配置文件
+java -jar diagnostic/diagnostic-core/target/diagnostic-core-1.0.0-SNAPSHOT.jar \
+  --config /path/to/diagnostic.conf
+```
+
+诊断工具自动执行以下检查：
+
+| 检查项 | 说明 |
+|--------|------|
+| Spark Plugin | JAR 存在性、spark.plugins 配置 |
+| Hive Hook | hive.exec.post.hooks 配置 |
+| MR Collector | 配置文件、History Server 连通性 |
+| OTel Collector | gRPC 端口连通性、Health Check |
+| Kafka | Broker 连通性、Topic 存在性 |
+| MySQL | 数据库连通性、表 schema 验证 |
+| Grafana 面板 | Dashboard SQL 查询有效性检查 |
+| 数据流 | 端到端数据完整性验证 |
+
+配置文件参考：`diagnostic/diagnostic-core/src/main/resources/diagnostic.conf`
 
 ---
 
@@ -407,7 +438,7 @@ SELECT COUNT(*) FROM hive_table_io_metrics;
 
 ```
 URL: mysql:3306
-Database: telemetry
+Database: metrics_db
 User: metrics / Password: metrics
 ```
 
@@ -425,6 +456,13 @@ User: metrics / Password: metrics
 | `hive-mr.json` | Hive on MR Telemetry | Hive MR 引擎查询 |
 | `hive-spark.json` | Hive on Spark Telemetry | Hive Spark 引擎查询 |
 | `spark-mr-telemetry-dashboard.json` | Spark/MR/Hive 合并面板 | 综合视图 |
+| `hive-analysis.json` | Hive 查询与数据血缘分析 | 操作分布、表 IO、执行引擎对比 |
+| `performance-analysis.json` | 性能异常与瓶颈分析 | Stage 耗时、GC 开销、数据倾斜检测 |
+| `efficiency.json` | 综合效率评分 | 资源效率评分、队列效率对比 |
+| `reliability.json` | 可靠性与失败分析 | 任务成功率趋势、失败事件 |
+| `capacity.json` | 容量规划与资源利用率 | 任务并发量、内存趋势、GC 频率 |
+| `cost-attribution.json` | 成本归属与资源排行 | 用户/队列/应用资源排行 |
+| `io-analysis.json` | 数据吞吐与 IO 分析 | 各引擎 IO 吞吐量、Shuffle 分析 |
 
 ### 5.3 MR Dashboard 说明
 

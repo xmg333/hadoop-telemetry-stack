@@ -11,7 +11,9 @@ Spark Telemetry Listener 是一套透明的 Spark / MapReduce 可观测性方案
 | **Spark Telemetry Plugin** | Spark 插件 | 捕获 Spark 任务/阶段 IO 指标及 JVM 系统指标 | [Spark Plugin](spark-plugin.md) |
 | **MR Telemetry Collector** | 独立 Java 应用 | 轮询 Hadoop History Server REST API 采集 MR 作业指标 | [MR Telemetry](mr-telemetry.md) |
 | **MR Telemetry Agent** | Java Agent | 字节码增强方式实时采集 MR 任务级指标 | [MR Telemetry](mr-telemetry.md) |
+| **Hive Telemetry Hook** | Hive Hook | 捕获 HiveServer2 查询指标（支持 MR 和 Spark 引擎） | [Hive Hook](hive-hook.md) |
 | **Flink Metrics Consumer** | Flink 作业 | 消费 Kafka 中的 OTLP 指标写入 MySQL / ClickHouse | [Flink Consumer](flink-consumer.md) |
+| **Diagnostic Tool** | 交互式 CLI 工具 | 检查后端组件（OTel/Kafka/MySQL/Grafana）健康状态和应用配置正确性 | [诊断工具](diagnostic.md) |
 
 ### 支持的 Spark 版本
 
@@ -31,11 +33,13 @@ graph TD
         SP["Spark Plugin<br/>(Task/Stage/JVM)"]
         MR["MR Collector<br/>(History Server)"]
         MA["MR Agent<br/>(字节码增强)"]
+        HH["Hive Hook<br/>(ExecuteWithHookContext)"]
     end
 
     SP -- OTLP gRPC --> OTel
     MR -- OTLP gRPC --> OTel
     MA -- OTLP gRPC --> OTel
+    HH -- OTLP gRPC --> OTel
 
     OTel["OTel Collector<br/>(接收 OTLP → 调试输出 + Kafka 导出)"]
     Flink["Flink Metrics Consumer<br/>(Kafka → 批量写入 MySQL / ClickHouse)"]
@@ -71,6 +75,9 @@ chmod +x build-omni.sh && ./build-omni.sh
 
 # 构建 Flink Consumer
 mvn clean package -pl flink/metrics-flink-consumer,flink/metrics-flink-consumer-dist -am -DskipTests
+
+# 构建诊断工具
+mvn clean package -pl diagnostic/diagnostic-core -am -DskipTests
 ```
 
 ### 产出物
@@ -84,6 +91,7 @@ mvn clean package -pl flink/metrics-flink-consumer,flink/metrics-flink-consumer-
 | MR Collector | `mapreduce-collector/mr-telemetry-dist/target/*.jar` | 自包含 Shaded JAR |
 | MR Agent | `mapreduce-agent/mr-telemetry-agent-dist/target/*.jar` | Java Agent JAR |
 | Flink Consumer | `flink/metrics-flink-consumer-dist/target/*.jar` | 自包含 Shaded JAR |
+| Diagnostic Tool | `diagnostic/diagnostic-core/target/*.jar` | 交互式诊断工具（JLine CLI） |
 
 所有 Distribution JAR 均通过 `maven-shade-plugin` 打包，OTel、gRPC、Protobuf 等依赖已 relocate 到 `x.mg.metrics.shaded.*` 命名空间下，不会与宿主环境产生冲突。
 
@@ -311,7 +319,7 @@ docker run -d --name otel-collector \
 
 ### Q3: MR Collector 连接 History Server 超时
 
-1. 确认 URL 和端口正确（Hadoop 2.x 端口 50070，Hadoop 3.x 端口 9870）
+1. 确认 URL 和端口正确（History Server 端口均为 19888，Hadoop 2.x 和 3.x 相同）
 2. 增大超时：`connect.timeout.secs` / `read.timeout.secs`
 
 ### Q4: OTel Collector 启动失败

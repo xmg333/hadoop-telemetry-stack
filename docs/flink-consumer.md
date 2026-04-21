@@ -14,7 +14,7 @@ Kafka (OTLP Protobuf) → Flink KafkaSource → OtlpDeserializationSchema
 - **OtlpDeserializationSchema**: 将 Kafka 中的 OTLP protobuf 字节反序列化为 `MetricRecord`（含 `MetricSample` + `HistogramBucket`）
 - **MetricRecordSplitFlatMap**: 将 `MetricRecord` 拆分为独立的 `MetricItem`（单个 sample 或 bucket）
 - **AccumulatingProcessFunction**: Flink `ProcessFunction`，使用 `ValueState<WideRowAccumulator>` 管理聚合状态，基于 batch-size 阈值和 processing-time timer 触发 flush。支持 Flink checkpoint 故障恢复
-- **FlinkCategoryJdbcSink**: Flink `RichSinkFunction`，管理 JDBC 连接生命周期（`open()`/`close()`），将 `FlushResult` 写入 15 张分类表
+- **FlinkCategoryJdbcSink**: Flink `RichSinkFunction`，管理 JDBC 连接生命周期（`open()`/`close()`），将 `FlushResult` 写入 15 张分类表 + `metric_events` 统一宽表
 
 ## 部署
 
@@ -28,7 +28,7 @@ CREATE USER 'metrics'@'%' IDENTIFIED BY 'metrics';
 GRANT ALL PRIVILEGES ON metrics_db.* TO 'metrics'@'%';
 ```
 
-启动时自动创建 15 张表，无需手动建表。
+启动时自动创建 15 张分类表 + `metric_events` 统一宽表，无需手动建表。
 
 #### ClickHouse
 
@@ -140,10 +140,11 @@ curl -s http://localhost:8081/jobs | python3 -c \
 | `hive_table_io_metrics` | Hive 查询表级 IO 指标 |
 | `mr_job_metrics` | MR Collector 作业级指标 |
 | `mr_task_metrics` | MR Agent 任务级指标 |
+| `metric_events` | 跨引擎统一宽表，按 engine（SPARK/MR/HIVE）和 event_type 分区 |
 
 ### task_metrics
 
-**维度列：** `timestamp_ms`, `app_id`, `executor_id`, `stage_id`, `task_id`, `task_success`, `task_host`, `task_locatity`, `task_speculative`
+**维度列：** `timestamp_ms`, `app_id`, `executor_id`, `stage_id`, `task_id`, `task_success`, `task_host`, `task_locality`, `task_speculative`
 
 **指标列：** `duration_ms`, `io_bytes_read`, `io_bytes_written`, `io_records_read`, `io_records_written`, `shuffle_bytes_read`, `shuffle_bytes_written`, `shuffle_fetch_wait_time_ms`, `disk_bytes_spilled`, `memory_bytes_spilled`, `executor_run_time_ms`, `executor_cpu_time_ns`, `deserialize_time_ms`, `deserialize_cpu_time_ns`, `result_serialization_time_ms`, `jvm_gc_time_ms`, `scheduler_delay_ms`, `result_size_bytes`, `peak_execution_memory_bytes`, `shuffle_local_blocks_fetched`, `shuffle_records_read`, `shuffle_remote_bytes_read_to_disk`, `shuffle_remote_reqs_duration_ms`
 
@@ -190,6 +191,20 @@ curl -s http://localhost:8081/jobs | python3 -c \
 ### 直方图桶表
 
 `task_histogram_buckets`、`stage_histogram_buckets`、`job_histogram_buckets` 维度列与对应 metrics 表一致，额外包含 `metric_name`、`bucket_le`、`bucket_count` 三列。
+
+### metric_events
+
+**统一跨引擎宽表**，整合全部 15 张分类表数据。每个事件一行，通过 `engine`（SPARK/MR/HIVE）和 `event_type`（TASK/STAGE/JOB/JVM_MEMORY/JVM_GC/SQL_QUERY/SQL_TABLE_IO/HIVE_QUERY/HIVE_TABLE_IO/MR_JOB/MR_TASK）区分事件类型。
+
+**核心维度列：** `timestamp_ms`, `event_type`, `engine`, `status`, `app_id`, `app_name`, `user_name`, `queue`
+
+**归一化指标列：** `duration_ms`, `io_bytes_read`, `io_bytes_written`, `shuffle_bytes_read`, `shuffle_bytes_written`, `cpu_time_ms`, `gc_time_ms`, `memory_bytes_spilled`
+
+**引擎特定维度/指标列：** 保留各引擎独有字段（如 Spark 的 `executor_id`/`stage_id`/`task_id`，MR 的 `job_id`/`launched_maps`/`hdfs_bytes_read`，Hive 的 `operation`/`execution_engine`），NULL 表示不适用。
+
+**文本列：** `query_text`（TEXT，SQL 查询文本）
+
+完整建表语句见 `deploy/sql/v5_migration.sql`。`query_text` 列由 `deploy/sql/v6_migration.sql` 添加。
 
 ---
 

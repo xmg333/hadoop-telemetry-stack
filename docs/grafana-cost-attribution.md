@@ -151,7 +151,7 @@ ORDER  BY 1,
 **使用建议**: 选择时间范围大于 7 天时，建议在 Grafana 中将 `$__interval_ms` 设为 86400000（1 天）以获得日级粒度。若某引擎曲线突然上升，需检查是否有新上线的高负载作业。
 
 ## 注意事项
-- `metric_events` 为统一大宽表视图，实际数据存储在 `task_metrics`、`mr_task_metrics`、`mr_job_metrics` 等物理表中。如需直接查询物理表，请将 `event_type` 替换为对应表名。
+- `metric_events` 为统一大宽表（物理表，非视图），实际数据同时写入各分类表和大宽表。如需直接查询分类表，请将 `event_type` 替换为对应表名。
 - `cpu_time_ms` 对 Spark 来源于 `executor_cpu_time_ns` 的毫秒转换，对 MR 来源于 MR Counter 中的 `CPU_MILLISECONDS`。
 - `queue` 字段依赖 v4+ 版本的 Flink Consumer 写入。早期版本中该字段为空，需先执行 `v4_migration.sql` 升级。
 - 排行类面板建议设置时间范围为 1 天至 7 天，过大的时间范围会导致聚合计算缓慢。

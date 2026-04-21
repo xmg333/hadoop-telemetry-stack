@@ -56,7 +56,7 @@ SELECT ( Floor(timestamp_ms / $__interval_ms) * $__interval_ms / 1000 ) AS time,
        ROUND(AVG(heap_used) / 1073741824, 2)                              AS heap_gb,
        ROUND(AVG(non_heap_used) / 1073741824, 2)                           AS non_heap_gb
 FROM   jvm_memory_metrics
-WHERE  timestamp_ms >= ( $__unixepochFrom() * 1000 )
+WHERE  timestamp_ms >= ( $__unixEpochFrom() * 1000 )
        AND timestamp_ms <= ( $__unixEpochTo() * 1000 )
 GROUP  BY 1,
           app_id,
@@ -156,4 +156,3 @@ ORDER  BY 1,
 - `jvm_memory_metrics` 和 `jvm_gc_metrics` 的数据采集频率取决于 OTel SDK 的 `export.interval.ms` 配置（默认 60 秒），非每个任务一条记录。
 - 内存趋势面板中 `executor_id` 可能较多，建议通过 Grafana 变量过滤特定应用。
 - 时间范围选择超过 7 天时，建议将 `$__interval_ms` 调整为小时级（3600000）或日级（86400000）以避免查询过慢。
-- `jvm_memory_metrics` 表的 SQL 查询中使用了 `$__unixepochFrom()`，部分 Grafana 版本可能需要使用 `$__unixEpochFrom()`（注意大小写），请根据实际版本调整。

@@ -33,6 +33,7 @@ graph TD
 | **MR Telemetry Agent** | Java Agent，通过字节码增强实时采集 MR 任务级指标 |
 | **Hive Telemetry Hook** | Hive 查询 Hook，捕获 HiveServer2 查询指标（支持 MR 和 Spark 引擎） |
 | **Flink Metrics Consumer** | Flink 作业，消费 Kafka 中的 OTLP 指标写入 MySQL / ClickHouse |
+| **Diagnostic Tool** | 交互式诊断工具，基于状态机检查 OTel Collector、Kafka、MySQL、Grafana 面板等后端组件健康状态及应用配置正确性 |
 | **Omnipackage** | 统一 JAR，自动检测 Spark 版本（2/3/4），同时包含 MR 和 Hive 组件 |
 
 ## 支持版本
@@ -93,6 +94,7 @@ hive/hive-telemetry-hook/                # Hive 查询 Hook（ExecuteWithHookCon
 hive/hive-telemetry-hook-dist/           # Shaded Fat JAR
 flink/metrics-flink-consumer/             # Flink 消费者（Kafka → MySQL / ClickHouse）
 flink/metrics-flink-consumer-dist/        # Shaded Fat JAR
+diagnostic/diagnostic-core/               # 交互式诊断工具（JLine CLI + 11 状态自动检查）
 integration-tests/                  # 集成测试（Spark 3）
 ```
 
@@ -102,8 +104,10 @@ integration-tests/                  # 集成测试（Spark 3）
 - **异步刷新**：`flushAsync()` 在 `onJobEnd` 时非阻塞刷新，避免阻塞 DAGScheduler
 - **appId Fallback**：自动回退 `appId → appName → "unknown"`，兼容 local 模式
 - **三层配置合并**：Spark Conf 覆盖 > HOCON 文件 > 内置默认值
-- **指标分类开关**：5 个 Category 独立控制采集粒度
+- **指标分类开关**：6 个 Category 独立控制采集粒度（含 SQL 查询执行指标和 query_text 追踪）
 - **Stage 治理预聚合**：Flink Consumer 自动计算数据倾斜、CPU 效率、GC 开销等治理指标
+- **SQL 文本追踪**：Spark 和 Hive 均支持 query_text 捕获，自动截断到配置长度（默认 4096 字符），写入 sql_query_metrics、hive_query_metrics、metric_events 三张表
+- **metric_events 统一宽表**：跨引擎分析大宽表，整合 Spark/MR/Hive 全部分类表数据，支持按 engine 和 event_type 维度的跨引擎聚合查询
 - **Shaded Fat JAR**：OTel/gRPC/Protobuf 等依赖 relocate 到 `x.mg.metrics.shaded.*`，无依赖冲突
 
 ## 配置示例
@@ -113,6 +117,8 @@ integration-tests/                  # 集成测试（Spark 3）
 - `conf/examples/telemetry.conf.example` — Spark 插件配置
 - `conf/examples/mr-collector.conf.example` — MR Collector 配置
 - `conf/examples/flink-consumer.conf.example` — Flink Consumer 配置
+- `conf/examples/hive-telemetry.conf.example` — Hive Hook 配置
+- `diagnostic/diagnostic-core/src/main/resources/diagnostic.conf` — 诊断工具配置
 
 ## 指标概览
 
@@ -154,8 +160,15 @@ integration-tests/                  # 集成测试（Spark 3）
 | `hive-mr.json` | Hive on MR Telemetry | Hive MR 引擎查询 |
 | `hive-spark.json` | Hive on Spark Telemetry | Hive Spark 引擎查询 |
 | `spark-mr-telemetry-dashboard.json` | Spark/MR/Hive 合并面板 | 综合视图 |
+| `hive-analysis.json` | Hive 查询与数据血缘分析 | 操作分布、表 IO、执行引擎对比 |
+| `performance-analysis.json` | 性能异常与瓶颈分析 | Stage 耗时、GC 开销、数据倾斜检测 |
+| `efficiency.json` | 综合效率评分 | 资源效率评分、队列效率对比 |
+| `reliability.json` | 可靠性与失败分析 | 任务成功率趋势、失败事件 |
+| `capacity.json` | 容量规划与资源利用率 | 任务并发量、内存趋势、GC 频率 |
+| `cost-attribution.json` | 成本归属与资源排行 | 用户/队列/应用资源排行 |
+| `io-analysis.json` | 数据吞吐与 IO 分析 | 各引擎 IO 吞吐量、Shuffle 分析 |
 
-面板覆盖：任务 IO / 时长时序趋势、JVM 内存 / GC 监控、数据倾斜检测、资源效率分析、小文件检测、任务时长直方图分布。
+前 6 个面板使用各引擎独立分类表，后 7 个分析面板使用 `metric_events` 统一宽表实现跨引擎聚合查询。覆盖：任务 IO / 时长时序趋势、JVM 内存 / GC 监控、数据倾斜检测、资源效率分析、成本归属、小文件检测、任务时长直方图分布。
 
 ## 完整文档
 

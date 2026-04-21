@@ -12,7 +12,7 @@
 
 ## 前置条件
 
-数据源：全部 11 张独立指标表
+数据源：全部 15 张独立指标表
 
 Grafana 变量：
 :   `$app_id` — Spark 应用 ID（多选，含 All），从 `task_metrics` 获取
