@@ -1,0 +1,42 @@
+# Diagnostic Configuration
+# 遥测诊断工具配置文件
+
+diagnostic {
+  # OTel Collector 配置
+  otel-collector {
+    endpoint = "http://localhost:4317"
+    health-check-port = 13133
+    timeout-ms = 5000
+  }
+
+  # Kafka 配置
+  kafka {
+    bootstrap-servers = "localhost:9092"
+    metrics-topic = "telemetry-metrics"
+    traces-topic = "telemetry-traces"
+    timeout-ms = 5000
+  }
+
+  # MySQL 配置
+  mysql {
+    host = "localhost"
+    port = 3306
+    database = "metrics_db"
+    username = "metrics"
+    password = "metrics"
+    timeout-ms = 5000
+  }
+
+  # 启用/禁用特定检查
+  spark {
+    plugins-config.enabled = true
+  }
+
+  hive {
+    hook-config.enabled = true
+  }
+
+  mr-collector {
+    enabled = true
+  }
+}
