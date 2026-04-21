@@ -77,7 +77,12 @@ class SparkTelemetryListener(confMap: Map[String, String]) extends SparkListener
       if (config.isCaptureTaskShuffleExtended) {
         io.setShuffleLocalBlocksFetched(taskMetrics.shuffleReadMetrics.localBlocksFetched)
         io.setShuffleRecordsRead(taskMetrics.shuffleReadMetrics.recordsRead)
-        io.setShuffleRemoteBytesReadToDisk(taskMetrics.shuffleReadMetrics.remoteBytesReadToDisk)
+        // remoteBytesReadToDisk added in Spark 3.3.0
+        try {
+          io.setShuffleRemoteBytesReadToDisk(taskMetrics.shuffleReadMetrics.remoteBytesReadToDisk)
+        } catch {
+          case _: NoSuchMethodError => // API not available in Spark 3.0.x
+        }
       }
     }
 

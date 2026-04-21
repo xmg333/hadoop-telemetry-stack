@@ -20,17 +20,17 @@ class TelemetryConfigTest {
         assertTrue(config.isListenerEnabled());
         assertTrue(config.isCaptureTaskEnd());
         assertTrue(config.isCaptureStageComplete());
-        assertFalse(config.isCaptureJobEnd());
+        assertTrue(config.isCaptureJobEnd());  // Changed default to true
         assertTrue(config.isSystemMetricsEnabled());
         assertTrue(config.isCaptureJvmMemory());
         assertTrue(config.isCaptureJvmGc());
         assertTrue(config.isCaptureBufferPools());
-        // New detail toggles
+        // New detail toggles - all default to true
         assertTrue(config.isCaptureTaskExecution());
         assertTrue(config.isCaptureTaskShuffleExtended());
         assertTrue(config.isCaptureTaskInfo());
-        assertFalse(config.isCaptureStageDetailed());
-        assertFalse(config.isCaptureJobLifecycle());
+        assertTrue(config.isCaptureStageDetailed());  // Changed default to true
+        assertTrue(config.isCaptureJobLifecycle());   // Changed default to true
     }
 
     @Test
