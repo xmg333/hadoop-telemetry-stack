@@ -22,12 +22,23 @@ public class HiveHookContext {
     private final HiveOtelRegistry otelRegistry;
     private final HiveMetricRecorder metricRecorder;
     private final AtomicBoolean initialized = new AtomicBoolean(false);
+    private final Thread shutdownHook;
 
     private HiveHookContext() {
         this.config = new HiveHookConfig();
         this.otelRegistry = new HiveOtelRegistry(config);
         this.otelRegistry.start();
         this.metricRecorder = new HiveMetricRecorder(otelRegistry.getOpenTelemetry(), config);
+
+        // Register shutdown hook to flush OTel SDK before JVM exits.
+        // Without this, PeriodicMetricReader may not export the last batch of metrics.
+        this.shutdownHook = new Thread(this::shutdown, "hive-telemetry-shutdown");
+        try {
+            Runtime.getRuntime().addShutdownHook(shutdownHook);
+        } catch (IllegalStateException e) {
+            // JVM already shutting down
+        }
+
         this.initialized.set(true);
         LOG.info("HiveHookContext initialized");
     }
@@ -56,9 +67,21 @@ public class HiveHookContext {
         }
     }
 
+    /** Flush metrics immediately after recording a query. */
+    public void flush() {
+        if (otelRegistry != null) {
+            otelRegistry.forceFlush();
+        }
+    }
+
     public void shutdown() {
-        otelRegistry.forceFlush();
-        otelRegistry.stop();
+        try {
+            Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        } catch (Exception ignored) {}
+        if (otelRegistry != null) {
+            otelRegistry.forceFlush();
+            otelRegistry.stop();
+        }
         initialized.set(false);
     }
 }

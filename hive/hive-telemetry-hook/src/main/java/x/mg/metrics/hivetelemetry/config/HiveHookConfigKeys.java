@@ -15,6 +15,7 @@ public final class HiveHookConfigKeys {
     public static final String METRICS_QUERY_DURATION = "hive-telemetry.metrics.query.duration";
     public static final String METRICS_QUERY_IO = "hive-telemetry.metrics.query.io";
     public static final String METRICS_QUERY_TABLES = "hive-telemetry.metrics.query.tables";
+    public static final String SQL_MAX_LENGTH = "hive-telemetry.metrics.sql.max-length";
 
     // Filter
     public static final String FILTER_USER_INCLUDE = "hive-telemetry.filter.user.include";

@@ -6,6 +6,8 @@ import org.apache.hadoop.hive.ql.QueryPlan;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
 import org.apache.hadoop.hive.ql.hooks.WriteEntity;
 import org.apache.hadoop.hive.ql.hooks.Entity;
+import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.ql.metadata.Partition;
 import x.mg.metrics.hivetelemetry.model.HiveQueryMetrics;
 
 import java.util.Map;
@@ -42,10 +44,13 @@ public class HiveTelemetryHook implements ExecuteWithHookContext {
             }
 
             ctx.getMetricRecorder().record(metrics);
+
+            // Force flush after each query to ensure metrics are exported
+            // before JVM exit (critical for short-lived Hive CLI processes).
+            ctx.flush();
         } catch (Exception e) {
             // ERROR ISOLATION: Never propagate exceptions to HiveServer2.
-            // A telemetry hook must never break query execution.
-            LOG.log(Level.WARNING, "HiveTelemetryHook error (suppressed): " + e.getMessage(), e);
+            LOG.log(Level.WARNING, "HiveTelemetryHook error: " + e.getMessage(), e);
         }
     }
 
@@ -81,89 +86,77 @@ public class HiveTelemetryHook implements ExecuteWithHookContext {
         // POST_EXEC implies success
         m.setSuccess(true);
 
-        // Input tables (read)
+        // Input tables (read) + IO estimates from table stats
         Set<ReadEntity> inputs = hookContext.getInputs();
         if (inputs != null) {
             for (ReadEntity entity : inputs) {
                 Entity.Type type = entity.getType();
                 if (type == Entity.Type.TABLE) {
-                    m.addInputTable(entity.getTable().getTableName());
+                    Table t = entity.getTable();
+                    m.addInputTable(t.getTableName());
+                    addTableStats(t, m, true);
                 } else if (type == Entity.Type.PARTITION) {
-                    m.addInputTable(entity.getPartition().getTable().getTableName());
+                    Partition p = entity.getPartition();
+                    m.addInputTable(p.getTable().getTableName());
+                    addTableStats(p.getTable(), m, true);
                 } else if (type == Entity.Type.DATABASE) {
                     m.addInputDatabase(entity.getDatabase().getName());
                 }
             }
         }
 
-        // Output tables (written)
+        // Output tables (written) + IO estimates from table stats
         Set<WriteEntity> outputs = hookContext.getOutputs();
         if (outputs != null) {
             for (WriteEntity entity : outputs) {
                 Entity.Type type = entity.getType();
                 if (type == Entity.Type.TABLE) {
-                    m.addOutputTable(entity.getTable().getTableName());
+                    Table t = entity.getTable();
+                    m.addOutputTable(t.getTableName());
+                    addTableStats(t, m, false);
                 } else if (type == Entity.Type.PARTITION) {
-                    m.addOutputTable(entity.getPartition().getTable().getTableName());
+                    Partition p = entity.getPartition();
+                    m.addOutputTable(p.getTable().getTableName());
+                    addTableStats(p.getTable(), m, false);
                 }
             }
         }
 
-        // IO counters from QueryPlan
-        extractCounters(plan, m);
-
         return m;
     }
 
-    private void extractCounters(QueryPlan plan, HiveQueryMetrics m) {
-        if (plan == null) return;
+    /**
+     * Estimate IO from Hive metastore table statistics (totalSize, numRows).
+     * These are maintained by Hive's StatsTask after each DML operation.
+     * For input tables this is the full table size (approximate scan volume).
+     * For output tables after INSERT OVERWRITE / CTAS this is the new data size.
+     */
+    private void addTableStats(Table table, HiveQueryMetrics m, boolean isInput) {
         try {
-            // getCounters() returns Map<GroupName, Map<CounterName, Long>>
-            Map<String, Map<String, Long>> counterGroups = plan.getCounters();
-            if (counterGroups == null) {
-                LOG.fine("QueryPlan.getCounters() returned null for query: " + m.getQueryId());
-                return;
+            Map<String, String> params = table.getParameters();
+            if (params == null) return;
+
+            long size = parseLong(params.get("totalSize"));
+            long rows = parseLong(params.get("numRows"));
+
+            if (isInput) {
+                if (size > 0) m.setInputBytes(m.getInputBytes() + size);
+                if (rows > 0) m.setInputRows(m.getInputRows() + rows);
+            } else {
+                if (size > 0) m.setOutputBytes(m.getOutputBytes() + size);
+                if (rows > 0) m.setOutputRows(m.getOutputRows() + rows);
             }
-
-            LOG.fine("Found " + counterGroups.size() + " counter groups for query: " + m.getQueryId());
-
-            // Flatten all counter groups and look for common counter names
-            for (Map.Entry<String, Map<String, Long>> entry : counterGroups.entrySet()) {
-                Map<String, Long> group = entry.getValue();
-                if (group == null) continue;
-
-                Long val;
-                // Input bytes - try multiple counter names across Hive/MR versions
-                val = group.get("HDFS_BYTES_READ");
-                if (val == null) val = group.get("BYTES_READ");
-                if (val == null) val = group.get("FILE_BYTES_READ");
-                if (val != null && val > m.getInputBytes()) m.setInputBytes(val);
-
-                // Output bytes
-                val = group.get("HDFS_BYTES_WRITTEN");
-                if (val == null) val = group.get("BYTES_WRITTEN");
-                if (val == null) val = group.get("FILE_BYTES_WRITTEN");
-                if (val != null && val > m.getOutputBytes()) m.setOutputBytes(val);
-
-                // Output rows
-                val = group.get("RECORDS_OUT_INTERMEDIATE");
-                if (val == null) val = group.get("RECORDS_WRITTEN");
-                if (val == null) val = group.get("MAP_OUTPUT_RECORDS");
-                if (val == null) val = group.get("REDUCE_OUTPUT_RECORDS");
-                if (val != null && val > m.getOutputRows()) m.setOutputRows(val);
-
-                // Input rows
-                val = group.get("RECORDS_READ");
-                if (val == null) val = group.get("MAP_INPUT_RECORDS");
-                if (val == null) val = group.get("REDUCE_INPUT_RECORDS");
-                if (val != null && val > m.getInputRows()) m.setInputRows(val);
-            }
-
-            LOG.fine("Extracted counters for " + m.getQueryId() + ": inBytes=" + m.getInputBytes()
-                + " outBytes=" + m.getOutputBytes() + " inRows=" + m.getInputRows() + " outRows=" + m.getOutputRows());
         } catch (Exception e) {
-            // getCounters() may throw in some execution modes (Tez, LLAP)
-            LOG.log(Level.FINE, "Could not extract counters: " + e.getMessage());
+            LOG.log(Level.FINE, "Could not read table stats for " + table.getTableName() + ": " + e.getMessage());
+        }
+    }
+
+    private long parseLong(String value) {
+        if (value == null || value.isEmpty()) return 0;
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            return 0;
         }
     }
 }

@@ -73,6 +73,7 @@ public class HiveHookConfig {
         d.put(HiveHookConfigKeys.FILTER_USER_EXCLUDE, Collections.emptyList());
         d.put(HiveHookConfigKeys.FILTER_OPERATION_INCLUDE, Collections.singletonList(".*"));
         d.put(HiveHookConfigKeys.FILTER_OPERATION_EXCLUDE, Collections.emptyList());
+        d.put(HiveHookConfigKeys.SQL_MAX_LENGTH, 4096);
         return d;
     }
 
@@ -80,6 +81,7 @@ public class HiveHookConfig {
     public boolean isQueryDuration() { return getBoolean(HiveHookConfigKeys.METRICS_QUERY_DURATION, true); }
     public boolean isQueryIO() { return getBoolean(HiveHookConfigKeys.METRICS_QUERY_IO, true); }
     public boolean isQueryTables() { return getBoolean(HiveHookConfigKeys.METRICS_QUERY_TABLES, true); }
+    public int getSqlMaxLength() { return (int) getLong(HiveHookConfigKeys.SQL_MAX_LENGTH, 4096); }
     public String getOtelEndpoint() { return getString(HiveHookConfigKeys.OTEL_EXPORTER_ENDPOINT, HiveHookConfigKeys.DEFAULT_ENDPOINT); }
     public String getServiceName() { return getString(HiveHookConfigKeys.OTEL_SERVICE_NAME, HiveHookConfigKeys.DEFAULT_SERVICE_NAME); }
     public long getExportIntervalMs() { return getLong(HiveHookConfigKeys.OTEL_EXPORT_INTERVAL_MS, HiveHookConfigKeys.DEFAULT_EXPORT_INTERVAL_MS); }

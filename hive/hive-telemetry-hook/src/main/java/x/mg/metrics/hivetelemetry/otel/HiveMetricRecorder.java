@@ -110,6 +110,11 @@ public class HiveMetricRecorder {
         if (m.getUserName() != null) b.put("hive.query.user", m.getUserName());
         b.put("hive.query.success", String.valueOf(m.isSuccess()));
         if (m.getExecutionEngine() != null) b.put("hive.query.execution_engine", m.getExecutionEngine());
+        if (m.getQueryText() != null && !m.getQueryText().isEmpty()) {
+            String sql = m.getQueryText();
+            int maxLen = config.getSqlMaxLength();
+            b.put("hive.query.sql_text", sql.length() > maxLen ? sql.substring(0, maxLen) : sql);
+        }
         return b.build();
     }
 }
