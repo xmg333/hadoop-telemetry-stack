@@ -7,6 +7,7 @@
 - **应用诊断**：检查 Spark Plugin、Hive Hook、MR Collector 配置
 - **后端诊断**：检查 OTel Collector、Kafka、MySQL 健康状态
 - **数据流验证**：端到端数据流检查
+- **Grafana 面板检查**：扫描 Dashboard JSON 文件，提取 SQL 查询并在 MySQL 中执行验证
 - **中文输出**：诊断结果以中文显示
 
 ## 构建
@@ -88,13 +89,13 @@ diagnostic {
   ↓
 检查 MR Collector (CHECK_MR_COLLECTOR)
   ↓
-检查 OTel App (CHECK_OTEL_APP)
-  ↓
 检查 OTel Collector (CHECK_OTEL_COLLECTOR)
   ↓
 检查 Kafka (CHECK_KAFKA)
   ↓
 检查 MySQL (CHECK_MYSQL)
+  ↓
+检查 Grafana 面板 (CHECK_GRAFANA)
   ↓
 数据流验证 (DATA_FLOW_CHECK)
   ↓
@@ -144,6 +145,7 @@ diagnostic/
 │   │   │       ├── CheckOtelCollectorHandler.java
 │   │   │       ├── CheckKafkaHandler.java
 │   │   │       ├── CheckMySqlHandler.java
+│   │   │       ├── GrafanaSqlCheckHandler.java  # Grafana 面板 SQL 有效性检查
 │   │   │       ├── DataFlowCheckHandler.java
 │   │   │       ├── GenerateReportHandler.java
 │   │   │       └── ErrorHandlers.java      # 错误状态处理器
@@ -157,8 +159,9 @@ diagnostic/
 │   │   │   └── MySQLChecker.java
 │   │   ├── report/
 │   │   │   └── DiagnosticReport.java       # 诊断报告
-│   │   └── ui/
-│   │       └── AnsiColors.java             # ANSI 颜色定义
+│   │   ├── ui/
+│   │   │   ├── AnsiColors.java             # ANSI 颜色定义
+│   │   │   └── CheckPrinter.java           # 检查结果格式化输出
 │   └── src/main/resources/
 │       └── diagnostic.conf                 # 配置文件
 └── pom.xml

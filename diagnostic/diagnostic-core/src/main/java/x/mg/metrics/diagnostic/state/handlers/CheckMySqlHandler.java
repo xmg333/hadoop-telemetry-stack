@@ -17,7 +17,7 @@ public class CheckMySqlHandler extends CheckHandler {
             context.getConfig().getMysqlTimeoutMs()
         ).check());
 
-        return DiagnosticState.DATA_FLOW_CHECK;
+        return DiagnosticState.CHECK_GRAFANA;
     }
     @Override
     public String getName() { return "检查 MySQL"; }

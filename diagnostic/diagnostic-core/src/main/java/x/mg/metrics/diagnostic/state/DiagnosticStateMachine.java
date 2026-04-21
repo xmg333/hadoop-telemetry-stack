@@ -52,6 +52,7 @@ public class DiagnosticStateMachine {
             case CHECK_OTEL_COLLECTOR: return "检查 OTel Collector";
             case CHECK_KAFKA: return "检查 Kafka";
             case CHECK_MYSQL: return "检查 MySQL";
+            case CHECK_GRAFANA: return "检查 Grafana 面板";
             case DATA_FLOW_CHECK: return "数据流验证";
             case GENERATE_REPORT: return "生成报告";
             default: return s.name();
@@ -68,6 +69,7 @@ public class DiagnosticStateMachine {
             case CHECK_OTEL_COLLECTOR: return new CheckOtelCollectorHandler();
             case CHECK_KAFKA: return new CheckKafkaHandler();
             case CHECK_MYSQL: return new CheckMySqlHandler();
+            case CHECK_GRAFANA: return new GrafanaSqlCheckHandler();
             case DATA_FLOW_CHECK: return new DataFlowCheckHandler();
             case GENERATE_REPORT: return new GenerateReportHandler();
             default: return (ctx) -> DiagnosticState.EXIT_FAILURE;
@@ -84,7 +86,8 @@ public class DiagnosticStateMachine {
             case CHECK_MR_COLLECTOR: return DiagnosticState.CHECK_OTEL_COLLECTOR;
             case CHECK_OTEL_COLLECTOR: return DiagnosticState.CHECK_KAFKA;
             case CHECK_KAFKA: return DiagnosticState.CHECK_MYSQL;
-            case CHECK_MYSQL: return DiagnosticState.DATA_FLOW_CHECK;
+            case CHECK_MYSQL: return DiagnosticState.CHECK_GRAFANA;
+            case CHECK_GRAFANA: return DiagnosticState.DATA_FLOW_CHECK;
             case DATA_FLOW_CHECK: return DiagnosticState.GENERATE_REPORT;
             default: return DiagnosticState.EXIT_FAILURE;
         }

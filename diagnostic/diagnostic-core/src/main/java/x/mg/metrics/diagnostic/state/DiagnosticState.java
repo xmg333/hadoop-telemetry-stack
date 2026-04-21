@@ -17,6 +17,9 @@ public enum DiagnosticState {
     CHECK_KAFKA,
     CHECK_MYSQL,
 
+    // Grafana 面板检查
+    CHECK_GRAFANA,
+
     // 数据流
     DATA_FLOW_CHECK,
 
