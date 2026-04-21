@@ -1359,6 +1359,7 @@ public class CategoryJdbcSink {
     }
 
     private int insertMrJobMetrics(List<MrJobMetricRow> rows) throws SQLException {
+        // Use UPSERT to avoid duplicate rows for the same job
         String sql = "INSERT INTO mr_job_metrics (timestamp_ms, job_id, job_name, user_name, state, queue, " +
             "hdfs_bytes_read, hdfs_bytes_written, file_bytes_read, file_bytes_written, " +
             "map_input_records, map_output_records, map_output_bytes, " +
@@ -1366,7 +1367,33 @@ public class CategoryJdbcSink {
             "cpu_time_ms, gc_time_ms, physical_memory_bytes, virtual_memory_bytes, committed_heap_bytes, " +
             "maps_duration_ms, reduces_duration_ms, elapsed_time_ms, launched_maps, launched_reduces, " +
             "start_time_ms, finish_time_ms) " +
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) " +
+            "ON DUPLICATE KEY UPDATE " +
+            "timestamp_ms=VALUES(timestamp_ms), job_name=VALUES(job_name), user_name=VALUES(user_name), " +
+            "state=VALUES(state), queue=VALUES(queue), " +
+            "hdfs_bytes_read=IFNULL(VALUES(hdfs_bytes_read), hdfs_bytes_read), " +
+            "hdfs_bytes_written=IFNULL(VALUES(hdfs_bytes_written), hdfs_bytes_written), " +
+            "file_bytes_read=IFNULL(VALUES(file_bytes_read), file_bytes_read), " +
+            "file_bytes_written=IFNULL(VALUES(file_bytes_written), file_bytes_written), " +
+            "map_input_records=IFNULL(VALUES(map_input_records), map_input_records), " +
+            "map_output_records=IFNULL(VALUES(map_output_records), map_output_records), " +
+            "map_output_bytes=IFNULL(VALUES(map_output_bytes), map_output_bytes), " +
+            "reduce_input_records=IFNULL(VALUES(reduce_input_records), reduce_input_records), " +
+            "reduce_output_records=IFNULL(VALUES(reduce_output_records), reduce_output_records), " +
+            "reduce_shuffle_bytes=IFNULL(VALUES(reduce_shuffle_bytes), reduce_shuffle_bytes), " +
+            "spilled_records=IFNULL(VALUES(spilled_records), spilled_records), " +
+            "cpu_time_ms=IFNULL(VALUES(cpu_time_ms), cpu_time_ms), " +
+            "gc_time_ms=IFNULL(VALUES(gc_time_ms), gc_time_ms), " +
+            "physical_memory_bytes=IFNULL(VALUES(physical_memory_bytes), physical_memory_bytes), " +
+            "virtual_memory_bytes=IFNULL(VALUES(virtual_memory_bytes), virtual_memory_bytes), " +
+            "committed_heap_bytes=IFNULL(VALUES(committed_heap_bytes), committed_heap_bytes), " +
+            "maps_duration_ms=IFNULL(VALUES(maps_duration_ms), maps_duration_ms), " +
+            "reduces_duration_ms=IFNULL(VALUES(reduces_duration_ms), reduces_duration_ms), " +
+            "elapsed_time_ms=IFNULL(VALUES(elapsed_time_ms), elapsed_time_ms), " +
+            "launched_maps=IFNULL(VALUES(launched_maps), launched_maps), " +
+            "launched_reduces=IFNULL(VALUES(launched_reduces), launched_reduces), " +
+            "start_time_ms=IFNULL(VALUES(start_time_ms), start_time_ms), " +
+            "finish_time_ms=IFNULL(VALUES(finish_time_ms), finish_time_ms)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (MrJobMetricRow r : rows) {
             int i = 1;
@@ -1408,7 +1435,8 @@ public class CategoryJdbcSink {
     }
 
     private int insertMrTaskMetrics(List<MrTaskMetricRow> rows) throws SQLException {
-        String sql = "INSERT INTO mr_task_metrics (timestamp_ms, task_id, task_type, job_id, job_name, user_name, state, queue, " +
+        // Use UPSERT (INSERT ... ON DUPLICATE KEY UPDATE) to merge metrics for the same task
+        StringBuilder sqlBuilder = new StringBuilder("INSERT INTO mr_task_metrics (timestamp_ms, task_id, task_type, job_id, job_name, user_name, state, queue, " +
             "hdfs_bytes_read, hdfs_bytes_written, file_bytes_read, file_bytes_written, " +
             "map_input_records, map_output_records, map_output_bytes, " +
             "reduce_input_records, reduce_output_records, reduce_shuffle_bytes, spilled_records, " +
@@ -1416,7 +1444,40 @@ public class CategoryJdbcSink {
             "duration_ms, success_count, failure_count, " +
             "hdfs_read_ops, hdfs_write_ops, hdfs_large_read_ops, " +
             "file_read_ops, file_write_ops, file_large_read_ops) " +
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) " +
+            "ON DUPLICATE KEY UPDATE ");
+
+        // Build the UPDATE clause - only update non-null values
+        String[] columns = {
+            "timestamp_ms=VALUES(timestamp_ms)",
+            "task_type=VALUES(task_type)", "job_id=VALUES(job_id)", "job_name=VALUES(job_name)",
+            "user_name=VALUES(user_name)", "state=VALUES(state)", "queue=VALUES(queue)",
+            "hdfs_bytes_read=IFNULL(VALUES(hdfs_bytes_read), hdfs_bytes_read)",
+            "hdfs_bytes_written=IFNULL(VALUES(hdfs_bytes_written), hdfs_bytes_written)",
+            "file_bytes_read=IFNULL(VALUES(file_bytes_read), file_bytes_read)",
+            "file_bytes_written=IFNULL(VALUES(file_bytes_written), file_bytes_written)",
+            "map_input_records=IFNULL(VALUES(map_input_records), map_input_records)",
+            "map_output_records=IFNULL(VALUES(map_output_records), map_output_records)",
+            "map_output_bytes=IFNULL(VALUES(map_output_bytes), map_output_bytes)",
+            "reduce_input_records=IFNULL(VALUES(reduce_input_records), reduce_input_records)",
+            "reduce_output_records=IFNULL(VALUES(reduce_output_records), reduce_output_records)",
+            "reduce_shuffle_bytes=IFNULL(VALUES(reduce_shuffle_bytes), reduce_shuffle_bytes)",
+            "spilled_records=IFNULL(VALUES(spilled_records), spilled_records)",
+            "cpu_time_ms=IFNULL(VALUES(cpu_time_ms), cpu_time_ms)",
+            "gc_time_ms=IFNULL(VALUES(gc_time_ms), gc_time_ms)",
+            "duration_ms=IFNULL(VALUES(duration_ms), duration_ms)",
+            "success_count=IFNULL(VALUES(success_count), success_count)",
+            "failure_count=IFNULL(VALUES(failure_count), failure_count)",
+            "hdfs_read_ops=IFNULL(VALUES(hdfs_read_ops), hdfs_read_ops)",
+            "hdfs_write_ops=IFNULL(VALUES(hdfs_write_ops), hdfs_write_ops)",
+            "hdfs_large_read_ops=IFNULL(VALUES(hdfs_large_read_ops), hdfs_large_read_ops)",
+            "file_read_ops=IFNULL(VALUES(file_read_ops), file_read_ops)",
+            "file_write_ops=IFNULL(VALUES(file_write_ops), file_write_ops)",
+            "file_large_read_ops=IFNULL(VALUES(file_large_read_ops), file_large_read_ops)"
+        };
+        sqlBuilder.append(String.join(", ", columns));
+
+        String sql = sqlBuilder.toString();
         PreparedStatement ps = connection.prepareStatement(sql);
         for (MrTaskMetricRow r : rows) {
             int i = 1;
@@ -1504,6 +1565,18 @@ public class CategoryJdbcSink {
                 LOG.log(Level.FINE, "Migration skipped (column likely exists): " + e.getMessage());
             }
         }
+        // v5: Add unique constraint on task_id for mr_task_metrics to enable UPSERT
+        String[] mrTaskUniqueMigrations = {
+            "ALTER TABLE mr_task_metrics ADD UNIQUE INDEX IF NOT EXISTS idx_unique_task_id (task_id)"
+        };
+        for (String sql : mrTaskUniqueMigrations) {
+            try {
+                stmt.execute(sql);
+            } catch (SQLException e) {
+                LOG.log(Level.FINE, "Unique index migration skipped: " + e.getMessage());
+            }
+        }
+
         // v4: Add start/finish time to mr_job_metrics
         String[] mrJobTimeMigrations = {
             "ALTER TABLE mr_job_metrics ADD COLUMN IF NOT EXISTS start_time_ms BIGINT",
