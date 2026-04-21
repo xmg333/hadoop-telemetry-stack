@@ -86,7 +86,7 @@ public class TelemetryConfig {
         defaults.put(ConfigKeys.PREFIX + ".metrics.listener.enabled", true);
         defaults.put(ConfigKeys.PREFIX + ".metrics.listener.capture.task-end", true);
         defaults.put(ConfigKeys.PREFIX + ".metrics.listener.capture.stage-complete", true);
-        defaults.put(ConfigKeys.PREFIX + ".metrics.listener.capture.job-end", false);
+        defaults.put(ConfigKeys.PREFIX + ".metrics.listener.capture.job-end", true);
         defaults.put(ConfigKeys.PREFIX + ".metrics.system.enabled", true);
         defaults.put(ConfigKeys.PREFIX + ".metrics.system.capture.jvm-memory", true);
         defaults.put(ConfigKeys.PREFIX + ".metrics.system.capture.jvm-gc", true);
@@ -95,9 +95,10 @@ public class TelemetryConfig {
         defaults.put(ConfigKeys.PREFIX + ".metrics.task.execution", true);
         defaults.put(ConfigKeys.PREFIX + ".metrics.task.shuffle-extended", true);
         defaults.put(ConfigKeys.PREFIX + ".metrics.task.info", true);
-        defaults.put(ConfigKeys.PREFIX + ".metrics.stage.detailed", false);
-        defaults.put(ConfigKeys.PREFIX + ".metrics.job.lifecycle", false);
-        defaults.put(ConfigKeys.PREFIX + ".metrics.sql.query-execution", false);
+        defaults.put(ConfigKeys.PREFIX + ".metrics.stage.detailed", true);
+        defaults.put(ConfigKeys.PREFIX + ".metrics.job.lifecycle", true);
+        defaults.put(ConfigKeys.PREFIX + ".metrics.sql.query-execution", true);
+        defaults.put(ConfigKeys.PREFIX + ".metrics.sql.max-length", 4096);
         defaults.put(ConfigKeys.PREFIX + ".filter.app.name.include", Collections.singletonList(".*"));
         defaults.put(ConfigKeys.PREFIX + ".filter.app.name.exclude", Collections.emptyList());
         return defaults;
@@ -134,7 +135,7 @@ public class TelemetryConfig {
     }
 
     public boolean isCaptureJobEnd() {
-        return getBoolean(ConfigKeys.PREFIX + ".metrics.listener.capture.job-end", false);
+        return getBoolean(ConfigKeys.PREFIX + ".metrics.listener.capture.job-end", true);
     }
 
     public boolean isSystemMetricsEnabled() {
@@ -170,15 +171,19 @@ public class TelemetryConfig {
     }
 
     public boolean isCaptureStageDetailed() {
-        return getBoolean(ConfigKeys.METRICS_STAGE_DETAILED, false);
+        return getBoolean(ConfigKeys.METRICS_STAGE_DETAILED, true);
     }
 
     public boolean isCaptureJobLifecycle() {
-        return getBoolean(ConfigKeys.METRICS_JOB_LIFECYCLE, false);
+        return getBoolean(ConfigKeys.METRICS_JOB_LIFECYCLE, true);
     }
 
     public boolean isCaptureSqlQueryExecution() {
-        return getBoolean(ConfigKeys.METRICS_SQL_QUERY_EXECUTION, false);
+        return getBoolean(ConfigKeys.METRICS_SQL_QUERY_EXECUTION, true);
+    }
+
+    public int getSqlMaxLength() {
+        return (int) getLong(ConfigKeys.METRICS_SQL_MAX_LENGTH, 4096);
     }
 
     public boolean shouldAcceptApp(String appName) {

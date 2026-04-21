@@ -37,6 +37,7 @@ public final class ConfigKeys {
     public static final String METRICS_STAGE_DETAILED = "spark-telemetry.metrics.stage.detailed";
     public static final String METRICS_JOB_LIFECYCLE = "spark-telemetry.metrics.job.lifecycle";
     public static final String METRICS_SQL_QUERY_EXECUTION = "spark-telemetry.metrics.sql.query-execution";
+    public static final String METRICS_SQL_MAX_LENGTH = "spark-telemetry.metrics.sql.max-length";
 
     // Filter
     public static final String FILTER_APP_NAME_INCLUDE = "spark-telemetry.filter.app.name.include";

@@ -140,4 +140,47 @@ class TelemetryLifecycleTest {
         assertNotNull(config);
         assertEquals("test-job", config.getServiceName());
     }
+
+    @Test
+    void testSqlTextCachePutAndGet() {
+        Map<String, String> conf = new HashMap<>();
+        conf.put("spark.telemetry.otel.exporter.endpoint", "http://localhost:9999");
+        TelemetryLifecycle lifecycle = TelemetryLifecycle.init(conf);
+
+        lifecycle.putSqlText(42L, "SELECT * FROM t");
+        assertEquals("SELECT * FROM t", lifecycle.getAndRemoveSqlText(42L));
+    }
+
+    @Test
+    void testSqlTextCacheGetAndRemove() {
+        Map<String, String> conf = new HashMap<>();
+        conf.put("spark.telemetry.otel.exporter.endpoint", "http://localhost:9999");
+        TelemetryLifecycle lifecycle = TelemetryLifecycle.init(conf);
+
+        lifecycle.putSqlText(1L, "SQL1");
+        lifecycle.getAndRemoveSqlText(1L);
+        assertNull(lifecycle.getAndRemoveSqlText(1L));
+    }
+
+    @Test
+    void testSqlTextCacheLruEviction() {
+        Map<String, String> conf = new HashMap<>();
+        conf.put("spark.telemetry.otel.exporter.endpoint", "http://localhost:9999");
+        TelemetryLifecycle lifecycle = TelemetryLifecycle.init(conf);
+
+        for (long i = 0; i < 1001; i++) {
+            lifecycle.putSqlText(i, "SQL" + i);
+        }
+        assertNull(lifecycle.getAndRemoveSqlText(0L));
+        assertNotNull(lifecycle.getAndRemoveSqlText(1000L));
+    }
+
+    @Test
+    void testSqlTextCacheNotFound() {
+        Map<String, String> conf = new HashMap<>();
+        conf.put("spark.telemetry.otel.exporter.endpoint", "http://localhost:9999");
+        TelemetryLifecycle lifecycle = TelemetryLifecycle.init(conf);
+
+        assertNull(lifecycle.getAndRemoveSqlText(999L));
+    }
 }

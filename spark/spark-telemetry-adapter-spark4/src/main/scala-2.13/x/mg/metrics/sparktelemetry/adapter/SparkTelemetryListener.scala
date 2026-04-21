@@ -1,6 +1,6 @@
 package x.mg.metrics.sparktelemetry.adapter
 
-import org.apache.spark.scheduler.{SparkListener, SparkListenerJobEnd, SparkListenerJobStart, SparkListenerStageCompleted, SparkListenerTaskEnd}
+import org.apache.spark.scheduler.{SparkListener, SparkListenerEvent, SparkListenerJobEnd, SparkListenerJobStart, SparkListenerStageCompleted, SparkListenerTaskEnd}
 import x.mg.metrics.sparktelemetry.lifecycle.TelemetryLifecycle
 import x.mg.metrics.sparktelemetry.model.{IOMetrics, SparkMetricEvent, TaskExecutionMetrics}
 
@@ -259,5 +259,15 @@ class SparkTelemetryListener(confMap: Map[String, String]) extends SparkListener
     // Flush metrics after job end to ensure short-lived jobs don't lose data.
     // Must run regardless of isCaptureJobLifecycle — task/stage metrics also need flushing.
     lifecycle.flushAsync()
+  }
+
+  override def onOtherEvent(event: SparkListenerEvent): Unit = {
+    event match {
+      case sqlStart: org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart =>
+        if (sqlStart.description != null && sqlStart.description.nonEmpty) {
+          lifecycle.putSqlText(sqlStart.executionId, sqlStart.description)
+        }
+      case _ =>
+    }
   }
 }

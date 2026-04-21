@@ -218,4 +218,20 @@ class ModelTest {
         assertNotNull(event.getTaskExecutionMetrics());
         assertEquals(500, event.getTaskExecutionMetrics().getExecutorRunTime());
     }
+
+    @Test
+    void testSqlExecutionMetricsQueryText() {
+        SqlExecutionMetrics m = new SqlExecutionMetrics();
+        assertNull(m.getQueryText());
+        m.setQueryText("SELECT 1");
+        assertEquals("SELECT 1", m.getQueryText());
+    }
+
+    @Test
+    void testSqlExecutionMetricsExecutionId() {
+        SqlExecutionMetrics m = new SqlExecutionMetrics();
+        assertEquals(0L, m.getExecutionId());
+        m.setExecutionId(42L);
+        assertEquals(42L, m.getExecutionId());
+    }
 }

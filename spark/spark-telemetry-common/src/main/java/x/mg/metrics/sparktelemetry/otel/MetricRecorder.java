@@ -474,13 +474,16 @@ public class MetricRecorder {
         SqlExecutionMetrics sql = event.getSqlExecutionMetrics();
         if (sql == null) return;
 
-        Attributes attrs = Attributes.builder()
+        AttributesBuilder attrsBuilder = Attributes.builder()
                 .put("spark.app.id", event.getApplicationId() != null ? event.getApplicationId() : "unknown")
                 .put("spark.app.name", event.getApplicationName() != null ? event.getApplicationName() : "")
                 .put("spark.user", event.getUser() != null ? event.getUser() : "")
                 .put("spark.yarn.queue", event.getQueue() != null ? event.getQueue() : "")
-                .put("spark.sql.execution_id", String.valueOf(sql.getExecutionId()))
-                .build();
+                .put("spark.sql.execution_id", String.valueOf(sql.getExecutionId()));
+        if (sql.getQueryText() != null && !sql.getQueryText().isEmpty()) {
+            attrsBuilder.put("spark.sql.query_text", sql.getQueryText());
+        }
+        Attributes attrs = attrsBuilder.build();
 
         if (sql.getDurationMs() > 0) {
             sqlQueryDurationHistogram.record(sql.getDurationMs(), attrs);
@@ -506,15 +509,18 @@ public class MetricRecorder {
         String queue = event.getQueue() != null ? event.getQueue() : "";
 
         for (SqlTableIOMetrics tm : tableMetrics) {
-            Attributes attrs = Attributes.builder()
+            AttributesBuilder attrsBuilder = Attributes.builder()
                     .put("spark.app.id", appId)
                     .put("spark.app.name", appName)
                     .put("spark.user", user)
                     .put("spark.yarn.queue", queue)
                     .put("spark.sql.execution_id", String.valueOf(tm.getExecutionId()))
                     .put("spark.sql.table_name", tm.getTableName() != null ? tm.getTableName() : "unknown")
-                    .put("spark.sql.operation", tm.getOperation() != null ? tm.getOperation() : "unknown")
-                    .build();
+                    .put("spark.sql.operation", tm.getOperation() != null ? tm.getOperation() : "unknown");
+            if (event.getSqlExecutionMetrics() != null && event.getSqlExecutionMetrics().getQueryText() != null) {
+                attrsBuilder.put("spark.sql.query_text", event.getSqlExecutionMetrics().getQueryText());
+            }
+            Attributes attrs = attrsBuilder.build();
 
             if (tm.getBytes() > 0) sqlTableBytesCounter.add(tm.getBytes(), attrs);
             if (tm.getRows() > 0) sqlTableRowsCounter.add(tm.getRows(), attrs);

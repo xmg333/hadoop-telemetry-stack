@@ -7,6 +7,7 @@ import x.mg.metrics.sparktelemetry.otel.MetricRecorder;
 import x.mg.metrics.sparktelemetry.otel.OtelRegistry;
 
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -37,6 +38,15 @@ public class TelemetryLifecycle {
         t.setDaemon(true);
         return t;
     });
+
+    // Bounded LRU cache for SQL text: executionId -> SQL text
+    // SparkTelemetryListener.onOtherEvent puts, SparkTelemetryQueryExecutionListener gets and removes
+    private final LinkedHashMap<Long, String> sqlTextCache = new LinkedHashMap<Long, String>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Long, String> eldest) {
+            return size() > 1000;
+        }
+    };
 
     private TelemetryLifecycle(TelemetryConfig config, Map<String, String> sparkConfOverrides) {
         this.config = config;
@@ -101,6 +111,26 @@ public class TelemetryLifecycle {
      */
     public TelemetryConfig getConfig() {
         return config;
+    }
+
+    /**
+     * Store SQL text for a Spark SQL execution.
+     * Called by SparkTelemetryListener.onOtherEvent when SparkListenerSQLExecutionStart fires.
+     */
+    public void putSqlText(long executionId, String sqlText) {
+        synchronized (sqlTextCache) {
+            sqlTextCache.put(executionId, sqlText);
+        }
+    }
+
+    /**
+     * Retrieve and remove SQL text for a Spark SQL execution.
+     * Called by SparkTelemetryQueryExecutionListener.extractMetrics.
+     */
+    public String getAndRemoveSqlText(long executionId) {
+        synchronized (sqlTextCache) {
+            return sqlTextCache.remove(executionId);
+        }
     }
 
     public String getAppName() {

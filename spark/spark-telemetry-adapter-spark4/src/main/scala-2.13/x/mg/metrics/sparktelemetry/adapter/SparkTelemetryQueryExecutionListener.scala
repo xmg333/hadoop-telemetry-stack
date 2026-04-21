@@ -37,11 +37,25 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
   private def extractMetrics(qe: QueryExecution, durationNs: Long, success: Boolean, ex: Exception): (SqlExecutionMetrics, java.util.List[SqlTableIOMetrics]) = {
     val queryMetrics = new SqlExecutionMetrics
     queryMetrics.setSuccess(success)
+
+    // Fix executionId (was hardcoded 0)
+    queryMetrics.setExecutionId(qe.id)
+
+    // Look up SQL text from shared cache (populated by SparkTelemetryListener.onOtherEvent)
+    val sqlText = lifecycle.getAndRemoveSqlText(qe.id)
+    if (sqlText != null) {
+      val maxLen = config.getSqlMaxLength
+      queryMetrics.setQueryText(if (sqlText.length > maxLen) sqlText.substring(0, maxLen) else sqlText)
+    }
+
     if (ex != null) queryMetrics.setErrorMessage(if (ex.getMessage != null) ex.getMessage else ex.getClass.getName)
     queryMetrics.setDurationMs(durationNs / 1000000)
 
     val tableMetrics = new java.util.ArrayList[SqlTableIOMetrics]()
     collectPlanMetrics(qe.executedPlan, queryMetrics, tableMetrics)
+
+    // Propagate executionId to table metrics
+    tableMetrics.asScala.foreach(_.setExecutionId(qe.id))
 
     (queryMetrics, tableMetrics)
   }

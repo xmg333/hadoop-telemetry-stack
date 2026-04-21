@@ -8,6 +8,7 @@ public class SqlExecutionMetrics {
 
     private long executionId;
     private String funcName;
+    private String queryText;
     private boolean success;
     private String errorMessage;
 
@@ -27,6 +28,9 @@ public class SqlExecutionMetrics {
 
     public String getFuncName() { return funcName; }
     public void setFuncName(String funcName) { this.funcName = funcName; }
+
+    public String getQueryText() { return queryText; }
+    public void setQueryText(String queryText) { this.queryText = queryText; }
 
     public boolean isSuccess() { return success; }
     public void setSuccess(boolean success) { this.success = success; }
