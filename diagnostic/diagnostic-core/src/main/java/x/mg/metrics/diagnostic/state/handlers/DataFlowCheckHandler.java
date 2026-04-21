@@ -373,7 +373,7 @@ public class DataFlowCheckHandler extends CheckHandler {
         nullCheckTables.put("mr_job_metrics", new String[]{
             "hdfs_bytes_read", "hdfs_bytes_written", "cpu_time_ms", "elapsed_time_ms"});
         nullCheckTables.put("sql_query_metrics", new String[]{
-            "duration_ms", "shuffle_bytes_read", "shuffle_bytes_written"});
+            "duration_ms", "shuffle_bytes_read", "shuffle_bytes_written", "join_count"});
         nullCheckTables.put("sql_query_table_metrics", new String[]{
             "bytes", "rows", "files_read"});
         nullCheckTables.put("task_metrics", new String[]{
@@ -456,6 +456,7 @@ public class DataFlowCheckHandler extends CheckHandler {
     private SubmitResult submitSparkSql(String sparkHome, String javaHome, String otelEndpoint,
                                           java.io.File pluginJar) {
         // Write PySpark SQL test script that reads/writes actual files for table IO metrics
+        // Include JOIN queries to generate join_count metrics
         String pysparkScript =
             "from pyspark.sql import SparkSession\n" +
             "import pyspark.sql.functions as F\n" +
@@ -463,18 +464,26 @@ public class DataFlowCheckHandler extends CheckHandler {
             "spark = SparkSession.builder.appName('diag-sql-test').getOrCreate()\n" +
             "tmpdir = tempfile.mkdtemp()\n" +
             "try:\n" +
-            "  df = spark.range(100).withColumn('name', F.concat(F.lit('name_'), F.col('id')))\n" +
+            "  # Create two tables for JOIN\n" +
+            "  df1 = spark.range(100).withColumn('name', F.concat(F.lit('name_'), F.col('id')))\n" +
+            "  df2 = spark.range(50).withColumn('value', F.col('id') * 10)\n" +
             "  # Write parquet (generates table IO write metrics)\n" +
-            "  df.write.mode('overwrite').parquet(tmpdir + '/t1')\n" +
+            "  df1.write.mode('overwrite').parquet(tmpdir + '/t1')\n" +
+            "  df2.write.mode('overwrite').parquet(tmpdir + '/t2')\n" +
             "  # Read parquet (generates table IO scan metrics)\n" +
             "  t1 = spark.read.parquet(tmpdir + '/t1')\n" +
+            "  t2 = spark.read.parquet(tmpdir + '/t2')\n" +
             "  t1.createOrReplaceTempView('t1')\n" +
-            "  # SQL queries against parquet-backed table\n" +
+            "  t2.createOrReplaceTempView('t2')\n" +
+            "  # SQL queries against parquet-backed tables\n" +
             "  spark.sql('SELECT COUNT(*) FROM t1').collect()\n" +
             "  spark.sql('SELECT id, name FROM t1 WHERE id > 50 ORDER BY id').collect()\n" +
             "  spark.sql('SELECT name, SUM(id) as total FROM t1 GROUP BY name').collect()\n" +
+            "  # JOIN query (generates join_count metrics)\n" +
+            "  spark.sql('SELECT t1.id, t1.name, t2.value FROM t1 JOIN t2 ON t1.id = t2.id').collect()\n" +
+            "  spark.sql('SELECT t1.id, t1.name, t2.value FROM t1 LEFT JOIN t2 ON t1.id = t2.id WHERE t2.id IS NULL').collect()\n" +
             "  # Write result (generates another write metric)\n" +
-            "  spark.sql('SELECT * FROM t1 WHERE id < 10').write.mode('overwrite').parquet(tmpdir + '/t2')\n" +
+            "  spark.sql('SELECT * FROM t1 WHERE id < 10').write.mode('overwrite').parquet(tmpdir + '/t3')\n" +
             "finally:\n" +
             "  shutil.rmtree(tmpdir, ignore_errors=True)\n" +
             "spark.stop()\n";
@@ -764,6 +773,7 @@ public class DataFlowCheckHandler extends CheckHandler {
     private SubmitResult submitHiveQuery(String hiveHome, String hadoopHome, String javaHome,
                                           java.io.File hiveHookJar, String otelEndpoint) {
         // SQL script: use STORED AS TEXTFILE (HDFS-backed) + INSERT to trigger MR counters
+        // Add ANALYZE TABLE to populate table statistics for IO metrics
         String sqlScript =
             "CREATE DATABASE IF NOT EXISTS diagnostic_test;\n" +
             "USE diagnostic_test;\n" +
@@ -772,8 +782,10 @@ public class DataFlowCheckHandler extends CheckHandler {
             "CREATE TABLE diag_src (id INT, name STRING) STORED AS TEXTFILE;\n" +
             "CREATE TABLE diag_dst (id INT, name STRING) STORED AS TEXTFILE;\n" +
             "INSERT INTO diag_src VALUES (1, 'alice'), (2, 'bob'), (3, 'charlie'), (4, 'dave'), (5, 'eve');\n" +
+            "ANALYZE TABLE diag_src COMPUTE STATISTICS;\n" +  // Populate table stats for IO metrics
             "SELECT COUNT(*) FROM diag_src;\n" +
             "INSERT OVERWRITE TABLE diag_dst SELECT * FROM diag_src WHERE id > 2;\n" +
+            "ANALYZE TABLE diag_dst COMPUTE STATISTICS;\n" +  // Populate table stats for IO metrics
             "SELECT * FROM diag_dst;\n" +
             "DROP TABLE diag_src;\n" +
             "DROP TABLE diag_dst;\n";
