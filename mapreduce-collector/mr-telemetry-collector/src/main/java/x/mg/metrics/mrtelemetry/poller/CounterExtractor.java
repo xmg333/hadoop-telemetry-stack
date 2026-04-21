@@ -186,7 +186,8 @@ public class CounterExtractor {
     public Map<String, Long> extractTaskCounters(String json) throws IOException {
         Map<String, Long> result = new HashMap<>();
         JsonNode root = MAPPER.readTree(json);
-        JsonNode counterGroups = root.path("taskCounters").path("counterGroup");
+        // Task counters endpoint uses "taskCounterGroup" not "counterGroup"
+        JsonNode counterGroups = root.path("jobTaskCounters").path("taskCounterGroup");
         if (!counterGroups.isArray()) return result;
 
         for (JsonNode group : counterGroups) {
