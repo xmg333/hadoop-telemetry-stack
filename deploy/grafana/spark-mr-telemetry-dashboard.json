@@ -33,7 +33,7 @@
       "type": "dashboard"
     }
   ],
-  "refresh": "60s",
+  "refresh": "30s",
   "panels": [
     {
       "id": 1,
@@ -2049,7 +2049,7 @@
     },
     {
       "id": 27,
-      "title": "Hive IO Bytes",
+      "title": "Hive IO Bytes (Estimated)",
       "type": "stat",
       "datasource": {
         "type": "mysql",
@@ -2061,7 +2061,7 @@
         "x": 18,
         "y": 80
       },
-      "description": "Total input and output bytes across all Hive queries",
+      "description": "Total input and output bytes across all Hive queries (table statistics estimates from metastore)",
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -2096,12 +2096,12 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COALESCE(SUM(input_bytes), 0) AS 'Input Bytes' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
+          "rawSql": "SELECT COALESCE(SUM(input_bytes), 0) AS 'Input Bytes (est.)' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
           "format": "table"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT COALESCE(SUM(output_bytes), 0) AS 'Output Bytes' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
+          "rawSql": "SELECT COALESCE(SUM(output_bytes), 0) AS 'Output Bytes (est.)' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
           "format": "table"
         }
       ]
@@ -2196,7 +2196,7 @@
     },
     {
       "id": 30,
-      "title": "Hive IO Throughput",
+      "title": "Hive IO Throughput (Estimated)",
       "type": "timeseries",
       "datasource": {
         "type": "mysql",
@@ -2208,7 +2208,7 @@
         "x": 0,
         "y": 92
       },
-      "description": "Input/output bytes over time for Hive queries",
+      "description": "Input/output bytes over time for Hive queries (table statistics estimates from metastore)",
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -2224,12 +2224,12 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(input_bytes) AS 'Input Bytes' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND input_bytes IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(input_bytes) AS 'Input Bytes (est.)' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND input_bytes IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(output_bytes) AS 'Output Bytes' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND output_bytes IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(output_bytes) AS 'Output Bytes (est.)' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND output_bytes IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         }
       ]
@@ -2299,7 +2299,7 @@
         "x": 0,
         "y": 100
       },
-      "description": "Per-query metrics with operation, duration, IO, broken down by operation type",
+      "description": "Per-query metrics with operation, duration, IO (table statistics estimates from metastore)",
       "fieldConfig": {
         "defaults": {},
         "overrides": [
@@ -2318,7 +2318,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "input_bytes"
+              "options": "Input (est.)"
             },
             "properties": [
               {
@@ -2330,7 +2330,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "output_bytes"
+              "options": "Output (est.)"
             },
             "properties": [
               {
@@ -2381,7 +2381,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, operation, user_name, success, duration_ms, input_bytes, output_bytes, input_rows, output_rows FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND operation IN ($hive_operation) ORDER BY timestamp_ms DESC LIMIT 200",
+          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, operation, user_name, success, duration_ms, input_bytes AS 'Input (est.)', output_bytes AS 'Output (est.)', input_rows AS 'Rows In (est.)', output_rows AS 'Rows Out (est.)' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND operation IN ($hive_operation) ORDER BY timestamp_ms DESC LIMIT 200",
           "format": "table"
         }
       ]
@@ -2452,7 +2452,6 @@
       ]
     }
   ],
-  "refresh": "30s",
   "schemaVersion": 39,
   "tags": [
     "spark",

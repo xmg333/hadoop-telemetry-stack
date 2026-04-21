@@ -1,12 +1,18 @@
 {
-  "annotations": {"list": []},
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "links": [],
   "refresh": "60s",
   "schemaVersion": 39,
-  "tags": ["hive", "analysis", "telemetry"],
+  "tags": [
+    "hive",
+    "analysis",
+    "telemetry"
+  ],
   "templating": {
     "list": [
       {
@@ -24,11 +30,17 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "query",
-        "datasource": {"type": "mysql", "uid": "DS_MYSQL"}
+        "datasource": {
+          "type": "mysql",
+          "uid": "DS_MYSQL"
+        }
       }
     ]
   },
-  "time": {"from": "now-1h", "to": "now"},
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "timezone": "utc",
   "title": "Hive Query Analysis",
   "uid": "hive-analysis",
@@ -36,31 +48,87 @@
     {
       "title": "Slow Queries",
       "type": "table",
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
-      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "DS_MYSQL"
+      },
       "targets": [
         {
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id AS query_id, operation, user_name, duration_ms, COALESCE(input_bytes,0)/1073741824 AS input_gb, COALESCE(output_bytes,0)/1073741824 AS output_gb, input_rows, output_rows, execution_engine FROM metric_events WHERE event_type='HIVE_QUERY' AND duration_ms IS NOT NULL AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) ORDER BY duration_ms DESC LIMIT 20",
+          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id AS query_id, operation, user_name, duration_ms, COALESCE(input_bytes,0)/1073741824 AS 'Input GB (est.)', COALESCE(output_bytes,0)/1073741824 AS 'Output GB (est.)', input_rows AS 'Rows In (est.)', output_rows AS 'Rows Out (est.)', execution_engine FROM metric_events WHERE event_type='HIVE_QUERY' AND duration_ms IS NOT NULL AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) ORDER BY duration_ms DESC LIMIT 20",
           "format": "table",
           "refId": "A"
         }
       ],
       "fieldConfig": {
-        "defaults": {"mappings": []},
+        "defaults": {
+          "mappings": []
+        },
         "overrides": [
-          {"matcher": {"id": "byName", "options": "duration_ms"}, "properties": [{"id": "unit", "value": "ms"}]},
-          {"matcher": {"id": "byName", "options": "input_gb"}, "properties": [{"id": "decimals", "value": 2}]},
-          {"matcher": {"id": "byName", "options": "output_gb"}, "properties": [{"id": "decimals", "value": 2}]}
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "duration_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Input GB (est.)"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Output GB (est.)"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
         ]
       },
-      "options": {"showHeader": true, "footer": {"show": false}},
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
       "id": 1
     },
     {
       "title": "Operation Distribution",
       "type": "piechart",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
-      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "DS_MYSQL"
+      },
       "targets": [
         {
           "rawSql": "SELECT operation AS metric, COUNT(*) AS value FROM metric_events WHERE event_type='HIVE_QUERY' AND operation IS NOT NULL AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY operation ORDER BY value DESC",
@@ -70,24 +138,50 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "palette-classic"},
+          "color": {
+            "mode": "palette-classic"
+          },
           "mappings": []
         },
         "overrides": []
       },
       "options": {
-        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "pieType": "donut",
-        "tooltip": {"mode": "single", "sort": "none"},
-        "legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value",
+            "percent"
+          ]
+        }
       },
       "id": 2
     },
     {
       "title": "Table Access Ranking",
       "type": "table",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
-      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "DS_MYSQL"
+      },
       "targets": [
         {
           "rawSql": "SELECT table_name, SUM(CASE WHEN table_type='input' THEN 1 ELSE 0 END) AS read_count, SUM(CASE WHEN table_type='output' THEN 1 ELSE 0 END) AS write_count, COUNT(DISTINCT app_id) AS query_count FROM metric_events WHERE event_type='HIVE_TABLE_IO' AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY table_name ORDER BY read_count+write_count DESC LIMIT 20",
@@ -96,17 +190,32 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {"mappings": []},
+        "defaults": {
+          "mappings": []
+        },
         "overrides": []
       },
-      "options": {"showHeader": true, "footer": {"show": false}},
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
       "id": 3
     },
     {
       "title": "Execution Engine Comparison",
       "type": "barchart",
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
-      "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "DS_MYSQL"
+      },
       "targets": [
         {
           "rawSql": "SELECT execution_engine, COUNT(*) AS query_count, AVG(duration_ms) AS avg_duration_ms, ROUND(SUM(CASE WHEN status='true' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0),1) AS success_rate_pct FROM metric_events WHERE event_type='HIVE_QUERY' AND execution_engine IS NOT NULL AND timestamp_ms>=(__unixEpochFrom()*1000) AND timestamp_ms<=(__unixEpochTo()*1000) GROUP BY execution_engine",
@@ -116,7 +225,9 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "palette-classic"},
+          "color": {
+            "mode": "palette-classic"
+          },
           "mappings": []
         },
         "overrides": []
@@ -126,8 +237,15 @@
         "groupWidth": 0.7,
         "barWidth": 0.5,
         "stacking": "none",
-        "tooltip": {"mode": "single", "sort": "none"},
-        "legend": {"displayMode": "list", "placement": "bottom", "calcs": []}
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
       },
       "id": 4
     }

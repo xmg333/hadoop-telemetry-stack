@@ -368,7 +368,7 @@
           "refId": "B"
         },
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(input_bytes + output_bytes) AS 'Hive' FROM hive_query_metrics WHERE input_bytes IS NOT NULL AND output_bytes IS NOT NULL AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(input_bytes + output_bytes) AS 'Hive (est.)' FROM hive_query_metrics WHERE input_bytes IS NOT NULL AND output_bytes IS NOT NULL AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "refId": "C"
         }
@@ -401,7 +401,8 @@
           "calcs": []
         }
       },
-      "id": 6
+      "id": 6,
+      "description": "Spark and MR IO are measured; Hive IO values are table statistics estimates from metastore"
     },
     {
       "title": "Job Duration Trends",

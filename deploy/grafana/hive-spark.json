@@ -152,7 +152,7 @@
     },
     {
       "id": 3,
-      "title": "Hive-Spark IO Bytes",
+      "title": "Hive-Spark IO Bytes (Estimated)",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -180,7 +180,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Total input bytes from Hive metastore table statistics (estimates)"
     },
     {
       "id": 4,
@@ -318,7 +319,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, operation, user_name, success, duration_ms, input_bytes, output_bytes, input_rows, output_rows FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND execution_engine='spark' AND operation IN ($hive_operation) ORDER BY timestamp_ms DESC LIMIT 200",
+          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, operation, user_name, success, duration_ms, input_bytes AS 'Input (est.)', output_bytes AS 'Output (est.)', input_rows AS 'Rows In (est.)', output_rows AS 'Rows Out (est.)' FROM hive_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND execution_engine='spark' AND operation IN ($hive_operation) ORDER BY timestamp_ms DESC LIMIT 200",
           "format": "table",
           "refId": "A"
         }
@@ -341,7 +342,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "input_bytes"
+              "options": "Input (est.)"
             },
             "properties": [
               {
@@ -353,7 +354,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "output_bytes"
+              "options": "Output (est.)"
             },
             "properties": [
               {

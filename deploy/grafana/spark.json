@@ -1729,7 +1729,7 @@
     },
     {
       "id": 22,
-      "title": "SQL Table IO Detail",
+      "title": "Table IO Detail",
       "type": "table",
       "datasource": {
         "type": "mysql",
@@ -1741,7 +1741,7 @@
         "x": 0,
         "y": 64
       },
-      "description": "Per-table scan/write bytes, rows, files for each SQL query execution",
+      "description": "Per-table scan/write bytes, rows, files across Spark, Hive and MapReduce",
       "fieldConfig": {
         "defaults": {},
         "overrides": [
@@ -1790,10 +1790,57 @@
                         "text": "WRITE",
                         "color": "green",
                         "index": 1
+                      },
+                      "INPUT": {
+                        "text": "INPUT",
+                        "color": "blue",
+                        "index": 2
+                      },
+                      "OUTPUT": {
+                        "text": "OUTPUT",
+                        "color": "green",
+                        "index": 3
                       }
                     }
                   }
                 ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "engine"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "SPARK": {
+                        "text": "Spark",
+                        "color": "orange",
+                        "index": 0
+                      },
+                      "HIVE": {
+                        "text": "Hive",
+                        "color": "yellow",
+                        "index": 1
+                      },
+                      "MAPREDUCE": {
+                        "text": "MapReduce",
+                        "color": "purple",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 120
               }
             ]
           }
@@ -1805,7 +1852,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id, execution_id, table_name, operation, bytes, `rows`, files_read, time_ms FROM sql_query_table_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 200",
+          "rawSql": "SELECT * FROM (\n  SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, 'SPARK' AS engine, app_id, execution_id, table_name, operation, bytes, `rows`, files_read, time_ms FROM sql_query_table_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)\n  UNION ALL\n  SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, 'HIVE' AS engine, query_id AS app_id, NULL AS execution_id, table_name, operation, NULL AS bytes, NULL AS `rows`, NULL AS files_read, NULL AS time_ms FROM hive_table_io_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)\n  UNION ALL\n  SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, 'MAPREDUCE' AS engine, job_id AS app_id, NULL AS execution_id, NULL AS table_name, NULL AS operation, hdfs_bytes_read AS bytes, map_input_records AS `rows`, NULL AS files_read, elapsed_time_ms AS time_ms FROM mr_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)\n) t ORDER BY time DESC LIMIT 200",
           "format": "table"
         }
       ]
