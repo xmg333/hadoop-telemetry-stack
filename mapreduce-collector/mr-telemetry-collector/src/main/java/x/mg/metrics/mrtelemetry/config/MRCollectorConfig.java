@@ -48,7 +48,7 @@ public class MRCollectorConfig {
         d.put(MRConfigKeys.FILTER_JOB_NAME_INCLUDE, Collections.singletonList(".*"));
         d.put(MRConfigKeys.FILTER_JOB_NAME_EXCLUDE, Collections.emptyList());
         d.put(MRConfigKeys.COLLECTION_JOB_COUNTERS, true);
-        d.put(MRConfigKeys.COLLECTION_TASK_COUNTERS, false);
+        d.put(MRConfigKeys.COLLECTION_TASK_COUNTERS, true);
         d.put(MRConfigKeys.COLLECTION_JOB_DETAILS, true);
         return d;
     }
@@ -63,7 +63,7 @@ public class MRCollectorConfig {
     public long getExportIntervalMs() { return getLong(MRConfigKeys.OTEL_EXPORT_INTERVAL_MS, MRConfigKeys.DEFAULT_EXPORT_INTERVAL_MS); }
     public String getStateFile() { return getString(MRConfigKeys.STATE_FILE, MRConfigKeys.DEFAULT_STATE_FILE); }
     public boolean isJobCounters() { return getBoolean(MRConfigKeys.COLLECTION_JOB_COUNTERS, true); }
-    public boolean isTaskCounters() { return getBoolean(MRConfigKeys.COLLECTION_TASK_COUNTERS, false); }
+    public boolean isTaskCounters() { return getBoolean(MRConfigKeys.COLLECTION_TASK_COUNTERS, true); }
     public boolean isJobDetails() { return getBoolean(MRConfigKeys.COLLECTION_JOB_DETAILS, true); }
     public Config getRawConfig() { return resolvedConfig; }
 

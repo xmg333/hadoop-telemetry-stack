@@ -54,6 +54,9 @@ public class MRMetricRecorder {
     private final LongCounter taskReduceShuffleBytesCounter;
     private final LongCounter taskFileBytesReadCounter;
     private final LongCounter taskFileBytesWrittenCounter;
+    private final LongCounter taskDurationCounter;
+    private final LongCounter taskSuccessCounter;
+    private final LongCounter taskFailureCounter;
 
     public MRMetricRecorder(OpenTelemetry openTelemetry) {
         this.meter = openTelemetry.getMeter(METER_NAME);
@@ -128,6 +131,12 @@ public class MRMetricRecorder {
                 .setDescription("Task local file bytes read").setUnit("By").build();
         this.taskFileBytesWrittenCounter = meter.counterBuilder("mr.task.io.file_bytes_written")
                 .setDescription("Task local file bytes written").setUnit("By").build();
+        this.taskDurationCounter = meter.counterBuilder("mr.task.duration_ms")
+                .setDescription("Task duration").setUnit("ms").build();
+        this.taskSuccessCounter = meter.counterBuilder("mr.task.success")
+                .setDescription("Task success count").build();
+        this.taskFailureCounter = meter.counterBuilder("mr.task.failure")
+                .setDescription("Task failure count").build();
     }
 
     public void record(MRJobMetrics m) {
@@ -167,37 +176,53 @@ public class MRMetricRecorder {
      * Uses the same mr.task.* metric names as the Agent's CounterMapping.ALL.
      */
     public void recordTask(String taskId, String taskType, String jobId,
-                           String jobName, String user, String queue, String state,
-                           long finishTime,
+                           String jobName, String user, String queue,
+                           String taskState, long taskElapsedTime,
+                           long jobFinishTime,
                            Map<String, Long> counters) {
-        if (counters == null || counters.isEmpty()) return;
         try {
             String type = taskType != null ? taskType.toLowerCase() : "unknown";
+            String state = taskState != null ? taskState : "";
             Attributes attrs = Attributes.builder()
                     .put(AttributeKey.stringKey("mr.task.id"), taskId != null ? taskId : "")
                     .put(AttributeKey.stringKey("mr.task.type"), type)
+                    .put(AttributeKey.stringKey("mr.task.state"), state)
                     .put(AttributeKey.stringKey("mr.job.id"), jobId != null ? jobId : "")
                     .put(AttributeKey.stringKey("mr.job.name"), jobName != null ? jobName : "")
                     .put(AttributeKey.stringKey("mr.job.user"), user != null ? user : "")
                     .put(AttributeKey.stringKey("mr.job.queue"), queue != null ? queue : "")
-                    .put(AttributeKey.stringKey("mr.job.state"), state != null ? state : "")
-                    .put(AttributeKey.longKey("mr.job.finish_time_ms"), finishTime)
-                    .put(AttributeKey.longKey("mr.job.start_time_ms"), 0L) // task-level: no individual task start time available
+                    .put(AttributeKey.longKey("mr.job.finish_time_ms"), jobFinishTime)
+                    .put(AttributeKey.longKey("mr.job.start_time_ms"), 0L)
                     .build();
 
-            safeAdd(taskMapInputRecordsCounter, counters.get("mr.task.io.map_input_records"), attrs);
-            safeAdd(taskMapOutputRecordsCounter, counters.get("mr.task.io.map_output_records"), attrs);
-            safeAdd(taskMapOutputBytesCounter, counters.get("mr.task.io.map_output_bytes"), attrs);
-            safeAdd(taskReduceInputRecordsCounter, counters.get("mr.task.io.reduce_input_records"), attrs);
-            safeAdd(taskReduceOutputRecordsCounter, counters.get("mr.task.io.reduce_output_records"), attrs);
-            safeAdd(taskReduceShuffleBytesCounter, counters.get("mr.task.io.reduce_shuffle_bytes"), attrs);
-            safeAdd(taskSpilledRecordsCounter, counters.get("mr.task.io.spilled_records"), attrs);
-            safeAdd(taskCpuMsCounter, counters.get("mr.task.cpu_time_ms"), attrs);
-            safeAdd(taskGcMsCounter, counters.get("mr.task.gc_time_ms"), attrs);
-            safeAdd(taskHdfsBytesReadCounter, counters.get("mr.task.io.hdfs_bytes_read"), attrs);
-            safeAdd(taskHdfsBytesWrittenCounter, counters.get("mr.task.io.hdfs_bytes_written"), attrs);
-            safeAdd(taskFileBytesReadCounter, counters.get("mr.task.io.file_bytes_read"), attrs);
-            safeAdd(taskFileBytesWrittenCounter, counters.get("mr.task.io.file_bytes_written"), attrs);
+            // Duration from task info (always available)
+            if (taskElapsedTime > 0) {
+                taskDurationCounter.add(taskElapsedTime, attrs);
+            }
+
+            // Success/failure from task state
+            if ("SUCCEEDED".equals(state)) {
+                taskSuccessCounter.add(1, attrs);
+            } else if ("FAILED".equals(state)) {
+                taskFailureCounter.add(1, attrs);
+            }
+
+            // Counters from task counters endpoint
+            if (counters != null && !counters.isEmpty()) {
+                safeAdd(taskMapInputRecordsCounter, counters.get("mr.task.io.map_input_records"), attrs);
+                safeAdd(taskMapOutputRecordsCounter, counters.get("mr.task.io.map_output_records"), attrs);
+                safeAdd(taskMapOutputBytesCounter, counters.get("mr.task.io.map_output_bytes"), attrs);
+                safeAdd(taskReduceInputRecordsCounter, counters.get("mr.task.io.reduce_input_records"), attrs);
+                safeAdd(taskReduceOutputRecordsCounter, counters.get("mr.task.io.reduce_output_records"), attrs);
+                safeAdd(taskReduceShuffleBytesCounter, counters.get("mr.task.io.reduce_shuffle_bytes"), attrs);
+                safeAdd(taskSpilledRecordsCounter, counters.get("mr.task.io.spilled_records"), attrs);
+                safeAdd(taskCpuMsCounter, counters.get("mr.task.cpu_time_ms"), attrs);
+                safeAdd(taskGcMsCounter, counters.get("mr.task.gc_time_ms"), attrs);
+                safeAdd(taskHdfsBytesReadCounter, counters.get("mr.task.io.hdfs_bytes_read"), attrs);
+                safeAdd(taskHdfsBytesWrittenCounter, counters.get("mr.task.io.hdfs_bytes_written"), attrs);
+                safeAdd(taskFileBytesReadCounter, counters.get("mr.task.io.file_bytes_read"), attrs);
+                safeAdd(taskFileBytesWrittenCounter, counters.get("mr.task.io.file_bytes_written"), attrs);
+            }
         } catch (Exception e) {
             // Don't let recording failures propagate
         }
