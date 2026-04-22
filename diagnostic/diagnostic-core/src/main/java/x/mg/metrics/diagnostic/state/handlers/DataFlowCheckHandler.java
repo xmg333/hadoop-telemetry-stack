@@ -741,6 +741,19 @@ public class DataFlowCheckHandler extends CheckHandler {
         return null;
     }
 
+    private boolean isInHiveAuxlib(java.io.File jar) {
+        String hiveHome = detectHiveHome();
+        if (hiveHome == null) return false;
+        java.io.File auxlib = new java.io.File(hiveHome, "auxlib");
+        if (!auxlib.isDirectory()) return false;
+        java.io.File[] jars = auxlib.listFiles((d, name) -> name.contains("hive-telemetry") && name.endsWith(".jar"));
+        if (jars == null) return false;
+        for (java.io.File auxJar : jars) {
+            if (auxJar.getName().equals(jar.getName())) return true;
+        }
+        return false;
+    }
+
     private java.io.File findMrCollectorJar() {
         // Search for MR collector dist JAR (not agent)
         String[] searchPaths = {".", "mapreduce-collector/mr-telemetry-dist/target",
@@ -905,7 +918,10 @@ public class DataFlowCheckHandler extends CheckHandler {
             // Use config.path to pass OTel endpoint via HOCON (Hive 2.x rejects unknown --hiveconf keys)
             cmd.add("--hiveconf");
             cmd.add("hive.telemetry.config.path=" + hoconFile.getAbsolutePath());
-            if (hiveHookJar != null) {
+            // Only set hive.aux.jars.path if the hook JAR is NOT in $HIVE_HOME/auxlib.
+            // JARs in auxlib are auto-loaded by Hive. Setting hive.aux.jars.path to a
+            // local path causes FileNotFoundException when YARN resolves it against HDFS.
+            if (hiveHookJar != null && !isInHiveAuxlib(hiveHookJar)) {
                 cmd.add("--hiveconf");
                 cmd.add("hive.aux.jars.path=" + hiveHookJar.getAbsolutePath());
             }
