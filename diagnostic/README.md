@@ -16,62 +16,109 @@
 # 构建 diagnostic 模块
 mvn clean package -pl diagnostic/diagnostic-core -am -DskipTests
 
-# 构建可执行 JAR
-mvn clean package -pl diagnostic/diagnostic-core -am
+# 构建 omnipackage（推荐，单一 JAR 支持 Spark 2/3/4）
+chmod +x build-omni.sh && ./build-omni.sh
+```
+
+## 环境重置（清理 Kafka + MySQL + OTel Collector）
+
+每次运行诊断前建议重置环境，确保测试数据不被旧数据污染：
+
+```bash
+# 一键重置脚本 — 在测试机上执行
+SSH="ssh -i ~/.ssh/id_rsa root@<HOST>"
+
+# 1. 清理 Kafka topic
+$SSH 'docker exec kafka /opt/kafka/bin/kafka-topics.sh --delete --topic telemetry-metrics --bootstrap-server localhost:9092 2>/dev/null; sleep 1; docker exec kafka /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic telemetry-metrics --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1'
+
+# 2. 清理 MySQL 所有指标表
+$SSH 'docker exec mysql mysql -u root -proot123 telemetry -e "
+SET FOREIGN_KEY_CHECKS=0;
+TRUNCATE TABLE task_metrics;
+TRUNCATE TABLE stage_metrics;
+TRUNCATE TABLE job_metrics;
+TRUNCATE TABLE jvm_memory_metrics;
+TRUNCATE TABLE jvm_gc_metrics;
+TRUNCATE TABLE task_histogram_buckets;
+TRUNCATE TABLE stage_histogram_buckets;
+TRUNCATE TABLE job_histogram_buckets;
+TRUNCATE TABLE stage_governance;
+TRUNCATE TABLE sql_query_metrics;
+TRUNCATE TABLE sql_query_table_metrics;
+TRUNCATE TABLE hive_query_metrics;
+TRUNCATE TABLE hive_table_io_metrics;
+TRUNCATE TABLE mr_job_metrics;
+TRUNCATE TABLE mr_task_metrics;
+SET FOREIGN_KEY_CHECKS=1;"'
+
+# 3. 重启 OTel Collector
+$SSH 'docker restart otel-collector'
 ```
 
 ## 运行
 
 ```bash
-# 运行 diagnostic 工具
-java -jar diagnostic/diagnostic-core/target/diagnostic-core-1.0.0-SNAPSHOT.jar
+# 上传 diagnostic JAR 和配置到测试机
+scp -i ~/.ssh/id_rsa diagnostic/diagnostic-core/target/diagnostic-core-1.0.0-SNAPSHOT.jar root@<HOST>:/tmp/diagnostic.jar
+scp -i ~/.ssh/id_rsa diagnostic.conf root@<HOST>:/tmp/diagnostic.conf
 
-# 指定配置文件
-java -jar diagnostic/diagnostic-core/target/diagnostic-core-1.0.0-SNAPSHOT.jar --config /path/to/diagnostic.conf
+# 运行（需设置所有环境变量以启用完整检查）
+ssh -i ~/.ssh/id_rsa root@<HOST> '
+export JAVA_HOME=/opt/jdk8u482-b08
+export PATH=$JAVA_HOME/bin:$PATH
+export SPARK_HOME=/opt/spark-3.2.0-bin-hadoop2.7
+export HADOOP_HOME=/opt/hadoop-2.7.0
+export HADOOP_CONF_DIR=/opt/hadoop-2.7.0/etc/hadoop
+export YARN_CONF_DIR=/opt/hadoop-2.7.0/etc/hadoop
+export HIVE_HOME=/opt/apache-hive-2.3.9-bin
+java -jar /tmp/diagnostic.jar --config /tmp/diagnostic.conf
+'
+```
+
+**关键环境变量：**
+
+| 变量 | 用途 | 未设置影响 |
+|------|------|-----------|
+| `SPARK_HOME` | Spark 测试（RDD + SQL） | 跳过所有 Spark 测试，5 个指标表为空 |
+| `HADOOP_HOME` | MR 测试 + MR Collector | 跳过 MR 测试 |
+| `HADOOP_CONF_DIR` | Spark 提交到 YARN | Spark 作业无法提交到 YARN |
+| `HIVE_HOME` | Hive 测试 | 跳过 Hive 测试 |
+| `JAVA_HOME` | 所有 Java 进程 | 使用系统默认 Java（可能与 Spark 不兼容） |
+
+**部署 Omnipackage 到 Spark：**
+
+```bash
+# 清理旧 JAR，部署 omnipackage（必须在 spark-submit 前完成）
+ssh -i ~/.ssh/id_rsa root@<HOST> '
+rm -f $SPARK_HOME/jars/spark-telemetry*.jar $SPARK_HOME/jars/omnipackage*.jar
+cp /opt/spark-telemetry-omni.jar $SPARK_HOME/jars/
+'
 ```
 
 ## 配置文件
 
-配置文件位于 `src/main/resources/diagnostic.conf`：
+配置文件位于 `src/main/resources/diagnostic.conf`，需根据实际环境调整 MySQL 用户名/密码/数据库名：
 
 ```hocon
 diagnostic {
-  # OTel Collector 配置
   otel-collector {
     endpoint = "http://localhost:4317"
     health-check-port = 13133
     timeout-ms = 5000
   }
-
-  # Kafka 配置
   kafka {
     bootstrap-servers = "localhost:9092"
     metrics-topic = "telemetry-metrics"
     traces-topic = "telemetry-traces"
     timeout-ms = 5000
   }
-
-  # MySQL 配置
   mysql {
     host = "localhost"
     port = 3306
-    database = "metrics_db"
-    username = "metrics"
-    password = "metrics"
+    database = "telemetry"       # 实际数据库名
+    username = "root"            # 实际用户名
+    password = "root123"         # 实际密码
     timeout-ms = 5000
-  }
-
-  # 启用/禁用特定检查
-  spark {
-    plugins-config.enabled = true
-  }
-
-  hive {
-    hook-config.enabled = true
-  }
-
-  mr-collector {
-    enabled = true
   }
 }
 ```
