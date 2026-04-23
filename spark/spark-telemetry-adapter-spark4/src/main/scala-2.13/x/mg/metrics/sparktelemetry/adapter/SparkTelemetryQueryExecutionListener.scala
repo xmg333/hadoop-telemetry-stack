@@ -22,6 +22,12 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
   private val lifecycle = TelemetryLifecycle.getInstance
   private val config = lifecycle.getConfig
 
+  private lazy val hiveTableScanClass: Option[Class[_]] = try {
+    Some(Class.forName("org.apache.spark.sql.hive.execution.HiveTableScanExec"))
+  } catch {
+    case _: ClassNotFoundException => None
+  }
+
   override def onSuccess(funcName: String, qe: QueryExecution, durationNs: Long): Unit = {
     if (!config.isCaptureSqlQueryExecution) return
     val (queryMetrics, tableMetrics) = extractMetrics(qe, durationNs, success = true, null)
@@ -139,6 +145,14 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
         tableMetric.setTimeMs(metricValue(s, "scanTime"))
         tm.add(tableMetric)
 
+      case s if hiveTableScanClass.exists(_.isInstance(s)) =>
+        val tableMetric = new SqlTableIOMetrics
+        tableMetric.setOperation("scan")
+        tableMetric.setTableName(extractHiveScanTableName(s))
+        tableMetric.setRows(metricValue(s, "numOutputRows"))
+        tableMetric.setTimeMs(metricValue(s, "scanTime"))
+        tm.add(tableMetric)
+
       case j: BroadcastHashJoinExec =>
         qm.setJoinCount(qm.getJoinCount + 1)
         qm.setJoinTypes(appendJoinType(qm.getJoinTypes, "broadcast"))
@@ -202,6 +216,16 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
   private def catalogTableToName(obj: Any): String = {
     val ident = obj.getClass.getMethod("identifier").invoke(obj)
     ident.getClass.getMethod("unquotedString").invoke(ident).asInstanceOf[String]
+  }
+
+  private def extractHiveScanTableName(scan: SparkPlan): String = {
+    try {
+      val relation = scan.getClass.getMethod("relation").invoke(scan)
+      val tableMeta = relation.getClass.getMethod("tableMeta").invoke(relation)
+      catalogTableToName(tableMeta)
+    } catch {
+      case _: Exception => "unknown"
+    }
   }
 
   private def extractBatchScanTableName(scan: BatchScanExec): String = {

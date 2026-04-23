@@ -26,6 +26,12 @@ class SparkTelemetryQueryExecutionListener extends QueryExecutionListener {
   private var lifecycle: TelemetryLifecycle = _
   private var config: x.mg.metrics.sparktelemetry.config.TelemetryConfig = _
 
+  private lazy val hiveTableScanClass: Option[Class[_]] = try {
+    Some(Class.forName("org.apache.spark.sql.hive.execution.HiveTableScanExec"))
+  } catch {
+    case _: ClassNotFoundException => None
+  }
+
   private def ensureInit(): Unit = {
     if (!initialized) {
       synchronized {
@@ -93,6 +99,14 @@ class SparkTelemetryQueryExecutionListener extends QueryExecutionListener {
         tableMetric.setTimeMs(metricValue(s, "scanTime"))
         tm.add(tableMetric)
 
+      case s if hiveTableScanClass.exists(_.isInstance(s)) =>
+        val tableMetric = new SqlTableIOMetrics
+        tableMetric.setOperation("scan")
+        tableMetric.setTableName(extractHiveScanTableName(s))
+        tableMetric.setRows(metricValue(s, "numOutputRows"))
+        tableMetric.setTimeMs(metricValue(s, "scanTime"))
+        tm.add(tableMetric)
+
       case j: BroadcastHashJoinExec =>
         qm.setJoinCount(qm.getJoinCount + 1)
         qm.setJoinTypes(appendJoinType(qm.getJoinTypes, "broadcast"))
@@ -136,6 +150,16 @@ class SparkTelemetryQueryExecutionListener extends QueryExecutionListener {
               case _: Exception => "unknown"
             }
         }
+    }
+  }
+
+  private def extractHiveScanTableName(scan: SparkPlan): String = {
+    try {
+      val relation = scan.getClass.getMethod("relation").invoke(scan)
+      val tableMeta = relation.getClass.getMethod("tableMeta").invoke(relation)
+      catalogTableToName(tableMeta)
+    } catch {
+      case _: Exception => "unknown"
     }
   }
 
