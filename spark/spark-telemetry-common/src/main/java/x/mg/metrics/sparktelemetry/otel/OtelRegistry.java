@@ -75,9 +75,11 @@ public class OtelRegistry {
                     + ", service=" + config.getServiceName());
         } catch (Exception e) {
             LOG.log(Level.WARNING, "OTel Collector connection failed, metrics will not be exported: " + e.getMessage(), e);
-            // Silent failure: do not throw exception to avoid breaking Spark plugin loading.
-            // The OTel SDK will retry connection on next export interval.
+            // Use noop SDK so downstream code (MetricRecorder etc.) never sees null
+            openTelemetrySdk = OpenTelemetrySdk.builder().build();
         }
+
+        suppressOtelSdkErrorLogs();
     }
 
     private Resource buildResource() {
@@ -105,6 +107,24 @@ public class OtelRegistry {
      */
     public OpenTelemetry getOpenTelemetry() {
         return openTelemetrySdk;
+    }
+
+    /**
+     * Downgrade OTel SDK internal ERROR logs (gRPC export failures etc.) to WARNING.
+     * When the collector is unreachable, the SDK logs at ERROR which causes operational alarm,
+     * but this is a telemetry concern — it should never look like a user application error.
+     */
+    private void suppressOtelSdkErrorLogs() {
+        try {
+            // The shade plugin relocates io.opentelemetry → x.mg.metrics.shaded.io.opentelemetry
+            // so all OTel SDK loggers live under this prefix.
+            Logger otelRoot = Logger.getLogger("x.mg.metrics.shaded.io.opentelemetry");
+            if (otelRoot != null) {
+                otelRoot.setLevel(Level.WARNING);
+            }
+        } catch (Exception e) {
+            // Best effort — don't let log config break anything
+        }
     }
 
     /**

@@ -2,7 +2,13 @@ package x.mg.metrics.sparktelemetry.adapter;
 
 import org.apache.spark.api.plugin.DriverPlugin;
 import org.apache.spark.api.plugin.ExecutorPlugin;
+import org.apache.spark.api.plugin.PluginContext;
 import org.apache.spark.api.plugin.SparkPlugin;
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Omnipackage facade for Spark 3.x/4.x plugin loading.
@@ -15,6 +21,8 @@ import org.apache.spark.api.plugin.SparkPlugin;
  * is never referenced and never loaded.
  */
 public class SparkTelemetryPlugin implements SparkPlugin {
+
+    private static final Logger LOG = Logger.getLogger(SparkTelemetryPlugin.class.getName());
 
     // Use the facade class's own classloader (child URLClassLoader from --jars),
     // NOT SparkPlugin's classloader (parent classloader) — the parent cannot see
@@ -30,7 +38,8 @@ public class SparkTelemetryPlugin implements SparkPlugin {
                     (Class<? extends DriverPlugin>) Class.forName(pkg + ".TelemetryDriverPlugin", true, PLUGIN_CLASSLOADER);
             return clazz.getConstructor().newInstance();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to create DriverPlugin for Spark " + OmniContext.getVersion(), e);
+            LOG.log(Level.WARNING, "Failed to create DriverPlugin, telemetry disabled: " + e.getMessage(), e);
+            return new NoOpDriverPlugin();
         }
     }
 
@@ -43,7 +52,18 @@ public class SparkTelemetryPlugin implements SparkPlugin {
                     (Class<? extends ExecutorPlugin>) Class.forName(pkg + ".TelemetryExecutorPlugin", true, PLUGIN_CLASSLOADER);
             return clazz.getConstructor().newInstance();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to create ExecutorPlugin for Spark " + OmniContext.getVersion(), e);
+            LOG.log(Level.WARNING, "Failed to create ExecutorPlugin, telemetry disabled: " + e.getMessage(), e);
+            return new NoOpExecutorPlugin();
         }
+    }
+
+    private static class NoOpDriverPlugin implements DriverPlugin {
+        @Override
+        public Map<String, String> init(org.apache.spark.SparkContext sc, PluginContext pluginContext) {
+            return Collections.emptyMap();
+        }
+    }
+
+    private static class NoOpExecutorPlugin implements ExecutorPlugin {
     }
 }

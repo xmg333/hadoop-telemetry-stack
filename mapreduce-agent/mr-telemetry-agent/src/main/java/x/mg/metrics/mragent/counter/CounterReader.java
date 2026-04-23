@@ -31,9 +31,8 @@ public class CounterReader {
             Object unwrapped = unwrapContext(context);
             Map<String, Long> result = new HashMap<>();
 
-            // Read TaskCounter values via getCounter(groupName, counterName)
+            // Read all counter values via getCounter(groupName, counterName)
             for (CounterMapping mapping : CounterMapping.ALL) {
-                if (!CounterMapping.TASK_COUNTER.equals(mapping.groupName)) continue;
                 try {
                     long value = readCounterNewApi(unwrapped, mapping.groupName, mapping.counterName);
                     if (value > 0) {
@@ -44,8 +43,9 @@ public class CounterReader {
                 }
             }
 
-            // Read FileSystemCounter values from FileSystem.Statistics
-            // (Counters object doesn't flush FS stats until task completion)
+            // Supplement FileSystemCounter values from FileSystem.Statistics
+            // for real-time values during task execution (Hadoop's Counters
+            // object doesn't flush FS stats until task completion).
             readFileSystemStats(result);
 
             return result;

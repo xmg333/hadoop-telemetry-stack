@@ -29,48 +29,52 @@ class TelemetryDriverPlugin extends DriverPlugin with org.apache.spark.internal.
   private var listener: SparkTelemetryListener = _
 
   override def init(sc: org.apache.spark.SparkContext, pluginContext: PluginContext): util.Map[String, String] = {
-    val sparkConf = sc.getConf
-    val confMap: Map[String, String] = sparkConf.getAll.toMap
+    try {
+      val sparkConf = sc.getConf
+      val confMap: Map[String, String] = sparkConf.getAll.toMap
 
-    TelemetryLifecycle.init(confMap.asJava)
+      TelemetryLifecycle.init(confMap.asJava)
 
-    listener = new SparkTelemetryListener(confMap)
-    sc.addSparkListener(listener)
+      listener = new SparkTelemetryListener(confMap)
+      sc.addSparkListener(listener)
 
-    // Register QueryExecutionListener for SQL metrics (driver-only)
-    val sqlConfig = TelemetryLifecycle.getInstance.getConfig.isCaptureSqlQueryExecution
-    if (sqlConfig) {
-      try {
-        org.apache.spark.sql.SparkSession.getActiveSession match {
-          case Some(session) =>
-            session.listenerManager.register(new SparkTelemetryQueryExecutionListener(confMap))
-            logInfo("QueryExecutionListener registered for SQL metrics capture")
-          case None =>
-            // SparkSession not yet created (e.g. PySpark creates it after SparkContext).
-            // Defer registration to the first job start via a one-shot SparkListener.
-            logInfo("SparkSession not available during plugin init, deferring QEL registration")
-            val qel = new SparkTelemetryQueryExecutionListener(confMap)
-            val deferred = new org.apache.spark.scheduler.SparkListener {
-              override def onJobStart(jobStart: org.apache.spark.scheduler.SparkListenerJobStart): Unit = {
-                try {
-                  // At this point SparkContext is fully initialized, so getOrCreate() is safe
-                  val session = org.apache.spark.sql.SparkSession.getActiveSession.getOrElse(
-                    org.apache.spark.sql.SparkSession.builder().getOrCreate())
-                  session.listenerManager.register(qel)
-                  logInfo("QueryExecutionListener registered for SQL metrics capture (deferred)")
-                } catch {
-                  case e: Exception =>
-                    logWarning("Failed to register QueryExecutionListener (deferred): " + e.getMessage, e)
+      // Register QueryExecutionListener for SQL metrics (driver-only)
+      val sqlConfig = TelemetryLifecycle.getInstance.getConfig.isCaptureSqlQueryExecution
+      if (sqlConfig) {
+        try {
+          org.apache.spark.sql.SparkSession.getActiveSession match {
+            case Some(session) =>
+              session.listenerManager.register(new SparkTelemetryQueryExecutionListener(confMap))
+              logInfo("QueryExecutionListener registered for SQL metrics capture")
+            case None =>
+              // SparkSession not yet created (e.g. PySpark creates it after SparkContext).
+              // Defer registration to the first job start via a one-shot SparkListener.
+              logInfo("SparkSession not available during plugin init, deferring QEL registration")
+              val qel = new SparkTelemetryQueryExecutionListener(confMap)
+              val deferred = new org.apache.spark.scheduler.SparkListener {
+                override def onJobStart(jobStart: org.apache.spark.scheduler.SparkListenerJobStart): Unit = {
+                  try {
+                    val session = org.apache.spark.sql.SparkSession.getActiveSession.getOrElse(
+                      org.apache.spark.sql.SparkSession.builder().getOrCreate())
+                    session.listenerManager.register(qel)
+                    logInfo("QueryExecutionListener registered for SQL metrics capture (deferred)")
+                  } catch {
+                    case e: Exception =>
+                      logWarning("Failed to register QueryExecutionListener (deferred): " + e.getMessage, e)
+                  }
+                  sc.removeSparkListener(this)
                 }
-                sc.removeSparkListener(this)
               }
-            }
-            sc.addSparkListener(deferred)
+              sc.addSparkListener(deferred)
+          }
+        } catch {
+          case e: Exception =>
+            logWarning("Failed to register QueryExecutionListener: " + e.getMessage, e)
         }
-      } catch {
-        case e: Exception =>
-          logWarning("Failed to register QueryExecutionListener: " + e.getMessage, e)
       }
+    } catch {
+      case e: Exception =>
+        logWarning("Telemetry plugin initialization failed, telemetry disabled: " + e.getMessage, e)
     }
 
     util.Collections.emptyMap[String, String]()
@@ -87,13 +91,18 @@ class TelemetryExecutorPlugin extends ExecutorPlugin {
   private var metricsSink: SparkTelemetryMetricsSink = _
 
   override def init(pluginContext: PluginContext, extraConf: util.Map[String, String]): Unit = {
-    TelemetryLifecycle.init(extraConf)
+    try {
+      TelemetryLifecycle.init(extraConf)
 
-    metricsSink = new SparkTelemetryMetricsSink(
-      pluginContext.metricRegistry(),
-      extraConf.asScala.toMap
-    )
-    metricsSink.start()
+      metricsSink = new SparkTelemetryMetricsSink(
+        pluginContext.metricRegistry(),
+        extraConf.asScala.toMap
+      )
+      metricsSink.start()
+    } catch {
+      case e: Exception =>
+        // Never let telemetry failures prevent executor startup
+    }
   }
 
   override def shutdown(): Unit = {

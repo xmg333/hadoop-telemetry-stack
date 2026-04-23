@@ -49,6 +49,10 @@ public class TelemetryLifecycle {
     };
 
     private TelemetryLifecycle(TelemetryConfig config, Map<String, String> sparkConfOverrides) {
+        this(config, sparkConfOverrides, true);
+    }
+
+    private TelemetryLifecycle(TelemetryConfig config, Map<String, String> sparkConfOverrides, boolean initializeOtel) {
         this.config = config;
         this.appName = sparkConfOverrides != null ? sparkConfOverrides.getOrDefault("spark.app.name", "") : "";
         String userVal = (sparkConfOverrides != null) ? sparkConfOverrides.getOrDefault("spark.user", "") : "";
@@ -60,13 +64,20 @@ public class TelemetryLifecycle {
             if (master.startsWith("yarn")) queueVal = "default";
         }
         this.queue = queueVal;
-        this.otelRegistry = new OtelRegistry(config);
-        this.otelRegistry.start();
-        this.metricRecorder = new MetricRecorder(otelRegistry.getOpenTelemetry(), config);
+        if (initializeOtel) {
+            this.otelRegistry = new OtelRegistry(config);
+            this.otelRegistry.start();
+            this.metricRecorder = new MetricRecorder(otelRegistry.getOpenTelemetry(), config);
+        } else {
+            this.otelRegistry = null;
+            this.metricRecorder = null;
+        }
     }
 
     /**
      * Initialize the singleton instance with Spark conf overrides.
+     * Never throws — if OTel SDK or MetricRecorder initialization fails,
+     * a disabled instance is created that silently discards all events.
      */
     public static TelemetryLifecycle init(Map<String, String> sparkConfOverrides) {
         if (instance != null && instance.started.get()) {
@@ -75,13 +86,29 @@ public class TelemetryLifecycle {
         }
         synchronized (LOCK) {
             if (instance == null || !instance.started.get()) {
-                TelemetryConfig config = new TelemetryConfig(sparkConfOverrides);
-                instance = new TelemetryLifecycle(config, sparkConfOverrides);
-                instance.started.set(true);
-                LOG.info("TelemetryLifecycle initialized");
+                try {
+                    TelemetryConfig config = new TelemetryConfig(sparkConfOverrides);
+                    instance = new TelemetryLifecycle(config, sparkConfOverrides);
+                    instance.started.set(true);
+                    LOG.info("TelemetryLifecycle initialized");
+                } catch (Exception e) {
+                    LOG.log(Level.WARNING, "TelemetryLifecycle init failed, telemetry disabled: " + e.getMessage(), e);
+                    instance = createDisabled(sparkConfOverrides);
+                    instance.started.set(true);
+                }
             }
         }
         return instance;
+    }
+
+    private static TelemetryLifecycle createDisabled(Map<String, String> sparkConfOverrides) {
+        TelemetryConfig config;
+        try {
+            config = new TelemetryConfig(sparkConfOverrides);
+        } catch (Exception e) {
+            config = new TelemetryConfig(null);
+        }
+        return new TelemetryLifecycle(config, sparkConfOverrides, false);
     }
 
     /**
@@ -105,7 +132,7 @@ public class TelemetryLifecycle {
      * Accept a metric event for recording.
      */
     public void accept(SparkMetricEvent event) {
-        if (event == null || stopped.get()) return;
+        if (event == null || stopped.get() || metricRecorder == null) return;
         try {
             metricRecorder.record(event);
         } catch (Exception e) {
@@ -157,7 +184,7 @@ public class TelemetryLifecycle {
      * Used during shutdown to ensure all metrics are exported.
      */
     public void flush() {
-        if (!stopped.get()) {
+        if (!stopped.get() && otelRegistry != null) {
             otelRegistry.forceFlush();
         }
     }
@@ -167,7 +194,7 @@ public class TelemetryLifecycle {
      * Avoids blocking the Spark DAGScheduler thread which causes job timeouts.
      */
     public void flushAsync() {
-        if (!stopped.get()) {
+        if (!stopped.get() && otelRegistry != null) {
             flushExecutor.submit(() -> {
                 try {
                     otelRegistry.forceFlush();
@@ -184,7 +211,6 @@ public class TelemetryLifecycle {
     public void stop() {
         if (stopped.compareAndSet(false, true)) {
             LOG.info("Shutting down TelemetryLifecycle");
-            // Drain pending async flush tasks before final synchronous flush
             flushExecutor.shutdown();
             try {
                 if (!flushExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -195,7 +221,9 @@ public class TelemetryLifecycle {
                 flushExecutor.shutdownNow();
                 Thread.currentThread().interrupt();
             }
-            otelRegistry.stop();
+            if (otelRegistry != null) {
+                otelRegistry.stop();
+            }
             started.set(false);
         }
     }

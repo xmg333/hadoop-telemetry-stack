@@ -7,6 +7,8 @@ import org.apache.spark.scheduler.SparkListenerStageCompleted;
 import org.apache.spark.scheduler.SparkListenerTaskEnd;
 
 import java.lang.reflect.Method;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Omnipackage facade for Spark 2.x listener registration.
@@ -20,6 +22,7 @@ import java.lang.reflect.Method;
  */
 public class SparkTelemetryListener extends SparkListener {
 
+    private static final Logger LOG = Logger.getLogger(SparkTelemetryListener.class.getName());
     private static final ClassLoader SPARK_CLASSLOADER = org.apache.spark.scheduler.SparkListener.class.getClassLoader();
 
     private volatile Object delegate;
@@ -27,25 +30,24 @@ public class SparkTelemetryListener extends SparkListener {
     private volatile Method onStageCompletedMethod;
     private volatile Method onJobStartMethod;
     private volatile Method onJobEndMethod;
+    private volatile boolean failed;
 
     private void ensureDelegate() {
-        if (delegate != null) return;
+        if (delegate != null || failed) return;
         synchronized (this) {
-            if (delegate != null) return;
+            if (delegate != null || failed) return;
             try {
                 String className = OmniContext.getAdapterPackage() + ".SparkTelemetryListener";
                 Class<?> clazz = Class.forName(className, true, SPARK_CLASSLOADER);
-                // Spark 2.x adapter uses no-arg constructor with lazy init
                 delegate = clazz.getConstructor().newInstance();
 
-                // Cache method references for fast event forwarding
                 onTaskEndMethod = clazz.getMethod("onTaskEnd", SparkListenerTaskEnd.class);
                 onStageCompletedMethod = clazz.getMethod("onStageCompleted", SparkListenerStageCompleted.class);
                 onJobStartMethod = clazz.getMethod("onJobStart", SparkListenerJobStart.class);
                 onJobEndMethod = clazz.getMethod("onJobEnd", SparkListenerJobEnd.class);
             } catch (Exception e) {
-                throw new RuntimeException(
-                        "Failed to create SparkTelemetryListener delegate for Spark " + OmniContext.getVersion(), e);
+                LOG.log(Level.WARNING, "Failed to create SparkTelemetryListener delegate, telemetry disabled: " + e.getMessage(), e);
+                failed = true;
             }
         }
     }
@@ -53,6 +55,7 @@ public class SparkTelemetryListener extends SparkListener {
     @Override
     public void onTaskEnd(SparkListenerTaskEnd taskEnd) {
         ensureDelegate();
+        if (failed) return;
         try {
             onTaskEndMethod.invoke(delegate, taskEnd);
         } catch (Exception e) {
@@ -63,6 +66,7 @@ public class SparkTelemetryListener extends SparkListener {
     @Override
     public void onStageCompleted(SparkListenerStageCompleted stageCompleted) {
         ensureDelegate();
+        if (failed) return;
         try {
             onStageCompletedMethod.invoke(delegate, stageCompleted);
         } catch (Exception e) {
@@ -73,6 +77,7 @@ public class SparkTelemetryListener extends SparkListener {
     @Override
     public void onJobStart(SparkListenerJobStart jobStart) {
         ensureDelegate();
+        if (failed) return;
         try {
             onJobStartMethod.invoke(delegate, jobStart);
         } catch (Exception e) {
@@ -83,6 +88,7 @@ public class SparkTelemetryListener extends SparkListener {
     @Override
     public void onJobEnd(SparkListenerJobEnd jobEnd) {
         ensureDelegate();
+        if (failed) return;
         try {
             onJobEndMethod.invoke(delegate, jobEnd);
         } catch (Exception e) {
