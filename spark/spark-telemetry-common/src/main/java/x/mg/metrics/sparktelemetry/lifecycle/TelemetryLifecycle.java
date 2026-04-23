@@ -51,8 +51,10 @@ public class TelemetryLifecycle {
     private TelemetryLifecycle(TelemetryConfig config, Map<String, String> sparkConfOverrides) {
         this.config = config;
         this.appName = sparkConfOverrides != null ? sparkConfOverrides.getOrDefault("spark.app.name", "") : "";
-        this.user = sparkConfOverrides != null ? sparkConfOverrides.getOrDefault("spark.user", "") : "";
-        this.queue = sparkConfOverrides != null ? sparkConfOverrides.getOrDefault("spark.yarn.queue", "") : "";
+        String userVal = (sparkConfOverrides != null) ? sparkConfOverrides.getOrDefault("spark.user", "") : "";
+        if (userVal.isEmpty()) userVal = System.getProperty("user.name", "");
+        this.user = userVal;
+        this.queue = (sparkConfOverrides != null) ? sparkConfOverrides.getOrDefault("spark.yarn.queue", "") : "";
         this.otelRegistry = new OtelRegistry(config);
         this.otelRegistry.start();
         this.metricRecorder = new MetricRecorder(otelRegistry.getOpenTelemetry(), config);

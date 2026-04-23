@@ -102,16 +102,12 @@ class SparkTelemetryQueryExecutionListener extends QueryExecutionListener {
         qm.setJoinTypes(appendJoinType(qm.getJoinTypes, "sort_merge"))
 
       case w: DataWritingCommandExec =>
-        w.cmd match {
-          case i: InsertIntoHadoopFsRelationCommand =>
-            val tableMetric = new SqlTableIOMetrics
-            tableMetric.setOperation("write")
-            tableMetric.setTableName(i.options.getOrElse("path", "unknown"))
-            tableMetric.setRows(metricValue(w, "numOutputRows"))
-            tableMetric.setBytes(metricValue(w, "numOutputBytes"))
-            tm.add(tableMetric)
-          case _ =>
-        }
+        val tableMetric = new SqlTableIOMetrics
+        tableMetric.setOperation("write")
+        tableMetric.setTableName(resolveWriteTableName(w.cmd))
+        tableMetric.setRows(metricValue(w, "numOutputRows"))
+        tableMetric.setBytes(metricValue(w, "numOutputBytes"))
+        tm.add(tableMetric)
 
       case _ =>
     }
@@ -119,6 +115,33 @@ class SparkTelemetryQueryExecutionListener extends QueryExecutionListener {
 
   private def metricValue(plan: SparkPlan, name: String): Long = {
     plan.metrics.get(name).map(_.value).getOrElse(0L)
+  }
+
+  private def resolveWriteTableName(cmd: org.apache.spark.sql.execution.command.DataWritingCommand): String = {
+    cmd match {
+      case i: InsertIntoHadoopFsRelationCommand =>
+        i.options.getOrElse("path", "unknown")
+      case _ =>
+        try {
+          val tableField = cmd.getClass.getDeclaredField("table")
+          tableField.setAccessible(true)
+          catalogTableToName(tableField.get(cmd))
+        } catch {
+          case _: Exception =>
+            try {
+              val tdField = cmd.getClass.getDeclaredField("tableDesc")
+              tdField.setAccessible(true)
+              catalogTableToName(tdField.get(cmd))
+            } catch {
+              case _: Exception => "unknown"
+            }
+        }
+    }
+  }
+
+  private def catalogTableToName(obj: Any): String = {
+    val ident = obj.getClass.getMethod("identifier").invoke(obj)
+    ident.getClass.getMethod("unquotedString").invoke(ident).asInstanceOf[String]
   }
 
   private def appendJoinType(current: String, joinType: String): String = {
@@ -145,6 +168,9 @@ class SparkTelemetryQueryExecutionListener extends QueryExecutionListener {
     } catch {
       case _: Exception =>
     }
+
+    event.setUser(lifecycle.getUser)
+    event.setQueue(lifecycle.getQueue)
 
     lifecycle.accept(event)
   }

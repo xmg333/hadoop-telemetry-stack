@@ -183,4 +183,39 @@ class TelemetryLifecycleTest {
 
         assertNull(lifecycle.getAndRemoveSqlText(999L));
     }
+
+    @Test
+    void testUserFallsBackToSystemProperty() {
+        Map<String, String> conf = new HashMap<>();
+        conf.put("spark.telemetry.otel.exporter.endpoint", "http://localhost:9999");
+        // Intentionally NOT setting "spark.user" — should fall back to user.name system property
+        TelemetryLifecycle lifecycle = TelemetryLifecycle.init(conf);
+        assertEquals(System.getProperty("user.name"), lifecycle.getUser());
+    }
+
+    @Test
+    void testUserFromSparkConf() {
+        Map<String, String> conf = new HashMap<>();
+        conf.put("spark.telemetry.otel.exporter.endpoint", "http://localhost:9999");
+        conf.put("spark.user", "customuser");
+        TelemetryLifecycle lifecycle = TelemetryLifecycle.init(conf);
+        assertEquals("customuser", lifecycle.getUser());
+    }
+
+    @Test
+    void testQueueFromSparkConf() {
+        Map<String, String> conf = new HashMap<>();
+        conf.put("spark.telemetry.otel.exporter.endpoint", "http://localhost:9999");
+        conf.put("spark.yarn.queue", "production");
+        TelemetryLifecycle lifecycle = TelemetryLifecycle.init(conf);
+        assertEquals("production", lifecycle.getQueue());
+    }
+
+    @Test
+    void testQueueEmptyWhenNotSet() {
+        Map<String, String> conf = new HashMap<>();
+        conf.put("spark.telemetry.otel.exporter.endpoint", "http://localhost:9999");
+        TelemetryLifecycle lifecycle = TelemetryLifecycle.init(conf);
+        assertEquals("", lifecycle.getQueue());
+    }
 }
