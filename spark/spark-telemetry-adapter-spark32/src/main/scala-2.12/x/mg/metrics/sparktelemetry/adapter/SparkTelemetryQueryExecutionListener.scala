@@ -267,12 +267,6 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
 
   private def extractSqlText(qe: QueryExecution): String = {
     try {
-      // SparkListenerSQLExecutionStart.description contains the logical plan string
-      // Try to get original SQL from SQLExecution's execution store
-      val sc = qe.sparkSession.sparkContext
-      val bus = sc.listenerBus
-      // Direct approach: get from QueryExecution's logical plan description
-      // For spark-sql CLI / ThriftServer, the description IS the SQL text
       val desc = qe.logical.toString
       if (desc != null && desc.nonEmpty && desc.length < config.getSqlMaxLength * 2) desc
       else null
