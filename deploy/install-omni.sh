@@ -63,6 +63,13 @@ AUTO_YES=false
 
 # ── Find Omnipackage JAR ─────────────────────────────────────────
 find_omni_jar() {
+  # Release package layout: lib/spark-telemetry-omni.jar
+  local release_jar="$PROJECT_ROOT/lib/spark-telemetry-omni.jar"
+  if [ -f "$release_jar" ]; then
+    echo "$release_jar"
+    return
+  fi
+  # Repo layout: spark/spark-telemetry-dist-omni/target/
   local jar_dir="$PROJECT_ROOT/spark/spark-telemetry-dist-omni/target"
   if [ ! -d "$jar_dir" ]; then
     error "Omnipackage not built. Run ./build-omni.sh first."

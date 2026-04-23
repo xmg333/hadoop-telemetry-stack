@@ -41,7 +41,12 @@ GRAFANA_URL=""
 GRAFANA_USER=""
 GRAFANA_PASSWORD=""
 FOLDER_NAME="Telemetry"
-DASHBOARD_DIR="$PROJECT_ROOT/deploy/grafana"
+# Detect dashboard directory (release vs repo layout)
+if [ -d "$PROJECT_ROOT/grafana" ]; then
+  DASHBOARD_DIR="$PROJECT_ROOT/grafana"
+else
+  DASHBOARD_DIR="$PROJECT_ROOT/deploy/grafana"
+fi
 DRY_RUN=false
 
 # ── Parse Arguments ───────────────────────────────────────────────
