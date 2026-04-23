@@ -98,7 +98,7 @@ class MRAgentIT {
         assertTrue(succeeded, "MR job with agent should complete. Output:\n" + output);
 
         // Wait for mr_task_metrics in MySQL
-        String where = "app_name LIKE '" + jobName + "%'";
+        String where = "job_name LIKE '" + jobName + "%'";
         String taskId = db.waitForMetric("mr_task_metrics", "task_id", where, PROPAGATION_TIMEOUT_SEC);
 
         if (taskId != null) {
