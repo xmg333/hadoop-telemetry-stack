@@ -4,177 +4,166 @@ This directory contains integration and end-to-end (E2E) tests for the Spark Tel
 
 ## Overview
 
-The integration tests verify the complete data flow:
+The integration tests verify the complete data flow on a bare-metal node:
 
 ```
 Spark/MR/Hive → Telemetry Plugin/Hook/Agent → OTel Collector → Kafka → Flink → MySQL/ClickHouse
 ```
 
+All tests run on a single bare-metal node with Docker containers providing backend services (OTel Collector, Kafka, MySQL). No Kubernetes cluster is required.
+
 ## Test Structure
 
-| Test Class | Description |
-|------------|-------------|
-| `K8sTestBase` | Base class providing K8s utilities |
-| `E2EMetricsFlowTest` | Verifies all K8s pods are running |
-| `MRCollectorIT` | Tests MR Collector polling and metric export |
-| `MRAgentIT` | Tests MR Agent instrumentation and real-time export |
-| `SparkMultiVersionIT` | Tests Spark plugin across multiple versions (2.4, 3.0, 3.2, 3.5, 4.0) |
-| `HadoopHiveE2EIT` | Tests Hadoop 2.x/3.x and Hive 2.x/3.x compatibility |
-| `ApiCompatibilityIT` | Verifies API compatibility using reflection |
+| Test Class | Description | Requires |
+|------------|-------------|----------|
+| `InfrastructureIT` | Smoke tests: Docker containers, OTel Collector, History Server, YARN RM | Docker |
+| `HadoopClusterIT` | Hadoop/YARN/HistoryServer REST API checks + MR Collector E2E | Hadoop, YARN |
+| `MRAgentIT` | MR Agent instrumentation: classpath safety + metric export | Hadoop, YARN |
+| `SparkMetricsFieldVerificationIT` | Spark plugin: task/stage/job/JVM/SQL metrics field verification | Spark |
+| `HiveMetricsFieldVerificationIT` | Hive hook: query metrics field verification | Hive |
+| `MRMetricsFieldVerificationIT` | MR Collector: job/task metrics field verification | Hadoop, YARN |
+| `SparkMultiVersionIT` | Spark plugin across versions (2.4, 3.0, 3.2, 3.5, 4.0) | Multiple Spark installs |
+| `HadoopHiveE2EIT` | Hadoop 2.x/3.x and Hive 2.x/3.x compatibility | Hadoop, Hive |
+| `ApiCompatibilityIT` | API compatibility verification via reflection | Build artifacts only |
 
 ## Prerequisites
 
-### For K8s-based Tests
+### Bare-Metal Node Setup
 
-1. **kubectl** installed and configured with a running cluster
-2. **K8s cluster** with the following deployed:
-   - Kafka pod (with port-forward to localhost:9092)
-   - MySQL pod (with port-forward to localhost:3306)
-   - OTel Collector pod (with port-forward to localhost:4317)
-   - Hadoop 2.x and 3.x pods
-   - Hive 2.x and 3.x pods
+Required software installations in `/opt/`:
 
-3. **Local installations** for multi-version testing:
-   - Spark: `/opt/spark-*` directories (e.g., `/opt/spark-2.4.4`, `/opt/spark-3.2.0`, `/opt/spark-3.5.5`)
-   - Hadoop: `/opt/hadoop-*` directories
-   - Hive: `/opt/apache-hive-*` directories
+| Software | Example Path | Notes |
+|----------|-------------|-------|
+| Java 8 | `/opt/jdk8u482-b08` | Required for Spark 3.x, Hadoop, Hive |
+| Spark | `/opt/spark-3.2.0-bin-hadoop2.7` | With telemetry plugin JAR in `jars/` |
+| Hadoop | `/opt/hadoop-3.2.0` | YARN + History Server running |
+| Hive | `/opt/apache-hive-2.3.9-bin` | With hook JAR in `auxlib/` |
 
-### Quick Setup
+Required Docker containers:
 
-Use the provided script to set up the K8s environment:
+| Container | Port | Purpose |
+|-----------|------|---------|
+| `otel-collector` | 4317 (gRPC) | Receives OTLP metrics |
+| `kafka` | 9092 | Buffers metrics as OTLP protobuf |
+| `mysql` | 3306 | Stores processed metrics |
+
+### Environment Variables
 
 ```bash
-# Setup only
-./src/test/resources/k8s-test-setup.sh setup
+export JAVA_HOME=/opt/jdk8u482-b08
+export PATH=$JAVA_HOME/bin:$PATH
+export SPARK_HOME=/opt/spark-3.2.0-bin-hadoop2.7
+export HADOOP_HOME=/opt/hadoop-3.2.0
+export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
+export YARN_CONF_DIR=$HADOOP_HOME/etc/hadoop
+export HIVE_HOME=/opt/apache-hive-2.3.9-bin
+export MYSQL_HOST=localhost
+export OTEL_ENDPOINT=http://localhost:4317
+```
 
-# Run tests
-./src/test/resources/k8s-test-setup.sh test
+### Data Reset (before each test run)
 
-# Cleanup
-./src/test/resources/k8s-test-setup.sh cleanup
+```bash
+# Clean MySQL
+docker exec mysql mysql -u root -proot123 telemetry -e \
+  "SET FOREIGN_KEY_CHECKS=0;
+   TRUNCATE TABLE task_metrics; TRUNCATE TABLE stage_metrics;
+   TRUNCATE TABLE job_metrics; TRUNCATE TABLE jvm_memory_metrics;
+   TRUNCATE TABLE jvm_gc_metrics; TRUNCATE TABLE sql_query_metrics;
+   TRUNCATE TABLE sql_query_table_metrics; TRUNCATE TABLE hive_query_metrics;
+   TRUNCATE TABLE hive_table_io_metrics; TRUNCATE TABLE mr_job_metrics;
+   TRUNCATE TABLE mr_task_metrics;
+   SET FOREIGN_KEY_CHECKS=1;"
 
-# Full cycle (default)
-./src/test/resources/k8s-test-setup.sh all
+# Clean Kafka
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --delete --topic telemetry-metrics --bootstrap-server localhost:9092
+sleep 1
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic telemetry-metrics --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+
+# Restart OTel Collector
+docker restart otel-collector
 ```
 
 ## Running Tests
 
-### Run All Tests
+### Build and Deploy First
 
 ```bash
-cd $PROJECT_ROOT
-mvn clean verify -Pspark-3
+mvn clean package -Pspark-3 -DskipTests
+
+# Deploy Spark plugin JAR
+cp spark/spark-telemetry-dist-spark3/target/spark-telemetry-dist-spark3-*.jar $SPARK_HOME/jars/
 ```
 
-### Run Specific Test
+### Run All IT Tests (failsafe)
 
 ```bash
-# Run a specific test class
-mvn test -Pspark-3 -pl integration-tests -Dtest=ApiCompatibilityIT
-
-# Run with K8s tests (requires cluster)
-mvn test -Pspark-3 -pl integration-tests -DskipK8sTests=false
+mvn verify -Pspark-3 -pl integration-tests -Dtest.skip=true
 ```
 
-### Skip K8s Tests
-
-To skip tests requiring a K8s cluster:
+### Run Specific Test Class
 
 ```bash
-mvn test -Pspark-3 -pl integration-tests -DskipK8sTests=true
+# Spark metrics verification (most common)
+mvn failsafe:integration-test -Pspark-3 -pl integration-tests \
+  -Dit.test=SparkMetricsFieldVerificationIT
+
+# Infrastructure smoke tests
+mvn failsafe:integration-test -Pspark-3 -pl integration-tests \
+  -Dit.test=InfrastructureIT
+
+# MR Agent tests
+mvn failsafe:integration-test -Pspark-3 -pl integration-tests \
+  -Dit.test=MRAgentIT
+
+# Hadoop + MR Collector
+mvn failsafe:integration-test -Pspark-3 -pl integration-tests \
+  -Dit.test=HadoopClusterIT
 ```
 
-## CI/CD
+### Run Unit Tests Only (no infrastructure needed)
 
-### GitHub Actions
-
-The project includes a CI workflow in `.github/workflows/ci.yml` that:
-
-1. Builds all Spark version profiles (2.4, 3.0, 3.2, 3.5, 4.0)
-2. Runs unit tests for each profile
-3. Runs integration tests (with K8s tests skipped in CI)
-4. Generates code coverage reports
-
-### Test Matrix
-
-| Profile | Spark | Scala | Java | Notes |
-|---------|-------|-------|------|-------|
-| `spark-2` | 2.4.8 | 2.11 | 8 | Legacy support |
-| `spark-30` | 3.0.3 | 2.12 | 8 | Compatibility |
-| `spark-32` | 3.2.4 | 2.12 | 8 | Compatibility |
-| `spark-3` | 3.5.5 | 2.12 | 8 | Default (all modules) |
-| `spark-4` | 4.0.0 | 2.13 | 17 | Preview |
-| `omni` | all | mixed | 8 | Unified JAR |
-
-## API Compatibility Testing
-
-The `ApiCompatibilityIT` test uses reflection to verify that all Spark/Hadoop/Hive APIs accessed by the telemetry plugins actually exist. This catches runtime `NoSuchMethodError` issues at build time.
-
-### Known Version-Specific APIs
-
-| API | Added In | Handling |
-|-----|----------|----------|
-| `ShuffleReadMetrics.remoteBytesReadToDisk()` | Spark 3.3.0 | Try-catch in Spark 3.0/3.2 adapters |
-| `ShuffleReadMetrics.remoteReqsDuration()` | Spark 3.3.0 | Try-catch in Spark 3.0/3.2 adapters |
-| `ShuffleWriteMetrics.bytesWritten` | Spark 3.0+ | Adapter selects API based on Spark version |
-| `QueryExecution.id` | Spark 3.0+ | Spark 2.x uses different mechanism |
+```bash
+mvn test -Pspark-3 -pl integration-tests
+```
 
 ## Troubleshooting
 
-### Test Failures
+### "No Spark installations found"
 
-#### "No Spark installations found"
+Ensure Spark is installed in `/opt/spark-*` with the telemetry plugin JAR in `jars/`.
 
-Ensure Spark is installed in `/opt/spark-*` directories with the telemetry plugin JAR in `jars/`.
+### "No Hadoop installation found"
 
-#### "kubectl not available"
+Set `HADOOP_HOME` or install Hadoop in `/opt/hadoop-*`.
 
-Install kubectl and configure access to a K8s cluster, or skip K8s tests with `-DskipK8sTests=true`.
+### "YARN ResourceManager not reachable"
 
-#### "Port-forward connection refused"
+Start YARN: `$HADOOP_HOME/sbin/start-yarn.sh`
 
-Ensure the K8s services are running and port-forwards are established:
+### "History Server not reachable"
 
-```bash
-kubectl port-forward svc/kafka 9092:9092 &
-kubectl port-forward svc/mysql 3306:3306 &
-kubectl port-forward svc/otel-collector 4317:4317 &
-```
+Start History Server: `$HADOOP_HOME/bin/mapred --daemon start historyserver`
 
-#### "NoSuchMethodError during tests"
+### "Agent JAR not found"
 
-This indicates an API compatibility issue. Check that the test is running against the correct Spark version and that the adapter handles the missing API gracefully.
+Build the project first: `mvn clean package -Pspark-3 -DskipTests`
 
 ## Writing New Tests
 
-### Adding a New Integration Test
-
 1. Create a test class in `src/test/java/x/mg/metrics/integration/`
-2. Extend `K8sTestBase` if K8s access is needed
-3. Annotate with `@Tag("integration")`
-4. Use `assumeTrue()` for optional prerequisites
-
-Example:
+2. Annotate with `@Tag("integration")`
+3. Use `assumeTrue()` for optional prerequisites (auto-skip if not available)
+4. Use `MetricsVerificationHelper` for MySQL queries and assertions
+5. Follow the bare-metal pattern: detect installation → submit job → wait for metrics → assert values
 
 ```java
 @Tag("integration")
-class MyNewIT extends K8sTestBase {
-
+class MyNewIT {
     @Test
     void testSomething() throws Exception {
-        // Skip if prerequisite not available
-        assumeTrue(someCondition(), "Prerequisite not met");
-
+        assumeTrue(prerequisite(), "Prerequisite not met");
         // Test code here
     }
 }
 ```
-
-## Contributing
-
-When adding new features:
-
-1. Add unit tests in the relevant module
-2. Add integration tests if the feature involves external systems
-3. Update `ApiCompatibilityIT` if new APIs are accessed
-4. Document any version-specific behavior

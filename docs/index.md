@@ -176,7 +176,38 @@ integration-tests/                  # 集成测试（Spark 3）
 
 ## K8s 测试环境
 
-`deploy/k8s/` 目录包含完整的 Kubernetes 测试环境清单（Hadoop、Spark、Kafka、OTel Collector、MySQL、ClickHouse）。
+已迁移至裸节点测试，不再依赖 Kubernetes。详见 [集成测试 README](../integration-tests/README.md)。
+
+## 集成测试
+
+所有集成测试在裸节点（bare-metal）上运行，通过 Docker 容器提供后端服务（OTel Collector、Kafka、MySQL），无需 K8s 集群。
+
+### 测试矩阵
+
+| 测试类 | 验证内容 | 依赖 |
+|--------|---------|------|
+| `InfrastructureIT` | Docker 容器、OTel Collector、History Server、YARN RM 可达性 | Docker |
+| `SparkMetricsFieldVerificationIT` | Spark task/stage/job/JVM/SQL 指标字段完整性 | Spark |
+| `HiveMetricsFieldVerificationIT` | Hive 查询指标字段完整性 | Hive |
+| `MRMetricsFieldVerificationIT` | MR Collector 作业/任务指标字段完整性 | Hadoop YARN |
+| `HadoopClusterIT` | Hadoop/YARN 服务可用性 + MR Collector 端到端 | Hadoop YARN |
+| `MRAgentIT` | MR Agent 字节码增强 + classpath 安全 + 指标导出 | Hadoop YARN |
+| `SparkMultiVersionIT` | Spark 2.4/3.0/3.2/3.5/4.0 跨版本兼容 | 多版本 Spark |
+| `ApiCompatibilityIT` | 反射验证 Spark/Hadoop/Hive API 兼容性 | 构建产物 |
+
+### 运行方式
+
+```bash
+# 构建并部署
+mvn clean package -Pspark-3 -DskipTests
+cp spark/spark-telemetry-dist-spark3/target/*.jar $SPARK_HOME/jars/
+
+# 运行全部 IT 测试
+mvn verify -Pspark-3 -pl integration-tests -Dtest.skip=true
+
+# 运行单个测试
+mvn failsafe:integration-test -Pspark-3 -pl integration-tests -Dit.test=SparkMetricsFieldVerificationIT
+```
 
 ## 性能基准测试
 

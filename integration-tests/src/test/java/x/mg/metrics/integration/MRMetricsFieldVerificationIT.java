@@ -58,6 +58,18 @@ class MRMetricsFieldVerificationIT {
         assumeTrue(hadoopHome != null && !hadoopHome.isEmpty(),
             "No Hadoop installation found. Set HADOOP_HOME.");
 
+        // Check HDFS is reachable
+        try {
+            ProcessBuilder pb = new ProcessBuilder(hadoopHome + "/bin/hadoop", "fs", "-ls", "/");
+            pb.redirectErrorStream(true);
+            Process proc = pb.start();
+            boolean finished = proc.waitFor(15, TimeUnit.SECONDS);
+            assumeTrue(finished && proc.exitValue() == 0,
+                "HDFS not reachable. Start HDFS and YARN first.");
+        } catch (Exception e) {
+            assumeTrue(false, "HDFS not reachable: " + e.getMessage());
+        }
+
         db = new MetricsVerificationHelper(MYSQL_HOST, Integer.parseInt(MYSQL_PORT),
             "telemetry", MYSQL_USER, MYSQL_PASSWORD);
 

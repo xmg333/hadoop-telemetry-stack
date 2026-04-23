@@ -57,6 +57,20 @@ class HiveMetricsFieldVerificationIT {
         assumeTrue(hiveHome != null && !hiveHome.isEmpty(),
             "No Hive installation found. Set HIVE_HOME.");
 
+        // Check HiveServer2 is reachable
+        try {
+            ProcessBuilder pb = new ProcessBuilder(hiveHome + "/bin/beeline",
+                "-u", beelineUrl, "-e", "SHOW DATABASES");
+            pb.redirectErrorStream(true);
+            Process proc = pb.start();
+            boolean finished = proc.waitFor(30, TimeUnit.SECONDS);
+            proc.getInputStream().close();
+            assumeTrue(finished && proc.exitValue() == 0,
+                "HiveServer2 not reachable at " + beelineUrl + ". Start HiveServer2 first.");
+        } catch (Exception e) {
+            assumeTrue(false, "HiveServer2 not reachable: " + e.getMessage());
+        }
+
         beelineUrl = System.getenv().getOrDefault("BEELINE_URL",
             "jdbc:hive2://localhost:10000");
 
