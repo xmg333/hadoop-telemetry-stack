@@ -734,7 +734,8 @@ public class DataFlowCheckHandler extends CheckHandler {
         if (hiveHome != null) {
             java.io.File auxlib = new java.io.File(hiveHome, "auxlib");
             if (auxlib.isDirectory()) {
-                java.io.File[] jars = auxlib.listFiles((d, name) -> name.contains("hive-telemetry") && name.endsWith(".jar"));
+                java.io.File[] jars = auxlib.listFiles((d, name) ->
+                    (name.contains("hive-telemetry") || name.contains("spark-telemetry")) && name.endsWith(".jar"));
                 if (jars != null && jars.length > 0) return jars[0];
             }
         }
@@ -746,7 +747,8 @@ public class DataFlowCheckHandler extends CheckHandler {
         if (hiveHome == null) return false;
         java.io.File auxlib = new java.io.File(hiveHome, "auxlib");
         if (!auxlib.isDirectory()) return false;
-        java.io.File[] jars = auxlib.listFiles((d, name) -> name.contains("hive-telemetry") && name.endsWith(".jar"));
+        java.io.File[] jars = auxlib.listFiles((d, name) ->
+            (name.contains("hive-telemetry") || name.contains("spark-telemetry")) && name.endsWith(".jar"));
         if (jars == null) return false;
         for (java.io.File auxJar : jars) {
             if (auxJar.getName().equals(jar.getName())) return true;
