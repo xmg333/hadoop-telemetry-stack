@@ -86,13 +86,7 @@ class SparkTelemetryQueryExecutionListener extends QueryExecutionListener {
         // Spark 2.x: FileSourceScanExt has public relation field
         val tableMetric = new SqlTableIOMetrics
         tableMetric.setOperation("scan")
-        tableMetric.setTableName(
-          try {
-            s.relation.location.rootPaths.map(_.toString).mkString(",")
-          } catch {
-            case _: Exception => "unknown"
-          }
-        )
+        tableMetric.setTableName(extractFileScanTableName(s))
         tableMetric.setBytes(metricValue(s, "numBytesRead"))
         tableMetric.setRows(metricValue(s, "numOutputRows"))
         tableMetric.setFilesRead(metricValue(s, "numFilesRead"))
@@ -150,6 +144,16 @@ class SparkTelemetryQueryExecutionListener extends QueryExecutionListener {
               case _: Exception => "unknown"
             }
         }
+    }
+  }
+
+  private def extractFileScanTableName(scan: FileSourceScanExec): String = {
+    try {
+      val roots = scan.relation.location.rootPaths
+      if (roots != null && roots.nonEmpty) roots.map(_.toString).mkString(",")
+      else "unknown"
+    } catch {
+      case _: Exception => "unknown"
     }
   }
 

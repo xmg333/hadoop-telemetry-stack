@@ -50,8 +50,11 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
     queryMetrics.setExecutionId(qe.id)
 
     // Look up SQL text from shared cache (populated by SparkTelemetryListener.onOtherEvent)
-    val sqlText = lifecycle.getAndRemoveSqlText(qe.id)
-    if (sqlText != null) {
+    var sqlText: String = lifecycle.getAndRemoveSqlText(qe.id)
+    if (sqlText == null || sqlText.isEmpty) {
+      sqlText = extractSqlText(qe)
+    }
+    if (sqlText != null && sqlText.nonEmpty) {
       val maxLen = config.getSqlMaxLength
       queryMetrics.setQueryText(if (sqlText.length > maxLen) sqlText.substring(0, maxLen) else sqlText)
     }
@@ -130,7 +133,7 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
       case s: FileSourceScanExec =>
         val tableMetric = new SqlTableIOMetrics
         tableMetric.setOperation("scan")
-        tableMetric.setTableName(s.tableIdentifier.map(_.unquotedString).getOrElse("unknown"))
+        tableMetric.setTableName(s.tableIdentifier.map(_.unquotedString).getOrElse(extractFileScanTableName(s)))
         tableMetric.setBytes(metricValue(s, "filesSize", "numBytesRead"))
         tableMetric.setRows(metricValue(s, "numOutputRows"))
         tableMetric.setFilesRead(metricValue(s, "numFiles", "numFilesRead"))
@@ -242,6 +245,16 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
     }
   }
 
+  private def extractFileScanTableName(scan: FileSourceScanExec): String = {
+    try {
+      val roots = scan.relation.location.rootPaths
+      if (roots != null && roots.nonEmpty) roots.map(_.toString).mkString(",")
+      else "unknown"
+    } catch {
+      case _: Exception => "unknown"
+    }
+  }
+
   private def extractBatchScanTableName(scan: BatchScanExec): String = {
     try {
       val table = scan.table
@@ -255,6 +268,16 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
 
   private def appendJoinType(current: String, joinType: String): String = {
     if (current == null || current.isEmpty) joinType else current + "," + joinType
+  }
+
+  private def extractSqlText(qe: QueryExecution): String = {
+    try {
+      val desc = qe.logical.toString
+      if (desc != null && desc.nonEmpty && desc.length < config.getSqlMaxLength * 2) desc
+      else null
+    } catch {
+      case _: Exception => null
+    }
   }
 
   private def emitEvent(funcName: String, qe: QueryExecution,

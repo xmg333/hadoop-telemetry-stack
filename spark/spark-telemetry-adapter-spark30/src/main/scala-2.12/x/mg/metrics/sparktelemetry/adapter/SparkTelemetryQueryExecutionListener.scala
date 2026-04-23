@@ -123,7 +123,7 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
       case s: FileSourceScanExec =>
         val tableMetric = new SqlTableIOMetrics
         tableMetric.setOperation("scan")
-        tableMetric.setTableName(s.tableIdentifier.map(_.unquotedString).getOrElse("unknown"))
+        tableMetric.setTableName(s.tableIdentifier.map(_.unquotedString).getOrElse(extractFileScanTableName(s)))
         tableMetric.setBytes(metricValue(s, "numBytesRead"))
         tableMetric.setRows(metricValue(s, "numOutputRows"))
         tableMetric.setFilesRead(metricValue(s, "numFilesRead"))
@@ -184,6 +184,16 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
 
   private def metricValue(plan: SparkPlan, name: String): Long = {
     plan.metrics.get(name).map(_.value).getOrElse(0L)
+  }
+
+  private def extractFileScanTableName(scan: FileSourceScanExec): String = {
+    try {
+      val roots = scan.relation.location.rootPaths
+      if (roots != null && roots.nonEmpty) roots.map(_.toString).mkString(",")
+      else "unknown"
+    } catch {
+      case _: Exception => "unknown"
+    }
   }
 
   private def resolveWriteTableName(cmd: org.apache.spark.sql.execution.command.DataWritingCommand): String = {
