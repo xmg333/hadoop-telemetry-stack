@@ -16,6 +16,13 @@ public class HiveTableIoMetricRow implements Serializable {
     private Double inputTableCount;
     private Double outputTableCount;
 
+    // Per-table I/O metrics (aligned with Spark sql_query_table_metrics)
+    private Double bytes;
+    private Double rows;
+    private Double filesRead;
+    private Double timeMs;
+    private String queue;
+
     public static HiveTableIoMetricRow fromLabels(long timestampMs, Map<String, String> labels) {
         HiveTableIoMetricRow row = new HiveTableIoMetricRow();
         row.timestampMs = timestampMs;
@@ -23,6 +30,7 @@ public class HiveTableIoMetricRow implements Serializable {
         row.operation = labels.getOrDefault("hive.query.operation", "unknown");
         row.userName = labels.getOrDefault("hive.query.user", "unknown");
         row.executionEngine = labels.getOrDefault("hive.query.execution_engine", "unknown");
+        row.queue = labels.getOrDefault("hive.query.queue", null);
 
         String inputTable = labels.get("hive.query.input_table");
         String outputTable = labels.get("hive.query.output_table");
@@ -43,6 +51,10 @@ public class HiveTableIoMetricRow implements Serializable {
         switch (columnName) {
             case "input_table_count": inputTableCount = value; break;
             case "output_table_count": outputTableCount = value; break;
+            case "bytes": bytes = value; break;
+            case "rows": rows = value; break;
+            case "files_read": filesRead = value; break;
+            case "time_ms": timeMs = value; break;
         }
     }
 
@@ -55,4 +67,9 @@ public class HiveTableIoMetricRow implements Serializable {
     public String getExecutionEngine() { return executionEngine; }
     public Double getInputTableCount() { return inputTableCount; }
     public Double getOutputTableCount() { return outputTableCount; }
+    public Double getBytes() { return bytes; }
+    public Double getRows() { return rows; }
+    public Double getFilesRead() { return filesRead; }
+    public Double getTimeMs() { return timeMs; }
+    public String getQueue() { return queue; }
 }

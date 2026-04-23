@@ -446,6 +446,11 @@ public class CategoryJdbcSink {
             "input_table_count DOUBLE, " +
             "output_table_count DOUBLE, " +
             "execution_engine VARCHAR(32), " +
+            "bytes DOUBLE, " +
+            "`rows` DOUBLE, " +
+            "files_read DOUBLE, " +
+            "time_ms DOUBLE, " +
+            "queue VARCHAR(255), " +
             "INDEX idx_query_time (query_id, timestamp_ms), " +
             "INDEX idx_table_time (table_name, timestamp_ms), " +
             "INDEX idx_engine_time (execution_engine, timestamp_ms))");
@@ -855,7 +860,12 @@ public class CategoryJdbcSink {
             "user_name Nullable(String), " +
             "input_table_count Nullable(Float64), " +
             "output_table_count Nullable(Float64), " +
-            "execution_engine LowCardinality(Nullable(String))" +
+            "execution_engine LowCardinality(Nullable(String)), " +
+            "bytes Nullable(Float64), " +
+            "rows Nullable(Float64), " +
+            "files_read Nullable(Float64), " +
+            "time_ms Nullable(Float64), " +
+            "queue Nullable(String)" +
             ") ENGINE = MergeTree() " +
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (table_name, timestamp_ms)");
@@ -1336,8 +1346,9 @@ public class CategoryJdbcSink {
 
     private int insertHiveTableIoMetrics(List<HiveTableIoMetricRow> rows) throws SQLException {
         String sql = "INSERT INTO hive_table_io_metrics (timestamp_ms, query_id, table_name, " +
-            "table_type, operation, user_name, input_table_count, output_table_count, execution_engine) " +
-            "VALUES (?,?,?,?,?,?,?,?,?)";
+            "table_type, operation, user_name, input_table_count, output_table_count, execution_engine, " +
+            "bytes, `rows`, files_read, time_ms, queue) " +
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (HiveTableIoMetricRow r : rows) {
             int i = 1;
@@ -1350,6 +1361,11 @@ public class CategoryJdbcSink {
             setDouble(ps, i++, r.getInputTableCount());
             setDouble(ps, i++, r.getOutputTableCount());
             ps.setString(i++, r.getExecutionEngine());
+            setDouble(ps, i++, r.getBytes());
+            setDouble(ps, i++, r.getRows());
+            setDouble(ps, i++, r.getFilesRead());
+            setDouble(ps, i++, r.getTimeMs());
+            ps.setString(i++, r.getQueue());
             ps.addBatch();
         }
         ps.executeBatch();

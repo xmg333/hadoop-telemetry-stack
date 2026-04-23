@@ -82,6 +82,10 @@ public class MetricCategoryClassifier {
         // Hive table IO metrics
         put("hive.query.input_tables",                      MetricCategory.HIVE_TABLE_IO, "input_table_count",      false);
         put("hive.query.output_tables",                     MetricCategory.HIVE_TABLE_IO, "output_table_count",     false);
+        put("hive.table.io.bytes",                          MetricCategory.HIVE_TABLE_IO, "bytes",                  false);
+        put("hive.table.io.rows",                           MetricCategory.HIVE_TABLE_IO, "rows",                   false);
+        put("hive.table.io.files_read",                     MetricCategory.HIVE_TABLE_IO, "files_read",             false);
+        put("hive.table.io.time_ms",                        MetricCategory.HIVE_TABLE_IO, "time_ms",                false);
 
         // MR job metrics (IO)
         put("mr.job.io.hdfs_bytes_read",                    MetricCategory.MR_JOB, "hdfs_bytes_read",              false);

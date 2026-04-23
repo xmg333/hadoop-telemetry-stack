@@ -1,6 +1,8 @@
 package x.mg.metrics.hivetelemetry.model;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 public class HiveQueryMetrics {
@@ -25,6 +27,12 @@ public class HiveQueryMetrics {
 
     // Execution engine (mr, spark, tez)
     private String executionEngine;
+
+    // YARN queue
+    private String queue;
+
+    // Per-table I/O metrics
+    private final List<HiveTableIOMetrics> tableIOMetrics = new ArrayList<>();
 
     public long getTimestampMs() { return timestampMs; }
     public void setTimestampMs(long timestampMs) { this.timestampMs = timestampMs; }
@@ -70,4 +78,10 @@ public class HiveQueryMetrics {
 
     public String getExecutionEngine() { return executionEngine; }
     public void setExecutionEngine(String executionEngine) { this.executionEngine = executionEngine; }
+
+    public String getQueue() { return queue; }
+    public void setQueue(String queue) { this.queue = queue; }
+
+    public List<HiveTableIOMetrics> getTableIOMetrics() { return tableIOMetrics; }
+    public void addTableIOMetrics(HiveTableIOMetrics metrics) { tableIOMetrics.add(metrics); }
 }

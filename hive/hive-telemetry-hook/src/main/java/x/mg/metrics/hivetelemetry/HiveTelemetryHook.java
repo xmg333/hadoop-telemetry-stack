@@ -9,6 +9,7 @@ import org.apache.hadoop.hive.ql.hooks.Entity;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import x.mg.metrics.hivetelemetry.model.HiveQueryMetrics;
+import x.mg.metrics.hivetelemetry.model.HiveTableIOMetrics;
 
 import java.util.Map;
 import java.util.Set;
@@ -82,6 +83,7 @@ public class HiveTelemetryHook implements ExecuteWithHookContext {
         try {
             org.apache.hadoop.hive.conf.HiveConf conf = hookContext.getConf();
             m.setExecutionEngine(conf != null ? conf.get("hive.execution.engine", "unknown") : "unknown");
+            m.setQueue(conf != null ? conf.get("mapreduce.job.queuename", "") : "");
         } catch (Exception e) {
             LOG.log(Level.FINE, "Could not read execution engine: " + e.getMessage());
             m.setExecutionEngine("unknown");
@@ -142,7 +144,9 @@ public class HiveTelemetryHook implements ExecuteWithHookContext {
 
             long size = parseLong(params.get("totalSize"));
             long rows = parseLong(params.get("numRows"));
+            long files = parseLong(params.get("numFiles"));
 
+            // Aggregate stats for HIVE_QUERY category (backward compat)
             if (isInput) {
                 if (size > 0) m.setInputBytes(m.getInputBytes() + size);
                 if (rows > 0) m.setInputRows(m.getInputRows() + rows);
@@ -150,6 +154,13 @@ public class HiveTelemetryHook implements ExecuteWithHookContext {
                 if (size > 0) m.setOutputBytes(m.getOutputBytes() + size);
                 if (rows > 0) m.setOutputRows(m.getOutputRows() + rows);
             }
+
+            // Per-table I/O metrics for HIVE_TABLE_IO category
+            HiveTableIOMetrics tio = new HiveTableIOMetrics(table.getTableName(), isInput ? "input" : "output");
+            tio.setBytes(size);
+            tio.setRows(rows);
+            tio.setFilesRead(files);
+            m.addTableIOMetrics(tio);
         } catch (Exception e) {
             LOG.log(Level.FINE, "Could not read table stats for " + table.getTableName() + ": " + e.getMessage());
         }

@@ -9,6 +9,7 @@ import io.opentelemetry.api.metrics.LongHistogram;
 import io.opentelemetry.api.metrics.Meter;
 import x.mg.metrics.hivetelemetry.config.HiveHookConfig;
 import x.mg.metrics.hivetelemetry.model.HiveQueryMetrics;
+import x.mg.metrics.hivetelemetry.model.HiveTableIOMetrics;
 
 public class HiveMetricRecorder {
     private static final String METER_NAME = "hive-telemetry";
@@ -25,6 +26,10 @@ public class HiveMetricRecorder {
     private final LongCounter outputRowsCounter;
     private final LongCounter inputTablesCounter;
     private final LongCounter outputTablesCounter;
+    private final LongCounter tableBytesCounter;
+    private final LongCounter tableRowsCounter;
+    private final LongCounter tableFilesReadCounter;
+    private final LongCounter tableTimeMsCounter;
 
     public HiveMetricRecorder(OpenTelemetry openTelemetry, HiveHookConfig config) {
         this.meter = openTelemetry.getMeter(METER_NAME);
@@ -48,6 +53,14 @@ public class HiveMetricRecorder {
             .setDescription("Hive query input tables count").build();
         this.outputTablesCounter = meter.counterBuilder("hive.query.output_tables")
             .setDescription("Hive query output tables count").build();
+        this.tableBytesCounter = meter.counterBuilder("hive.table.io.bytes")
+            .setDescription("Per-table I/O bytes").setUnit("By").build();
+        this.tableRowsCounter = meter.counterBuilder("hive.table.io.rows")
+            .setDescription("Per-table I/O rows").setUnit("{rows}").build();
+        this.tableFilesReadCounter = meter.counterBuilder("hive.table.io.files_read")
+            .setDescription("Per-table files read").build();
+        this.tableTimeMsCounter = meter.counterBuilder("hive.table.io.time_ms")
+            .setDescription("Per-table time (query duration)").setUnit("ms").build();
     }
 
     public void record(HiveQueryMetrics m) {
@@ -91,6 +104,20 @@ public class HiveMetricRecorder {
                         .build();
                     outputTablesCounter.add(1, tableAttrs);
                 }
+
+                // Per-table I/O metrics (bytes, rows, files_read, time_ms)
+                for (HiveTableIOMetrics tio : m.getTableIOMetrics()) {
+                    String tableAttrKey = "input".equals(tio.getTableType())
+                        ? "hive.query.input_table" : "hive.query.output_table";
+                    Attributes tioAttrs = Attributes.builder()
+                        .putAll(baseAttrs)
+                        .put(tableAttrKey, tio.getTableName())
+                        .build();
+                    if (tio.getBytes() > 0) tableBytesCounter.add(tio.getBytes(), tioAttrs);
+                    if (tio.getRows() > 0) tableRowsCounter.add(tio.getRows(), tioAttrs);
+                    if (tio.getFilesRead() > 0) tableFilesReadCounter.add(tio.getFilesRead(), tioAttrs);
+                    if (m.getDurationMs() > 0) tableTimeMsCounter.add(m.getDurationMs(), tioAttrs);
+                }
             }
         } catch (Exception e) {
             // Never let recording failures propagate to HiveServer2
@@ -110,6 +137,7 @@ public class HiveMetricRecorder {
         if (m.getUserName() != null) b.put("hive.query.user", m.getUserName());
         b.put("hive.query.success", String.valueOf(m.isSuccess()));
         if (m.getExecutionEngine() != null) b.put("hive.query.execution_engine", m.getExecutionEngine());
+        if (m.getQueue() != null && !m.getQueue().isEmpty()) b.put("hive.query.queue", m.getQueue());
         if (m.getQueryText() != null && !m.getQueryText().isEmpty()) {
             String sql = m.getQueryText();
             int maxLen = config.getSqlMaxLength();
