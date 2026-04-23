@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import x.mg.metrics.sparktelemetry.config.TelemetryConfig;
 import x.mg.metrics.sparktelemetry.model.*;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -217,5 +218,68 @@ class TelemetryLifecycleTest {
         conf.put("spark.telemetry.otel.exporter.endpoint", "http://localhost:9999");
         TelemetryLifecycle lifecycle = TelemetryLifecycle.init(conf);
         assertEquals("", lifecycle.getQueue());
+    }
+
+    @Test
+    void testAcceptSqlExecutionEvent() {
+        Map<String, String> conf = new HashMap<>();
+        conf.put("spark.telemetry.otel.exporter.endpoint", "http://localhost:9999");
+
+        TelemetryLifecycle lifecycle = TelemetryLifecycle.init(conf);
+
+        SparkMetricEvent event = new SparkMetricEvent();
+        event.setEventType(SparkMetricEvent.EventType.SQL_EXECUTION);
+        event.setTimestamp(System.currentTimeMillis());
+        event.setApplicationId("test-app");
+
+        SqlExecutionMetrics sqlMetrics = new SqlExecutionMetrics();
+        sqlMetrics.setExecutionId(1);
+        sqlMetrics.setDurationMs(100);
+        sqlMetrics.setSuccess(true);
+        sqlMetrics.setQueryText("SELECT * FROM t");
+        event.setSqlExecutionMetrics(sqlMetrics);
+
+        SqlTableIOMetrics tableIO = new SqlTableIOMetrics();
+        tableIO.setExecutionId(1);
+        tableIO.setTableName("default.t");
+        tableIO.setOperation("scan");
+        tableIO.setBytes(1024);
+        tableIO.setRows(100);
+
+        ArrayList<SqlTableIOMetrics> tableIOList = new ArrayList<>();
+        tableIOList.add(tableIO);
+        event.setSqlTableIOMetrics(tableIOList);
+
+        assertDoesNotThrow(() -> lifecycle.accept(event));
+    }
+
+    @Test
+    void testAcceptJobLifecycleEvents() {
+        Map<String, String> conf = new HashMap<>();
+        conf.put("spark.telemetry.otel.exporter.endpoint", "http://localhost:9999");
+
+        TelemetryLifecycle lifecycle = TelemetryLifecycle.init(conf);
+
+        SparkMetricEvent startEvent = new SparkMetricEvent();
+        startEvent.setEventType(SparkMetricEvent.EventType.JOB_START);
+        startEvent.setTimestamp(System.currentTimeMillis());
+        startEvent.setApplicationId("test-app");
+        startEvent.setJobId(1);
+        startEvent.setJobNumStages(2);
+        startEvent.setUser("testuser");
+        startEvent.setQueue("default");
+
+        SparkMetricEvent endEvent = new SparkMetricEvent();
+        endEvent.setEventType(SparkMetricEvent.EventType.JOB_END);
+        endEvent.setTimestamp(System.currentTimeMillis() + 1000);
+        endEvent.setApplicationId("test-app");
+        endEvent.setJobId(1);
+        endEvent.setJobSuccessful(true);
+        endEvent.setJobDurationMs(1000);
+
+        assertDoesNotThrow(() -> {
+            lifecycle.accept(startEvent);
+            lifecycle.accept(endEvent);
+        });
     }
 }

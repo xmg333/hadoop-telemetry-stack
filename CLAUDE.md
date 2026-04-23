@@ -229,3 +229,25 @@ Distribution modules use `maven-shade-plugin` to create self-contained JARs. OTe
 ### Deployment
 
 `deploy/otel-collector/` has the OTel Collector pipeline config. `deploy/grafana/` has Grafana dashboard JSON files. `deploy/sql/` has database migration scripts.
+
+## Critical Lesson: Test-Driven Metric Field Verification
+
+This project's core purpose is **capturing metrics from Spark/Hive/MapReduce and propagating them end-to-end to storage**. A recurring class of bugs is: **a metric field (user_name, queue, executionId, etc.) exists in the schema but is never actually populated by the source adapter**. These bugs are invisible without tests because:
+
+1. The field exists in the model class, the Flink consumer extracts it, the DB schema has the column, the Grafana dashboard queries it — but the value is always empty because the **source** never sets it.
+2. Spark/Hive/MR adapters are Scala code that requires a real cluster to test, so they have no unit tests. The Java layers below them (MetricRecorder, Flink Row models) are testable but were untested.
+
+**Mandatory rule when adding or modifying any metric field**: Before writing production code, write a test that verifies the field is populated end-to-end across the chain:
+
+```
+Source Adapter → SparkMetricEvent/HiveQueryMetrics → MetricRecorder (OTel attributes) → OTLP export → Flink Row fromLabels() → DB column
+```
+
+At minimum, verify at the **MetricRecorder layer** (Java, testable with InMemoryMetricReader) that every OTel attribute key is set with a non-empty value. This catches:
+- Missing `event.setUser()` / `event.setQueue()` calls in adapter code
+- Wrong Spark conf key names (e.g., `spark.user` which doesn't exist in SparkConf)
+- Fields that are set in one event type but forgotten in another (e.g., task events set user/queue but SQL events don't)
+
+The `MetricRecorderTest.java` and `SparkVersionSpecificMetricRecorderTest.java` in `spark-telemetry-common/src/test/` serve as the canonical examples of this testing pattern.
+
+**For Spark version-specific differences**: When an adapter uses version-specific APIs (e.g., Spark 2.x `shuffleBytesWritten` vs 3.x `bytesWritten`, Spark 3.0 missing `remoteReqsDuration`), write a dedicated test that constructs the IOMetrics as that version's adapter would produce it, and verify MetricRecorder handles it correctly.

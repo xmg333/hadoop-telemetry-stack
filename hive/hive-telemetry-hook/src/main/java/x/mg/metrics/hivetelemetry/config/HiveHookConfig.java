@@ -19,6 +19,10 @@ public class HiveHookConfig {
         this.resolvedConfig = overrides.withFallback(fileConfig).withFallback(defaults).resolve();
     }
 
+    public HiveHookConfig(Config resolvedConfig) {
+        this.resolvedConfig = resolvedConfig;
+    }
+
     private Map<String, Object> loadHiveConfOverrides() {
         Map<String, Object> map = new HashMap<>();
         try {

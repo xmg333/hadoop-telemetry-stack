@@ -26,7 +26,7 @@ class MRCollectorConfigTest {
         assertEquals(10000L, config.getExportIntervalMs());
         assertEquals("/tmp/mr-telemetry-state.json", config.getStateFile());
         assertTrue(config.isJobCounters());
-        assertFalse(config.isTaskCounters());
+        assertTrue(config.isTaskCounters());
         assertTrue(config.isJobDetails());
     }
 
