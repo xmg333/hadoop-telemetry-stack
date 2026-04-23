@@ -4,6 +4,9 @@ target/
 # MkDocs build output
 site/
 
+# Release output
+dist/
+
 # IDE
 .idea/
 *.iml
@@ -42,7 +45,7 @@ Thumbs.db
 *.tar.gz
 *.zip
 
-# Config files with real credentials
-telemetry.conf
-mr-collector.conf
-flink-consumer.conf
+# Config files with real credentials (root level only)
+/telemetry.conf
+/mr-collector.conf
+/flink-consumer.conf
