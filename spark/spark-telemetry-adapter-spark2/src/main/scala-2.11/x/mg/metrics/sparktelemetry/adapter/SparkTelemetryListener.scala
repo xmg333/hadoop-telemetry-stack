@@ -4,19 +4,6 @@ import org.apache.spark.scheduler.{SparkListener, SparkListenerEvent, SparkListe
 import x.mg.metrics.sparktelemetry.lifecycle.TelemetryLifecycle
 import x.mg.metrics.sparktelemetry.model.{IOMetrics, SparkMetricEvent, TaskExecutionMetrics}
 
-/**
- * Spark 2.x Listener adapter.
- *
- * Key difference from Spark 3.x: uses old ShuffleWriteMetrics API:
- *   - shuffleBytesWritten (instead of bytesWritten)
- *   - shuffleWriteTime (instead of writeTime)
- *   - shuffleRecordsWritten (instead of recordsWritten)
- *
- * Registration: spark.extraListeners=x.mg.metrics.sparktelemetry.adapter.SparkTelemetryListener
- *
- * Note: Spark 2.x does NOT have SparkPlugin API. This listener is registered via
- * spark.extraListeners and initializes TelemetryLifecycle on first event.
- */
 class SparkTelemetryListener extends SparkListener {
 
   private var initialized = false
@@ -56,11 +43,11 @@ class SparkTelemetryListener extends SparkListener {
       session.listenerManager.register(new SparkTelemetryQueryExecutionListener())
       qelRegistered = true
     } catch {
-      case _: Exception => // best effort, may not be on driver
+      case _: Exception =>
     }
   }
 
-  override def onTaskEnd(taskEnd: SparkListenerTaskEnd): Unit = {
+  override def onTaskEnd(taskEnd: SparkListenerTaskEnd): Unit = try {
     ensureInit()
     if (!config.isCaptureTaskEnd) return
 
@@ -92,47 +79,34 @@ class SparkTelemetryListener extends SparkListener {
     }
 
     val io = new IOMetrics
-
-    // Input metrics
     if (taskMetrics.inputMetrics != null) {
       io.setBytesRead(taskMetrics.inputMetrics.bytesRead)
       io.setRecordsRead(taskMetrics.inputMetrics.recordsRead)
     }
-
-    // Output metrics
     if (taskMetrics.outputMetrics != null) {
       io.setBytesWritten(taskMetrics.outputMetrics.bytesWritten)
       io.setRecordsWritten(taskMetrics.outputMetrics.recordsWritten)
     }
-
-    // Shuffle read metrics
     if (taskMetrics.shuffleReadMetrics != null) {
       io.setShuffleRemoteBytesRead(taskMetrics.shuffleReadMetrics.remoteBytesRead)
       io.setShuffleLocalBytesRead(taskMetrics.shuffleReadMetrics.localBytesRead)
       io.setShuffleRemoteBlocksFetched(taskMetrics.shuffleReadMetrics.remoteBlocksFetched)
       io.setShuffleFetchWaitTime(taskMetrics.shuffleReadMetrics.fetchWaitTime)
-
-      // Category 2: Extended shuffle (Spark 2.x: remoteReqsDuration not available)
       if (config.isCaptureTaskShuffleExtended) {
         io.setShuffleLocalBlocksFetched(taskMetrics.shuffleReadMetrics.localBlocksFetched)
         io.setShuffleRecordsRead(taskMetrics.shuffleReadMetrics.recordsRead)
         io.setShuffleRemoteBytesReadToDisk(taskMetrics.shuffleReadMetrics.remoteBytesReadToDisk)
       }
     }
-
-    // Shuffle write metrics - Spark 2.x API uses shuffleBytesWritten/shuffleWriteTime
     if (taskMetrics.shuffleWriteMetrics != null) {
       io.setShuffleBytesWritten(taskMetrics.shuffleWriteMetrics.shuffleBytesWritten)
       io.setShuffleWriteTime(taskMetrics.shuffleWriteMetrics.shuffleWriteTime)
       io.setShuffleRecordsWritten(taskMetrics.shuffleWriteMetrics.shuffleRecordsWritten)
     }
-
     io.setDiskBytesSpilled(taskMetrics.diskBytesSpilled)
     io.setMemoryBytesSpilled(taskMetrics.memoryBytesSpilled)
-
     event.setIoMetrics(io)
 
-    // Category 1: Task execution metrics
     if (config.isCaptureTaskExecution) {
       val exec = new TaskExecutionMetrics
       exec.setExecutorRunTime(taskMetrics.executorRunTime)
@@ -150,7 +124,6 @@ class SparkTelemetryListener extends SparkListener {
       event.setTaskExecutionMetrics(exec)
     }
 
-    // Category 3: Task info attributes
     if (config.isCaptureTaskInfo) {
       event.setTaskHost(taskEnd.taskInfo.host)
       event.setTaskLocality(taskEnd.taskInfo.taskLocality.toString)
@@ -160,9 +133,12 @@ class SparkTelemetryListener extends SparkListener {
     if (config.shouldAcceptApp(event.getApplicationName)) {
       lifecycle.accept(event)
     }
+  } catch {
+    case e: VirtualMachineError => throw e
+    case _: Throwable =>
   }
 
-  override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = {
+  override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = try {
     ensureInit()
     if (!config.isCaptureStageComplete && !config.isCaptureStageDetailed) return
 
@@ -215,7 +191,6 @@ class SparkTelemetryListener extends SparkListener {
       event.setIoMetrics(io)
     }
 
-    // Category 4: Stage detailed metrics
     if (config.isCaptureStageDetailed) {
       event.setStageNumTasks(stageInfo.numTasks)
       val sub = stageInfo.submissionTime.getOrElse(0L)
@@ -234,10 +209,12 @@ class SparkTelemetryListener extends SparkListener {
     if (config.shouldAcceptApp(event.getApplicationName)) {
       lifecycle.accept(event)
     }
+  } catch {
+    case e: VirtualMachineError => throw e
+    case _: Throwable =>
   }
 
-  // Category 5: Job lifecycle
-  override def onJobStart(jobStart: SparkListenerJobStart): Unit = {
+  override def onJobStart(jobStart: SparkListenerJobStart): Unit = try {
     ensureInit()
     registerQELIfNeeded()
     if (!config.isCaptureJobLifecycle) return
@@ -266,9 +243,12 @@ class SparkTelemetryListener extends SparkListener {
     if (config.shouldAcceptApp(event.getApplicationName)) {
       lifecycle.accept(event)
     }
+  } catch {
+    case e: VirtualMachineError => throw e
+    case _: Throwable =>
   }
 
-  override def onJobEnd(jobEnd: SparkListenerJobEnd): Unit = {
+  override def onJobEnd(jobEnd: SparkListenerJobEnd): Unit = try {
     ensureInit()
 
     if (config.isCaptureJobLifecycle) {
@@ -299,12 +279,13 @@ class SparkTelemetryListener extends SparkListener {
       }
     }
 
-    // Flush metrics after job end to ensure short-lived jobs don't lose data.
-    // Spark 2.x has no plugin shutdown callback, so this is the primary flush trigger.
     lifecycle.flushAsync()
+  } catch {
+    case e: VirtualMachineError => throw e
+    case _: Throwable =>
   }
 
-  override def onOtherEvent(event: SparkListenerEvent): Unit = {
+  override def onOtherEvent(event: SparkListenerEvent): Unit = try {
     event match {
       case sqlStart: org.apache.spark.sql.execution.ui.SparkListenerSQLExecutionStart =>
         if (sqlStart.description != null && sqlStart.description.nonEmpty) {
@@ -312,5 +293,8 @@ class SparkTelemetryListener extends SparkListener {
         }
       case _ =>
     }
+  } catch {
+    case e: VirtualMachineError => throw e
+    case _: Throwable =>
   }
 }

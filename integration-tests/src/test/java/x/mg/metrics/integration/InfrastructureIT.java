@@ -27,10 +27,9 @@ class InfrastructureIT {
 
     @Test
     void testOTelCollectorReachable() throws Exception {
-        int code = httpGetCode("http://localhost:4317");
-        // OTel gRPC endpoint may return 200 or 400 for plain HTTP, both mean it's listening
-        assertTrue(code > 0, "OTel Collector should be reachable on port 4317");
-        System.out.println("[PASS] OTel Collector reachable (HTTP " + code + ")");
+        boolean reachable = isTcpPortOpen("localhost", 4317, 5000);
+        assertTrue(reachable, "OTel Collector should be reachable on port 4317");
+        System.out.println("[PASS] OTel Collector reachable on port 4317");
     }
 
     @Test
@@ -117,5 +116,14 @@ class InfrastructureIT {
             if (dirs != null && dirs.length > 0) return dirs[0].getAbsolutePath();
         }
         return null;
+    }
+
+    private static boolean isTcpPortOpen(String host, int port, int timeoutMs) {
+        try (java.net.Socket socket = new java.net.Socket()) {
+            socket.connect(new java.net.InetSocketAddress(host, port), timeoutMs);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

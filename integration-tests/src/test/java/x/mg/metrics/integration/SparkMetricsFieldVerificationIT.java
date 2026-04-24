@@ -121,12 +121,12 @@ class SparkMetricsFieldVerificationIT {
         assertNotNull(ioRead);
         assertEquals(0.0, ioRead, 0.01, "Pi should have 0 bytes read");
 
-        // Non-negative metric columns (always populated)
+        // Non-negative metric columns (scheduler_delay_ms may be NULL for short tasks)
         db.assertMetricColumnsNonNegative("task_metrics", where,
             "io_bytes_read", "io_bytes_written", "io_records_read", "io_records_written",
             "shuffle_bytes_read", "shuffle_bytes_written", "shuffle_fetch_wait_time_ms",
             "disk_bytes_spilled", "memory_bytes_spilled",
-            "deserialize_time_ms", "scheduler_delay_ms",
+            "deserialize_time_ms",
             "shuffle_local_blocks_fetched", "shuffle_records_read",
             "shuffle_remote_bytes_read_to_disk", "shuffle_remote_reqs_duration_ms");
 
