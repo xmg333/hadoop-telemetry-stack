@@ -22,7 +22,7 @@ public class MySQLChecker {
      */
     private static final Map<String, String[]> EXPECTED_COLUMNS = new LinkedHashMap<>();
     static {
-        EXPECTED_COLUMNS.put("task_metrics", split(
+        EXPECTED_COLUMNS.put("spark_task_metrics", split(
             "timestamp_ms,app_id,executor_id,stage_id,task_id,task_success,task_host,task_locality,task_speculative," +
             "app_name,user_name,queue,duration_ms,io_bytes_read,io_bytes_written,io_records_read,io_records_written," +
             "shuffle_bytes_read,shuffle_bytes_written,shuffle_fetch_wait_time_ms,disk_bytes_spilled,memory_bytes_spilled," +
@@ -31,31 +31,31 @@ public class MySQLChecker {
             "peak_execution_memory_bytes,shuffle_local_blocks_fetched,shuffle_records_read," +
             "shuffle_remote_bytes_read_to_disk,shuffle_remote_reqs_duration_ms"));
 
-        EXPECTED_COLUMNS.put("stage_metrics", split(
+        EXPECTED_COLUMNS.put("spark_stage_metrics", split(
             "timestamp_ms,app_id,executor_id,stage_id,app_name,user_name,queue," +
             "duration_ms,num_tasks,executor_run_time_ms,executor_cpu_time_ns,jvm_gc_time_ms," +
             "peak_execution_memory_bytes,io_bytes_read,io_bytes_written"));
 
-        EXPECTED_COLUMNS.put("job_metrics", split(
+        EXPECTED_COLUMNS.put("spark_job_metrics", split(
             "timestamp_ms,app_id,job_id,job_success,app_name,user_name,queue," +
             "duration_ms,num_stages"));
 
-        EXPECTED_COLUMNS.put("jvm_memory_metrics", split(
+        EXPECTED_COLUMNS.put("spark_jvm_memory", split(
             "timestamp_ms,app_id,executor_id,app_name,user_name,queue,heap_used,non_heap_used"));
 
-        EXPECTED_COLUMNS.put("jvm_gc_metrics", split(
+        EXPECTED_COLUMNS.put("spark_jvm_gc", split(
             "timestamp_ms,app_id,executor_id,gc_name,app_name,user_name,queue,gc_count,gc_time_ms"));
 
-        EXPECTED_COLUMNS.put("task_histogram_buckets", split(
+        EXPECTED_COLUMNS.put("spark_task_histogram", split(
             "timestamp_ms,app_id,executor_id,stage_id,task_id,task_success,metric_name,bucket_le,bucket_count"));
 
-        EXPECTED_COLUMNS.put("stage_histogram_buckets", split(
+        EXPECTED_COLUMNS.put("spark_stage_histogram", split(
             "timestamp_ms,app_id,executor_id,stage_id,metric_name,bucket_le,bucket_count"));
 
-        EXPECTED_COLUMNS.put("job_histogram_buckets", split(
+        EXPECTED_COLUMNS.put("spark_job_histogram", split(
             "timestamp_ms,app_id,job_id,job_success,metric_name,bucket_le,bucket_count"));
 
-        EXPECTED_COLUMNS.put("stage_governance", split(
+        EXPECTED_COLUMNS.put("spark_stage_skew", split(
             "timestamp_ms,app_id,stage_id,task_count,stage_duration_ms,avg_task_duration_ms," +
             "max_task_duration_ms,min_task_duration_ms,duration_skew_ratio," +
             "total_bytes_read,total_bytes_written,total_shuffle_bytes_read,total_shuffle_bytes_written," +
@@ -64,11 +64,11 @@ public class MySQLChecker {
             "small_output_task_count,cpu_efficiency,gc_overhead_ratio,shuffle_wait_ratio," +
             "spill_ratio,deserialize_overhead,scheduler_delay_ratio,max_peak_memory_bytes,total_memory_spilled"));
 
-        EXPECTED_COLUMNS.put("sql_query_metrics", split(
+        EXPECTED_COLUMNS.put("spark_sql_metrics", split(
             "timestamp_ms,app_id,execution_id,app_name,user_name,queue," +
             "duration_ms,shuffle_bytes_read,shuffle_bytes_written,join_count,query_text"));
 
-        EXPECTED_COLUMNS.put("sql_query_table_metrics", split(
+        EXPECTED_COLUMNS.put("spark_sql_table", split(
             "timestamp_ms,app_id,execution_id,table_name,operation,app_name,user_name,queue," +
             "bytes,rows,files_read,time_ms"));
 
@@ -77,7 +77,7 @@ public class MySQLChecker {
             "success_count,failure_count,input_bytes,output_bytes,input_rows,output_rows," +
             "execution_engine,query_text"));
 
-        EXPECTED_COLUMNS.put("hive_table_io_metrics", split(
+        EXPECTED_COLUMNS.put("hive_query_table", split(
             "timestamp_ms,query_id,table_name,table_type,operation,user_name," +
             "input_table_count,output_table_count,execution_engine"));
 
@@ -96,13 +96,12 @@ public class MySQLChecker {
             "map_input_records,map_output_records,map_output_bytes," +
             "reduce_input_records,reduce_output_records,reduce_shuffle_bytes,spilled_records," +
             "cpu_time_ms,gc_time_ms,duration_ms,success_count,failure_count," +
-            "hdfs_read_ops,hdfs_write_ops,hdfs_large_read_ops," +
-            "file_read_ops,file_write_ops,file_large_read_ops"));
+            "hdfs_read_ops,hdfs_write_ops,hdfs_large_read_ops"));
 
-        EXPECTED_COLUMNS.put("metric_events", split(
+        EXPECTED_COLUMNS.put("unified_metrics", split(
             "timestamp_ms,event_type,engine,status,app_id,app_name,user_name,queue," +
-            "duration_ms,io_bytes_read,io_bytes_written,shuffle_bytes_read,shuffle_bytes_written," +
-            "cpu_time_ms,gc_time_ms,memory_bytes_spilled," +
+            "duration_ms,bytes_read,bytes_written,shuffle_bytes_read,shuffle_bytes_written," +
+            "cpu_time_ms,gc_time_ms,bytes_spilled," +
             "executor_id,stage_id,task_id,task_host,task_locality,task_speculative," +
             "executor_run_time_ms,executor_cpu_time_ns,deserialize_time_ms,deserialize_cpu_time_ns," +
             "result_serialization_time_ms,scheduler_delay_ms,result_size_bytes,peak_execution_memory_bytes," +
@@ -110,7 +109,7 @@ public class MySQLChecker {
             "shuffle_remote_bytes_read_to_disk,shuffle_remote_reqs_duration_ms," +
             "disk_bytes_spilled,shuffle_fetch_wait_time_ms,num_tasks,num_stages," +
             "execution_id,join_count," +
-            "table_name,table_operation,bytes,rows,files_read,time_ms_col," +
+            "table_name,table_operation,bytes,rows,files_read,time_ms," +
             "heap_used,non_heap_used,gc_name,gc_count," +
             "job_id,job_name,task_type,map_output_bytes," +
             "physical_memory_bytes,virtual_memory_bytes,committed_heap_bytes," +
@@ -120,9 +119,8 @@ public class MySQLChecker {
             "map_input_records,map_output_records,reduce_input_records,reduce_output_records," +
             "reduce_shuffle_bytes,spilled_records," +
             "hdfs_read_ops,hdfs_write_ops,hdfs_large_read_ops," +
-            "file_read_ops,file_write_ops,file_large_read_ops," +
             "operation,table_type,execution_engine,success_count,failure_count," +
-            "input_rows,output_rows,io_records_read,io_records_written,query_text"));
+            "input_rows,output_rows,records_read,records_written,query_text"));
     }
 
     private static String[] split(String s) { return s.split(","); }
@@ -197,10 +195,10 @@ public class MySQLChecker {
                     "表结构与 Flink Consumer JAR 不匹配，原因：旧版 JAR 建表后升级了 JAR 但未更新表结构。\n" +
                     "修复方案（二选一）：\n" +
                     "  方案 1 (推荐): 删除所有表后重启 Flink Consumer 自动重建\n" +
-                    "    mysql -u metrics -p telemetry -e \"DROP TABLE task_metrics, stage_metrics, job_metrics, " +
-                    "jvm_memory_metrics, jvm_gc_metrics, task_histogram_buckets, stage_histogram_buckets, " +
-                    "job_histogram_buckets, stage_governance, sql_query_metrics, sql_query_table_metrics, " +
-                    "hive_query_metrics, hive_table_io_metrics, mr_job_metrics, mr_task_metrics, metric_events\"\n" +
+                    "    mysql -u metrics -p telemetry -e \"DROP TABLE spark_task_metrics, spark_stage_metrics, spark_job_metrics, " +
+                    "spark_jvm_memory, spark_jvm_gc, spark_task_histogram, spark_stage_histogram, " +
+                    "spark_job_histogram, spark_stage_skew, spark_sql_metrics, spark_sql_table, " +
+                    "hive_query_metrics, hive_query_table, mr_job_metrics, mr_task_metrics, unified_metrics\"\n" +
                     "    rm -f /tmp/flink-consumer-checkpoint.txt\n" +
                     "    重启 Flink Consumer\n" +
                     "  方案 2: 手动执行 ALTER TABLE 添加缺失列\n" +
@@ -210,10 +208,10 @@ public class MySQLChecker {
             }
 
             // 4. 检查最近数据
-            if (existingTables.contains("task_metrics")) {
+            if (existingTables.contains("spark_task_metrics")) {
                 try (Statement stmt = conn.createStatement();
                      ResultSet rs = stmt.executeQuery(
-                         "SELECT COUNT(*) as cnt FROM task_metrics WHERE " +
+                         "SELECT COUNT(*) as cnt FROM spark_task_metrics WHERE " +
                          "timestamp_ms >= UNIX_TIMESTAMP(NOW()) * 1000 - 1800000")) {
                     if (rs.next() && rs.getLong("cnt") > 0) {
                         items.add(CheckItem.ok("最近 30 分钟有 " + rs.getLong("cnt") + " 条 task_metrics 数据"));
@@ -224,16 +222,16 @@ public class MySQLChecker {
                 }
             }
 
-            // 5. metric_events 宽表数据检查
-            if (existingTables.contains("metric_events")) {
+            // 5. unified_metrics 宽表数据检查
+            if (existingTables.contains("unified_metrics")) {
                 long metricEventsCount = 0;
                 try (Statement stmt = conn.createStatement();
-                     ResultSet rs = stmt.executeQuery("SELECT COUNT(*) as cnt FROM metric_events")) {
+                     ResultSet rs = stmt.executeQuery("SELECT COUNT(*) as cnt FROM unified_metrics")) {
                     if (rs.next()) metricEventsCount = rs.getLong("cnt");
                 }
 
                 long categoryCount = 0;
-                String[] categoryTables = {"task_metrics", "mr_task_metrics", "hive_query_metrics"};
+                String[] categoryTables = {"spark_task_metrics", "mr_task_metrics", "hive_query_metrics"};
                 for (String t : categoryTables) {
                     if (existingTables.contains(t)) {
                         try (Statement stmt = conn.createStatement();
@@ -244,15 +242,15 @@ public class MySQLChecker {
                 }
 
                 if (metricEventsCount > 0) {
-                    items.add(CheckItem.ok("metric_events 宽表有 " + metricEventsCount + " 行数据"));
+                    items.add(CheckItem.ok("unified_metrics 宽表有 " + metricEventsCount + " 行数据"));
                 } else if (categoryCount > 0) {
-                    items.add(CheckItem.fail("metric_events 宽表为空 (0 行)，但分类表共有 " + categoryCount + " 行",
-                        "Flink Consumer 未写入 metric_events 宽表。可能原因：\n" +
-                        "  1. Flink Consumer JAR 版本过旧，不包含 metric_events 写入逻辑\n" +
+                    items.add(CheckItem.fail("unified_metrics 宽表为空 (0 行)，但分类表共有 " + categoryCount + " 行",
+                        "Flink Consumer 未写入 unified_metrics 宽表。可能原因：\n" +
+                        "  1. Flink Consumer JAR 版本过旧，不包含 unified_metrics 写入逻辑\n" +
                         "  2. 需要重新构建并部署最新的 Flink Consumer JAR\n" +
                         "  3. 构建命令：mvn clean package -pl flink/metrics-flink-consumer,flink/metrics-flink-consumer-dist -am -DskipTests"));
                 } else {
-                    items.add(CheckItem.warn("metric_events 宽表为空",
+                    items.add(CheckItem.warn("unified_metrics 宽表为空",
                         "暂无任何数据，请先确保上游（Spark/Hive/MR）正在发送指标"));
                 }
             }

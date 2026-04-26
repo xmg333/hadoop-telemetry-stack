@@ -253,12 +253,12 @@ public class DataFlowCheckHandler extends CheckHandler {
         terminal.writer().flush();
 
         String[] checkTables = {
-            "task_metrics", "stage_metrics", "job_metrics",
-            "jvm_memory_metrics", "jvm_gc_metrics",
-            "sql_query_metrics", "sql_query_table_metrics",
+            "spark_task_metrics", "spark_stage_metrics", "spark_job_metrics",
+            "spark_jvm_memory", "spark_jvm_gc",
+            "spark_sql_metrics", "spark_sql_table",
             "mr_job_metrics", "mr_task_metrics",
-            "hive_query_metrics", "hive_table_io_metrics",
-            "metric_events"
+            "hive_query_metrics", "hive_query_table",
+            "unified_metrics"
         };
 
         int passCount = 0;
@@ -308,18 +308,18 @@ public class DataFlowCheckHandler extends CheckHandler {
 
     private String getTableEmptyHint(String table) {
         switch (table) {
-            case "task_metrics": return "Task 指标需要 Spark 作业运行（默认开启）";
-            case "stage_metrics": return "Stage 指标需要 spark.telemetry.metrics.stage.detailed=true";
-            case "job_metrics": return "Job 指标需要 spark.telemetry.metrics.job.lifecycle=true";
-            case "jvm_memory_metrics": return "JVM 内存指标由 ExecutorPlugin 自动采集";
-            case "jvm_gc_metrics": return "JVM GC 指标由 ExecutorPlugin 自动采集";
-            case "sql_query_metrics": return "SQL 指标需要 spark.telemetry.metrics.sql.query-execution=true 且作业执行 SQL 查询";
-            case "sql_query_table_metrics": return "SQL Table IO 指标需要对实际数据源(parquet/orc/json等)执行 SQL 读写";
+            case "spark_task_metrics": return "Task 指标需要 Spark 作业运行（默认开启）";
+            case "spark_stage_metrics": return "Stage 指标需要 spark.telemetry.metrics.stage.detailed=true";
+            case "spark_job_metrics": return "Job 指标需要 spark.telemetry.metrics.job.lifecycle=true";
+            case "spark_jvm_memory": return "JVM 内存指标由 ExecutorPlugin 自动采集";
+            case "spark_jvm_gc": return "JVM GC 指标由 ExecutorPlugin 自动采集";
+            case "spark_sql_metrics": return "SQL 指标需要 spark.telemetry.metrics.sql.query-execution=true 且作业执行 SQL 查询";
+            case "spark_sql_table": return "SQL Table IO 指标需要对实际数据源(parquet/orc/json等)执行 SQL 读写";
             case "mr_job_metrics": return "MR Job 指标需要 MR Collector 运行并轮询 HistoryServer (端口 19888)";
             case "mr_task_metrics": return "MR Task 指标需要 MR Collector 启用 task.counters=true 且 MR 作业完成";
             case "hive_query_metrics": return "Hive 指标需要 Hive Hook 配置 (hive.exec.post.hooks) 且 Hive 查询执行";
-            case "hive_table_io_metrics": return "Hive Table IO 指标需要 Hive Hook 启用 query.tables=true 且查询涉及实际表";
-            case "metric_events": return "metric_events 宽表与分类表同步写入，如分类表有数据但宽表为空请重新部署 Flink Consumer";
+            case "hive_query_table": return "Hive Table IO 指标需要 Hive Hook 启用 query.tables=true 且查询涉及实际表";
+            case "unified_metrics": return "unified_metrics 宽表与分类表同步写入，如分类表有数据但宽表为空请重新部署 Flink Consumer";
             default: return null;
         }
     }
@@ -327,13 +327,13 @@ public class DataFlowCheckHandler extends CheckHandler {
     private Map<String, Long> getAllTableCounts(DiagnosticContext context) {
         Map<String, Long> counts = new HashMap<>();
         String[] tables = {
-            "task_metrics", "stage_metrics", "job_metrics",
-            "jvm_memory_metrics", "jvm_gc_metrics",
-            "sql_query_metrics", "sql_query_table_metrics",
-            "hive_query_metrics", "hive_table_io_metrics",
+            "spark_task_metrics", "spark_stage_metrics", "spark_job_metrics",
+            "spark_jvm_memory", "spark_jvm_gc",
+            "spark_sql_metrics", "spark_sql_table",
+            "hive_query_metrics", "hive_query_table",
             "mr_job_metrics", "mr_task_metrics",
-            "stage_governance", "metric_events",
-            "task_histogram_buckets", "stage_histogram_buckets", "job_histogram_buckets"
+            "spark_stage_skew", "unified_metrics",
+            "spark_task_histogram", "spark_stage_histogram", "spark_job_histogram"
         };
         String url = String.format("jdbc:mysql://%s:%d/telemetry?connectTimeout=3000",
             context.getConfig().getMysqlHost(), context.getConfig().getMysqlPort());
@@ -354,16 +354,17 @@ public class DataFlowCheckHandler extends CheckHandler {
     private String formatCounts(Map<String, Long> counts) {
         StringBuilder sb = new StringBuilder();
         String[] core = {
-            "task_metrics", "stage_metrics", "job_metrics", "jvm_memory_metrics", "jvm_gc_metrics",
-            "sql_query_metrics", "sql_query_table_metrics",
+            "spark_task_metrics", "spark_stage_metrics", "spark_job_metrics",
+            "spark_jvm_memory", "spark_jvm_gc",
+            "spark_sql_metrics", "spark_sql_table",
             "mr_job_metrics", "mr_task_metrics",
-            "hive_query_metrics", "hive_table_io_metrics",
-            "metric_events"
+            "hive_query_metrics", "hive_query_table",
+            "unified_metrics"
         };
         for (int i = 0; i < core.length; i++) {
             if (i > 0) sb.append(", ");
             long c = counts.getOrDefault(core[i], -1L);
-            String shortName = core[i].replace("_metrics", "").replace("metric_events", "events");
+            String shortName = core[i].replace("_metrics", "").replace("unified_metrics", "unified");
             sb.append(shortName).append("=").append(c >= 0 ? c : "?");
         }
         return sb.toString();
@@ -381,11 +382,11 @@ public class DataFlowCheckHandler extends CheckHandler {
             "input_bytes", "output_bytes", "input_rows", "output_rows"});
         nullCheckTables.put("mr_job_metrics", new String[]{
             "hdfs_bytes_read", "hdfs_bytes_written", "cpu_time_ms", "elapsed_time_ms"});
-        nullCheckTables.put("sql_query_metrics", new String[]{
+        nullCheckTables.put("spark_sql_metrics", new String[]{
             "duration_ms", "shuffle_bytes_read", "shuffle_bytes_written", "join_count"});
-        nullCheckTables.put("sql_query_table_metrics", new String[]{
+        nullCheckTables.put("spark_sql_table", new String[]{
             "bytes", "rows", "files_read"});
-        nullCheckTables.put("task_metrics", new String[]{
+        nullCheckTables.put("spark_task_metrics", new String[]{
             "duration_ms", "executor_run_time_ms", "executor_cpu_time_ns"});
 
         String url = String.format("jdbc:mysql://%s:%d/telemetry?connectTimeout=3000",
@@ -434,9 +435,9 @@ public class DataFlowCheckHandler extends CheckHandler {
                 return "MR Collector 从 HistoryServer REST API 获取 counters。\n" +
                     "  - 检查 HistoryServer 是否运行 (端口 19888)\n" +
                     "  - 检查 collection.job.counters=true 配置";
-            case "sql_query_metrics":
+            case "spark_sql_metrics":
                 return "SQL 指标列取决于查询类型。简单查询可能不产生 shuffle 数据";
-            case "sql_query_table_metrics":
+            case "spark_sql_table":
                 return "SQL Table IO 指标需要对实际数据源(parquet/orc)执行读写。\n" +
                     "  - 临时视图 (createOrReplaceTempView) 不产生 table IO 指标\n" +
                     "  - 需要对文件格式数据源执行读写操作";
