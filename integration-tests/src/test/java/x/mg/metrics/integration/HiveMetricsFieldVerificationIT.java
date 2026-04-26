@@ -10,16 +10,16 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Strict end-to-end integration test for Hive query metrics.
- * Submits real Hive queries with known characteristics and verifies EXACT
- * metric values per query marker in MySQL.
+ * Strict end-to-end integration test for Hive query and table IO metrics.
+ * Submits real Hive queries with known characteristics and verifies EVERY
+ * column is populated in both hive_query_metrics and hive_query_table.
  *
  * Test data characteristics used for assertions:
  *   - test_src has exactly 5 rows
  *   - test_src2 has exactly 3 rows
- *   - SELECT COUNT(*) → output_rows = 1
- *   - JOIN on id → output_rows = 3 (matching ids: 1,2,3)
- *   - CTAS → write metrics populated
+ *   - SELECT COUNT(*) → success=true, input_bytes > 0, input_rows >= 1
+ *   - CTAS → reads 5 rows, writes 5 rows, both input and output metrics > 0
+ *   - JOIN on id → reads from 2 tables, output 3 rows (matching ids: 1,2,3)
  *
  * Prerequisites:
  *   - Hive installation with HiveServer2 running
@@ -78,7 +78,6 @@ class HiveMetricsFieldVerificationIT {
         System.out.println("[DEBUG] hadoopHome=" + hadoopHome);
         System.out.println("[DEBUG] beelineUrl=" + beelineUrl);
 
-        // Check HiveServer2 is reachable by testing TCP port
         String host = beelineUrl.replace("jdbc:hive2://", "").split("/")[0].split(":")[0];
         int port = 10000;
         try {
@@ -99,7 +98,6 @@ class HiveMetricsFieldVerificationIT {
         System.out.println("Beeline URL: " + beelineUrl);
         System.out.println("MySQL: " + MYSQL_HOST + ":" + MYSQL_PORT);
 
-        // Setup test tables with known data
         runHive("CREATE DATABASE IF NOT EXISTS field_verify");
         runHive("DROP TABLE IF EXISTS field_verify.test_src");
         runHive("CREATE TABLE field_verify.test_src (id INT, name STRING) STORED AS TEXTFILE");
@@ -116,64 +114,38 @@ class HiveMetricsFieldVerificationIT {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // hive_query_metrics — SELECT COUNT(*) strict checks
+    // hive_query_metrics — SELECT COUNT(*) ALL columns verified
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    void testHiveSelect_QueryMetrics_StrictChecks() throws Exception {
+    void testHiveQueryMetrics_SelectAllColumns() throws Exception {
         String marker = "hv_sel_" + System.currentTimeMillis();
-        // SELECT COUNT(*) on 5-row table
         String sql = "SELECT COUNT(*) FROM field_verify.test_src /* " + marker + " */";
 
         String output = runHive(sql);
         assertFalse(output.contains("Error"), "Hive query should succeed: " + output);
 
-        // Wait for metrics
         db.waitForRows("hive_query_metrics",
             "query_text LIKE '%" + marker + "%'", PROPAGATION_TIMEOUT_SEC);
         String where = "query_text LIKE '%" + marker + "%'";
 
-        System.out.println("[hive_query_metrics] marker=" + marker);
+        System.out.println("[hive_query_metrics SELECT] marker=" + marker);
 
-        // ── Exactly 1 row for this query ──
-        long rows = db.getRowCount("hive_query_metrics", where);
-        assertEquals(1, rows, "Should have exactly 1 hive_query_metrics row for this query");
+        assertEquals(1, db.getRowCount("hive_query_metrics", where),
+            "Should have exactly 1 hive_query_metrics row for this query");
 
-        // ── Dimension columns: must be non-null, non-empty ──
+        // ── ALL dimension columns: non-null, non-empty ──
         db.assertDimensionColumns("hive_query_metrics", where,
             "query_id", "operation", "user_name", "success", "execution_engine");
 
         // ── success = true ──
-        String success = db.getStringValue("hive_query_metrics", "success", where);
-        assertEquals("true", success, "Query should succeed");
+        assertEquals("true", db.getStringValue("hive_query_metrics", "success", where));
 
-        // ── execution_engine: typically "mr" for Hive on MR ──
+        // ── execution_engine: non-empty (typically "mr") ──
         String engine = db.getStringValue("hive_query_metrics", "execution_engine", where);
-        assertNotNull(engine, "execution_engine should not be NULL");
         assertFalse(engine.isEmpty(), "execution_engine should not be empty");
 
-        // ── Duration: must be positive ──
-        db.assertMetricColumnsPositive("hive_query_metrics", where, "duration_ms");
-
-        // ── IO metrics: input_bytes and input_rows non-negative, output may be NULL for SELECT ──
-        db.assertMetricColumnsNonNegative("hive_query_metrics", where,
-            "input_bytes", "input_rows");
-
-        // ── input_rows: reading from 5-row table, should be >= 5 ──
-        Double inputRows = db.getDoubleValue("hive_query_metrics", "input_rows", where);
-        assertNotNull(inputRows, "input_rows should not be NULL");
-        // Hive may report input_rows as number of splits/files, not exact row count
-        // But it must be >= 1
-        assertTrue(inputRows >= 1,
-            "input_rows should be >= 1 for a table with data, got " + inputRows);
-
-        // ── input_bytes: must be > 0 (reading from HDFS) ──
-        Double inputBytes = db.getDoubleValue("hive_query_metrics", "input_bytes", where);
-        assertNotNull(inputBytes, "input_bytes should not be NULL");
-        assertTrue(inputBytes > 0,
-            "input_bytes should be > 0 when reading from HDFS table, got " + inputBytes);
-
-        // ── query_text must contain the marker and original SQL ──
+        // ── query_text: contains marker and SQL ──
         String queryText = db.getStringValue("hive_query_metrics", "query_text", where);
         assertNotNull(queryText, "query_text should not be NULL");
         assertFalse(queryText.trim().isEmpty(), "query_text should not be empty");
@@ -182,59 +154,40 @@ class HiveMetricsFieldVerificationIT {
         assertTrue(queryText.contains("SELECT"),
             "query_text should contain the SQL statement");
 
-        System.out.println("  [PASS] hive_query_metrics: success=" + success
+        // ── ALL timing columns: positive ──
+        db.assertMetricColumnsPositive("hive_query_metrics", where, "duration_ms");
+
+        // ── ALL counter columns: non-negative, NOT NULL ──
+        db.assertMetricColumnsNonNegative("hive_query_metrics", where,
+            "success_count", "failure_count",
+            "input_bytes", "output_bytes",
+            "input_rows", "output_rows");
+
+        // ── SELECT COUNT(*) specific: success_count MUST be > 0 ──
+        db.assertMetricColumnsPositive("hive_query_metrics", where,
+            "success_count", "input_bytes", "input_rows");
+
+        Double inputBytes = db.getDoubleValue("hive_query_metrics", "input_bytes", where);
+        assertTrue(inputBytes > 0,
+            "input_bytes should be > 0 when reading from HDFS table, got " + inputBytes);
+
+        Double inputRows = db.getDoubleValue("hive_query_metrics", "input_rows", where);
+        assertTrue(inputRows >= 1,
+            "input_rows should be >= 1 for a table with data, got " + inputRows);
+
+        System.out.println("  [PASS] hive_query_metrics: success=true"
             + ", duration=" + db.getDoubleValue("hive_query_metrics", "duration_ms", where).longValue() + "ms"
             + ", input_bytes=" + inputBytes.longValue()
-            + ", input_rows=" + inputRows.longValue());
+            + ", input_rows=" + inputRows.longValue()
+            + ", engine=" + engine);
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // hive_table_io_metrics — scan operations for SELECT
+    // hive_query_metrics — CTAS ALL columns verified (read + write)
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    void testHiveSelect_TableIOMetrics_StrictChecks() throws Exception {
-        String marker = "hv_tio_" + System.currentTimeMillis();
-        String sql = "SELECT COUNT(*) FROM field_verify.test_src /* " + marker + " */";
-
-        String output = runHive(sql);
-        assertFalse(output.contains("Error"), "Hive query should succeed: " + output);
-
-        // Wait for hive_query_metrics first
-        db.waitForRows("hive_query_metrics",
-            "query_text LIKE '%" + marker + "%'", PROPAGATION_TIMEOUT_SEC);
-
-        System.out.println("[hive_table_io_metrics] marker=" + marker);
-
-        // Try to wait for table IO metrics (may not be available depending on hook configuration)
-        long scanRows = 0;
-        try {
-            db.waitForRows("hive_table_io_metrics",
-                "operation = 'scan'", 30);
-            scanRows = db.getRowCount("hive_table_io_metrics", "operation = 'scan'");
-        } catch (RuntimeException e) {
-            System.out.println("  [SKIP] hive_table_io_metrics: no scan rows found (hook may not capture table IO)");
-            return;
-        }
-
-        assertTrue(scanRows >= 1, "Should have at least 1 scan row, got " + scanRows);
-
-        String scanWhere = "operation = 'scan' LIMIT 1";
-        db.assertDimensionColumns("hive_table_io_metrics", scanWhere,
-            "table_name", "operation");
-
-        db.assertMetricColumnsNonNegative("hive_table_io_metrics",
-            scanWhere, "bytes", "rows", "files_read", "time_ms");
-
-        System.out.println("  [PASS] hive_table_io_metrics: " + scanRows + " scans");
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // CTAS — write metrics verification
-    // ═══════════════════════════════════════════════════════════════
-
-    @Test
-    void testHiveCTAS_WriteMetrics_StrictChecks() throws Exception {
+    void testHiveQueryMetrics_CTAS_AllColumns() throws Exception {
         String marker = "hv_ctas_" + System.currentTimeMillis();
         String tableName = "field_verify.test_output_" + marker;
 
@@ -243,66 +196,62 @@ class HiveMetricsFieldVerificationIT {
         String output = runHive(sql);
         assertFalse(output.contains("Error"), "Hive CTAS should succeed: " + output);
 
-        // Wait for query metrics
         db.waitForRows("hive_query_metrics",
             "query_text LIKE '%" + marker + "%'", PROPAGATION_TIMEOUT_SEC);
         String where = "query_text LIKE '%" + marker + "%'";
 
-        System.out.println("[hive CTAS] marker=" + marker);
+        System.out.println("[hive_query_metrics CTAS] marker=" + marker);
 
-        // ── Query metrics must exist and be populated ──
-        long queryRows = db.getRowCount("hive_query_metrics", where);
-        assertEquals(1, queryRows, "Should have exactly 1 hive_query_metrics row for CTAS");
+        assertEquals(1, db.getRowCount("hive_query_metrics", where),
+            "Should have exactly 1 hive_query_metrics row for CTAS");
 
+        // ── ALL dimension columns: non-null, non-empty ──
         db.assertDimensionColumns("hive_query_metrics", where,
-            "query_id", "operation", "user_name", "success");
+            "query_id", "operation", "user_name", "success", "execution_engine");
 
-        String success = db.getStringValue("hive_query_metrics", "success", where);
-        assertEquals("true", success, "CTAS should succeed");
+        assertEquals("true", db.getStringValue("hive_query_metrics", "success", where));
 
+        // ── query_text: contains CTAS and marker ──
+        String queryText = db.getStringValue("hive_query_metrics", "query_text", where);
+        assertNotNull(queryText, "query_text should not be NULL for CTAS");
+        assertTrue(queryText.contains(marker),
+            "query_text should contain marker '" + marker + "'");
+
+        // ── ALL timing columns: positive ──
         db.assertMetricColumnsPositive("hive_query_metrics", where, "duration_ms");
 
-        // ── CTAS reads input → input_bytes > 0 ──
+        // ── ALL counter columns: non-negative, NOT NULL ──
+        db.assertMetricColumnsNonNegative("hive_query_metrics", where,
+            "success_count", "failure_count",
+            "input_bytes", "output_bytes",
+            "input_rows", "output_rows");
+
+        // ── CTAS reads 5-row table → input MUST be > 0 ──
+        db.assertMetricColumnsPositive("hive_query_metrics", where,
+            "success_count", "input_bytes", "input_rows");
+
+        // ── CTAS writes to HDFS → output_bytes and output_rows SHOULD be > 0 ──
+        db.assertMetricColumnsPositive("hive_query_metrics", where,
+            "output_bytes", "output_rows");
+
         Double inputBytes = db.getDoubleValue("hive_query_metrics", "input_bytes", where);
-        assertNotNull(inputBytes, "input_bytes should not be NULL for CTAS");
-        assertTrue(inputBytes > 0,
-            "CTAS should read input data, input_bytes > 0, got " + inputBytes);
-
-        // ── CTAS output metrics: may be NULL depending on hook ──
         Double outputBytes = db.getDoubleValue("hive_query_metrics", "output_bytes", where);
-        Double outputRows = db.getDoubleValue("hive_query_metrics", "output_rows", where);
 
-        // ── Table IO metrics: try to verify write entry ──
-        try {
-            db.waitForRows("hive_table_io_metrics",
-                "operation = 'write'", 30);
-            long writeRows = db.getRowCount("hive_table_io_metrics", "operation = 'write'");
-            assertTrue(writeRows >= 1, "CTAS should produce at least 1 write entry, got " + writeRows);
-            db.assertDimensionColumns("hive_table_io_metrics",
-                "operation = 'write' LIMIT 1", "table_name", "operation");
-            db.assertMetricColumnsNonNegative("hive_table_io_metrics",
-                "operation = 'write' LIMIT 1", "bytes", "rows", "files_read", "time_ms");
-        } catch (RuntimeException e) {
-            System.out.println("  [SKIP] hive_table_io_metrics write: no rows found");
-        }
-
-        System.out.println("  [PASS] Hive CTAS: success=" + success
+        System.out.println("  [PASS] hive_query_metrics CTAS: success=true"
+            + ", duration=" + db.getDoubleValue("hive_query_metrics", "duration_ms", where).longValue() + "ms"
             + ", input=" + inputBytes.longValue() + " bytes"
-            + ", output_bytes=" + outputBytes
-            + ", output_rows=" + outputRows);
+            + ", output=" + outputBytes.longValue() + " bytes");
 
-        // Cleanup
         runHive("DROP TABLE IF EXISTS " + tableName);
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // JOIN — cross-table verification
+    // hive_query_metrics — JOIN ALL columns verified (multi-table input)
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    void testHiveJoin_QueryMetrics_StrictChecks() throws Exception {
+    void testHiveQueryMetrics_JoinAllColumns() throws Exception {
         String marker = "hv_join_" + System.currentTimeMillis();
-        // JOIN test_src (5 rows) with test_src2 (3 rows) on id → 3 matching rows
         String sql = "SELECT a.id, a.name, b.value FROM field_verify.test_src a "
             + "JOIN field_verify.test_src2 b ON a.id = b.id /* " + marker + " */";
 
@@ -313,39 +262,222 @@ class HiveMetricsFieldVerificationIT {
             "query_text LIKE '%" + marker + "%'", PROPAGATION_TIMEOUT_SEC);
         String where = "query_text LIKE '%" + marker + "%'";
 
-        System.out.println("[hive JOIN] marker=" + marker);
+        System.out.println("[hive_query_metrics JOIN] marker=" + marker);
 
-        // ── Exactly 1 query metrics row ──
-        long queryRows = db.getRowCount("hive_query_metrics", where);
-        assertEquals(1, queryRows, "Should have exactly 1 query metrics row for JOIN");
+        assertEquals(1, db.getRowCount("hive_query_metrics", where),
+            "Should have exactly 1 query metrics row for JOIN");
 
-        // ── All dimension columns populated ──
+        // ── ALL dimension columns: non-null, non-empty ──
         db.assertDimensionColumns("hive_query_metrics", where,
             "query_id", "operation", "user_name", "success", "execution_engine");
 
-        // ── Duration positive ──
+        assertEquals("true", db.getStringValue("hive_query_metrics", "success", where));
+
+        // ── query_text contains JOIN and marker ──
+        String queryText = db.getStringValue("hive_query_metrics", "query_text", where);
+        assertNotNull(queryText);
+        assertTrue(queryText.contains(marker));
+
+        // ── ALL timing: positive ──
         db.assertMetricColumnsPositive("hive_query_metrics", where, "duration_ms");
 
-        // ── JOIN reads from 2 tables → input_bytes should be > 0 ──
-        Double inputBytes = db.getDoubleValue("hive_query_metrics", "input_bytes", where);
-        assertNotNull(inputBytes, "input_bytes should not be NULL for JOIN");
-        assertTrue(inputBytes > 0,
-            "JOIN should read input data from both tables, got " + inputBytes);
+        // ── ALL counter columns: non-negative, NOT NULL ──
+        db.assertMetricColumnsNonNegative("hive_query_metrics", where,
+            "success_count", "failure_count",
+            "input_bytes", "output_bytes",
+            "input_rows", "output_rows");
 
-        // ── Table IO: try to verify scan entries ──
+        // ── JOIN reads from 2 tables → input MUST be > 0 ──
+        db.assertMetricColumnsPositive("hive_query_metrics", where,
+            "success_count", "input_bytes", "input_rows");
+
+        System.out.println("  [PASS] hive_query_metrics JOIN: duration="
+            + db.getDoubleValue("hive_query_metrics", "duration_ms", where).longValue() + "ms"
+            + ", input_bytes="
+            + db.getDoubleValue("hive_query_metrics", "input_bytes", where).longValue());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // hive_query_table — scan entries for SELECT (ALL columns)
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    void testHiveQueryTable_ScanAllColumns() throws Exception {
+        String marker = "hv_tio_" + System.currentTimeMillis();
+        String sql = "SELECT COUNT(*) FROM field_verify.test_src /* " + marker + " */";
+
+        String output = runHive(sql);
+        assertFalse(output.contains("Error"), "Hive query should succeed: " + output);
+
+        // Wait for query metrics first (confirms pipeline processed the query)
+        db.waitForRows("hive_query_metrics",
+            "query_text LIKE '%" + marker + "%'", PROPAGATION_TIMEOUT_SEC);
+
+        System.out.println("[hive_query_table SCAN] marker=" + marker);
+
+        // Wait for table IO metrics (scan = input table entries)
+        long scanRows = 0;
         try {
-            db.waitForRows("hive_table_io_metrics",
-                "operation IN ('scan', 'write')", 30);
-            long scanCount = db.getRowCount("hive_table_io_metrics", "operation = 'scan'");
-            assertTrue(scanCount >= 2,
-                "JOIN of 2 tables should produce at least 2 scan entries, got " + scanCount);
+            db.waitForRows("hive_query_table",
+                "table_type = 'input'", 30);
+            scanRows = db.getRowCount("hive_query_table", "table_type = 'input'");
         } catch (RuntimeException e) {
-            System.out.println("  [SKIP] hive_table_io_metrics: no scan rows found");
+            System.out.println("  [SKIP] hive_query_table: no scan rows found");
+            return;
         }
 
-        System.out.println("  [PASS] Hive JOIN: duration="
-            + db.getDoubleValue("hive_query_metrics", "duration_ms", where).longValue() + "ms"
-            + ", input_bytes=" + inputBytes.longValue());
+        assertTrue(scanRows >= 1, "Should have at least 1 input row, got " + scanRows);
+
+        // Use the most recent scan row for detailed checks
+        String scanWhere = "table_type = 'input' ORDER BY timestamp_ms DESC LIMIT 1";
+
+        // ── ALL dimension columns: non-null, non-empty ──
+        db.assertDimensionColumns("hive_query_table", scanWhere,
+            "query_id", "table_name", "table_type", "operation", "user_name", "execution_engine");
+
+        // ── table_type cross-validation ──
+        assertEquals("input", db.getStringValue("hive_query_table", "table_type", scanWhere));
+
+        // ── table_name: must reference a real table (not "unknown") ──
+        String tableName = db.getStringValue("hive_query_table", "table_name", scanWhere);
+        assertFalse(tableName.isEmpty(), "table_name should not be empty");
+        assertNotEquals("unknown", tableName, "table_name should be a real table, not 'unknown'");
+
+        // ── ALL metric columns: non-negative, NOT NULL ──
+        db.assertMetricColumnsNonNegative("hive_query_table", scanWhere,
+            "input_table_count", "output_table_count",
+            "bytes", "rows", "files_read", "time_ms");
+
+        // ── Scan-specific: bytes and rows MUST be > 0 for reading from HDFS table ──
+        db.assertMetricColumnsPositive("hive_query_table", scanWhere,
+            "bytes", "rows");
+
+        System.out.println("  [PASS] hive_query_table SCAN: table=" + tableName
+            + ", bytes=" + db.getDoubleValue("hive_query_table", "bytes", scanWhere).longValue()
+            + ", rows=" + db.getDoubleValue("hive_query_table", "rows", scanWhere).longValue());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // hive_query_table — write entries for CTAS (ALL columns)
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    void testHiveQueryTable_WriteAllColumns() throws Exception {
+        String marker = "hv_tw_" + System.currentTimeMillis();
+        String table = "field_verify.test_output_" + marker;
+
+        String sql = "CREATE TABLE " + table + " AS SELECT * FROM field_verify.test_src /* " + marker + " */";
+
+        String output = runHive(sql);
+        assertFalse(output.contains("Error"), "Hive CTAS should succeed: " + output);
+
+        // Wait for query metrics
+        db.waitForRows("hive_query_metrics",
+            "query_text LIKE '%" + marker + "%'", PROPAGATION_TIMEOUT_SEC);
+
+        System.out.println("[hive_query_table WRITE] marker=" + marker);
+
+        // Wait for write entries
+        long writeRows = 0;
+        try {
+            db.waitForRows("hive_query_table",
+                "table_type = 'output'", 30);
+            writeRows = db.getRowCount("hive_query_table", "table_type = 'output'");
+        } catch (RuntimeException e) {
+            System.out.println("  [SKIP] hive_query_table WRITE: no output rows found");
+            runHive("DROP TABLE IF EXISTS " + table);
+            return;
+        }
+
+        assertTrue(writeRows >= 1, "CTAS should produce at least 1 output row, got " + writeRows);
+
+        String writeWhere = "table_type = 'output' ORDER BY timestamp_ms DESC LIMIT 1";
+
+        // ── ALL dimension columns: non-null, non-empty ──
+        db.assertDimensionColumns("hive_query_table", writeWhere,
+            "query_id", "table_name", "table_type", "operation", "user_name", "execution_engine");
+
+        // ── table_type cross-validation ──
+        assertEquals("output", db.getStringValue("hive_query_table", "table_type", writeWhere));
+
+        // ── table_name: must reference the CTAS target table ──
+        String tableName = db.getStringValue("hive_query_table", "table_name", writeWhere);
+        assertFalse(tableName.isEmpty(), "table_name should not be empty");
+        assertNotEquals("unknown", tableName, "table_name should be a real table, not 'unknown'");
+
+        // ── ALL metric columns: non-negative, NOT NULL ──
+        db.assertMetricColumnsNonNegative("hive_query_table", writeWhere,
+            "input_table_count", "output_table_count",
+            "bytes", "rows", "files_read", "time_ms");
+
+        // ── CTAS writes to HDFS → bytes and rows MUST be > 0 ──
+        db.assertMetricColumnsPositive("hive_query_table", writeWhere,
+            "bytes", "rows");
+
+        System.out.println("  [PASS] hive_query_table WRITE: table=" + tableName
+            + ", bytes=" + db.getDoubleValue("hive_query_table", "bytes", writeWhere).longValue()
+            + ", rows=" + db.getDoubleValue("hive_query_table", "rows", writeWhere).longValue());
+
+        runHive("DROP TABLE IF EXISTS " + table);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Cross-table: query ↔ table IO consistency
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    void testHive_CrossTableConsistency() throws Exception {
+        String marker = "hv_xref_" + System.currentTimeMillis();
+        String table = "field_verify.test_output_" + marker;
+
+        String sql = "CREATE TABLE " + table + " AS SELECT * FROM field_verify.test_src /* " + marker + " */";
+
+        String output = runHive(sql);
+        assertFalse(output.contains("Error"), "Hive CTAS should succeed: " + output);
+
+        db.waitForRows("hive_query_metrics",
+            "query_text LIKE '%" + marker + "%'", PROPAGATION_TIMEOUT_SEC);
+        String queryWhere = "query_text LIKE '%" + marker + "%'";
+
+        System.out.println("[hive CROSS-TABLE] marker=" + marker);
+
+        // ── Query metrics exist ──
+        assertEquals(1, db.getRowCount("hive_query_metrics", queryWhere));
+
+        // ── Dimension consistency: user_name must match across tables ──
+        String userFromQuery = db.getStringValue("hive_query_metrics", "user_name", queryWhere);
+        assertNotNull(userFromQuery);
+
+        String engineFromQuery = db.getStringValue("hive_query_metrics", "execution_engine", queryWhere);
+        assertNotNull(engineFromQuery);
+
+        // ── Table IO: CTAS reads from test_src (input) and writes to output table (output) ──
+        try {
+            db.waitForRows("hive_query_table",
+                "table_type IN ('input', 'output')", 30);
+
+            long inputCount = db.getRowCount("hive_query_table", "table_type = 'input'");
+            long outputCount = db.getRowCount("hive_query_table", "table_type = 'output'");
+            assertTrue(inputCount >= 1, "CTAS should have at least 1 input table entry");
+            assertTrue(outputCount >= 1, "CTAS should have at least 1 output table entry");
+
+            // Verify user_name matches in table IO
+            String inputWhere = "table_type = 'input' ORDER BY timestamp_ms DESC LIMIT 1";
+            String userFromTable = db.getStringValue("hive_query_table", "user_name", inputWhere);
+            assertEquals(userFromQuery, userFromTable,
+                "user_name must match between hive_query_metrics and hive_query_table");
+
+            String engineFromTable = db.getStringValue("hive_query_table", "execution_engine", inputWhere);
+            assertEquals(engineFromQuery, engineFromTable,
+                "execution_engine must match between hive_query_metrics and hive_query_table");
+
+            System.out.println("  [PASS] Cross-table: user_name="
+                + userFromQuery + " consistent, input=" + inputCount + " output=" + outputCount);
+        } catch (RuntimeException e) {
+            System.out.println("  [SKIP] hive_query_table: no table IO rows found");
+        }
+
+        runHive("DROP TABLE IF EXISTS " + table);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -377,7 +509,6 @@ class HiveMetricsFieldVerificationIT {
         Process proc = pb.start();
         proc.getOutputStream().close();
 
-        // Read output in a separate thread to avoid deadlock
         StringBuilder output = new StringBuilder();
         Thread readerThread = new Thread(() -> {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream()))) {

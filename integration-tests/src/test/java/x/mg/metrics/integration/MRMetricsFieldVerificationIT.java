@@ -12,9 +12,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Strict end-to-end integration test for MR job metrics.
- * Submits real MapReduce WordCount jobs and verifies EXACT metric values
- * and row counts per job_id in MySQL.
+ * Strict end-to-end integration test for MR job and task metrics.
+ * Submits real MapReduce WordCount jobs and verifies EVERY column is populated.
  *
  * WordCount characteristics used for assertions:
  *   - Reads input text → map_input_records > 0
@@ -25,7 +24,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *
  * Prerequisites:
  *   - Hadoop installation with YARN/Local mode running
- *   - MR Collector polling History Server
+ *   - MR Collector polling History Server (provides per-task counters via recordTask())
  *   - OTel Collector, Kafka, Flink Consumer, MySQL running
  *   - HADOOP_HOME env var set
  */
@@ -59,7 +58,6 @@ class MRMetricsFieldVerificationIT {
         assumeTrue(hadoopHome != null && !hadoopHome.isEmpty(),
             "No Hadoop installation found. Set HADOOP_HOME.");
 
-        // Check HDFS is reachable
         try {
             ProcessBuilder pb = new ProcessBuilder(hadoopHome + "/bin/hadoop", "fs", "-ls", "/");
             pb.redirectErrorStream(true);
@@ -84,11 +82,11 @@ class MRMetricsFieldVerificationIT {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // mr_job_metrics — strict per-job_id verification
+    // mr_job_metrics — ALL columns verified
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    void testMRJobMetrics_AllFieldsPopulated_StrictChecks() throws Exception {
+    void testMRJobMetrics_AllColumnsPopulated() throws Exception {
         String jobName = "it-mr-job-" + System.currentTimeMillis();
         MRJobResult result = submitMRWordCount(jobName);
 
@@ -100,105 +98,170 @@ class MRMetricsFieldVerificationIT {
 
         System.out.println("[mr_job_metrics] job_id=" + foundJobId);
 
-        // ── Exactly 1 row for this job ──
-        long jobRows = db.getRowCount("mr_job_metrics", where);
-        assertEquals(1, jobRows, "Should have exactly 1 mr_job_metrics row per job");
+        assertEquals(1, db.getRowCount("mr_job_metrics", where),
+            "Should have exactly 1 mr_job_metrics row per job");
 
-        // ── Dimension columns: must be non-null and non-empty ──
+        // ── ALL dimension columns: non-null, non-empty ──
         db.assertDimensionColumns("mr_job_metrics", where,
-            "job_id", "job_name", "state");
+            "job_id", "job_name", "user_name", "state", "queue");
 
-        // job_name: MR examples may override the name, just verify it's non-empty
-        String actualJobName = db.getStringValue("mr_job_metrics", "job_name", where);
-        assertNotNull(actualJobName, "job_name should not be NULL");
-        assertFalse(actualJobName.isEmpty(), "job_name should not be empty");
+        assertEquals("SUCCEEDED",
+            db.getStringValue("mr_job_metrics", "state", where));
 
-        // state should be SUCCEEDED
-        String state = db.getStringValue("mr_job_metrics", "state", where);
-        assertEquals("SUCCEEDED", state, "Job state should be SUCCEEDED");
-
-        // ── Timing columns: must be positive ──
+        // ── ALL timing columns: positive ──
         db.assertMetricColumnsPositive("mr_job_metrics", where,
             "start_time_ms", "finish_time_ms", "elapsed_time_ms");
 
-        // ── start < finish ──
         Double startTime = db.getDoubleValue("mr_job_metrics", "start_time_ms", where);
         Double finishTime = db.getDoubleValue("mr_job_metrics", "finish_time_ms", where);
-        assertNotNull(startTime, "start_time_ms should not be NULL");
-        assertNotNull(finishTime, "finish_time_ms should not be NULL");
         assertTrue(finishTime > startTime,
             "finish_time_ms (" + finishTime + ") should be > start_time_ms (" + startTime + ")");
 
-        // ── IO counters: non-negative (may be 0 if History Server doesn't provide all counters) ──
+        // ── ALL IO counter columns: non-negative, NOT NULL ──
         db.assertMetricColumnsNonNegative("mr_job_metrics", where,
-            "hdfs_bytes_read", "map_input_records",
-            "map_output_records", "map_output_bytes",
-            "reduce_input_records", "reduce_output_records",
-            "reduce_shuffle_bytes",
-            "hdfs_bytes_written",
+            "hdfs_bytes_read", "hdfs_bytes_written",
             "file_bytes_read", "file_bytes_written",
+            "map_input_records", "map_output_records", "map_output_bytes",
+            "reduce_input_records", "reduce_output_records", "reduce_shuffle_bytes",
             "spilled_records",
             "cpu_time_ms", "gc_time_ms",
-            "physical_memory_bytes", "virtual_memory_bytes");
+            "physical_memory_bytes", "virtual_memory_bytes", "committed_heap_bytes");
 
-        // ── Task counts: non-negative ──
-        db.assertMetricColumnsNonNegative("mr_job_metrics", where,
-            "launched_maps", "launched_reduces");
-
-        // ── Duration: non-negative ──
-        db.assertMetricColumnsNonNegative("mr_job_metrics", where,
+        // ── WordCount-specific: these MUST be > 0 ──
+        db.assertMetricColumnsPositive("mr_job_metrics", where,
+            "hdfs_bytes_read", "hdfs_bytes_written",
+            "map_input_records", "map_output_records", "map_output_bytes",
+            "reduce_input_records", "reduce_output_records", "reduce_shuffle_bytes",
+            "spilled_records", "cpu_time_ms",
+            "launched_maps", "launched_reduces",
             "maps_duration_ms", "reduces_duration_ms");
 
-        System.out.println("  [PASS] mr_job_metrics: state=" + state
-            + ", maps=" + db.getDoubleValue("mr_job_metrics", "launched_maps", where).intValue()
-            + ", reduces=" + db.getDoubleValue("mr_job_metrics", "launched_reduces", where).intValue()
-            + ", hdfs_read=" + db.getDoubleValue("mr_job_metrics", "hdfs_bytes_read", where).longValue()
-            + ", map_input=" + db.getDoubleValue("mr_job_metrics", "map_input_records", where).longValue());
+        System.out.println("  [PASS] mr_job_metrics: all "
+            + "hdfs_read=" + db.getDoubleValue("mr_job_metrics", "hdfs_bytes_read", where).longValue()
+            + ", map_in=" + db.getDoubleValue("mr_job_metrics", "map_input_records", where).longValue()
+            + ", cpu=" + db.getDoubleValue("mr_job_metrics", "cpu_time_ms", where).longValue()
+            + "ms, maps=" + db.getDoubleValue("mr_job_metrics", "launched_maps", where).intValue()
+            + ", reduces=" + db.getDoubleValue("mr_job_metrics", "launched_reduces", where).intValue());
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // mr_task_metrics — strict per-task verification
+    // mr_task_metrics MAP — ALL columns verified
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    void testMRTaskMetrics_AllFieldsPopulated_StrictChecks() throws Exception {
-        String jobName = "it-mr-task-" + System.currentTimeMillis();
+    void testMRTaskMetrics_MAP_AllColumnsPopulated() throws Exception {
+        String jobName = "it-mr-map-" + System.currentTimeMillis();
         MRJobResult result = submitMRWordCount(jobName);
 
         db.waitForRows("mr_task_metrics", "job_id = '" + result.jobId + "'",
             PROPAGATION_TIMEOUT_SEC);
-        String where = "job_id = '" + result.jobId + "'";
+        String where = "job_id = '" + result.jobId + "' AND task_type = 'MAP'";
 
-        System.out.println("[mr_task_metrics] job_id=" + result.jobId);
+        System.out.println("[mr_task_metrics MAP] job_id=" + result.jobId);
 
-        // ── Must have at least 1 task row ──
-        long mapCount = db.getRowCount("mr_task_metrics",
-            where + " AND task_type = 'MAP'");
-        long reduceCount = db.getRowCount("mr_task_metrics",
-            where + " AND task_type = 'REDUCE'");
-        long totalTasks = db.getRowCount("mr_task_metrics", where);
+        long mapCount = db.getRowCount("mr_task_metrics", where);
+        assertTrue(mapCount >= 1, "Should have at least 1 MAP task, got " + mapCount);
 
-        assertTrue(totalTasks >= 1, "Should have at least 1 task, got " + totalTasks);
-
-        // ── Dimension columns for ALL tasks ──
+        // ── ALL dimension columns: non-null, non-empty ──
         db.assertDimensionColumns("mr_task_metrics", where,
-            "task_id", "task_type", "job_id");
+            "task_id", "task_type", "job_id", "job_name", "user_name", "state");
 
-        // ── Metric columns: verify columns exist (may be NULL depending on History Server) ──
-        // Just verify the row is queryable — counter values depend on History Server capabilities
-        String taskCols = "task_id, task_type, job_id";
-        String sql = "SELECT " + taskCols + " FROM mr_task_metrics WHERE " + where + " LIMIT 1";
-        try (java.sql.Statement stmt = db.getConnection().createStatement();
-             java.sql.ResultSet rs = stmt.executeQuery(sql)) {
-            assertTrue(rs.next(), "Should have at least 1 task row");
-        }
+        assertEquals("MAP", db.getStringValue("mr_task_metrics", "task_type", where));
+        assertEquals("SUCCEEDED", db.getStringValue("mr_task_metrics", "state", where));
 
-        System.out.println("  [PASS] mr_task_metrics: MAP=" + mapCount + " REDUCE=" + reduceCount
-            + " total=" + totalTasks);
+        // ── task_id cross-validation ──
+        String taskId = db.getStringValue("mr_task_metrics", "task_id", where);
+        assertNotNull(taskId);
+        assertTrue(taskId.contains("_m_"),
+            "MAP task_id must contain '_m_', got: " + taskId);
+        assertTrue(taskId.matches("attempt_\\d+_\\d+_m_\\d+_\\d+"),
+            "task_id must match Hadoop attempt pattern: " + taskId);
+
+        // ── ALL metric columns: non-negative, NOT NULL ──
+        db.assertMetricColumnsNonNegative("mr_task_metrics", where,
+            "hdfs_bytes_read", "hdfs_bytes_written",
+            "file_bytes_read", "file_bytes_written",
+            "map_input_records", "map_output_records", "map_output_bytes",
+            "reduce_input_records", "reduce_output_records", "reduce_shuffle_bytes",
+            "spilled_records", "cpu_time_ms", "gc_time_ms",
+            "duration_ms", "success_count",
+            "hdfs_read_ops", "hdfs_write_ops", "hdfs_large_read_ops");
+
+        // ── MAP-specific: MUST be positive for WordCount ──
+        db.assertMetricColumnsPositive("mr_task_metrics", where,
+            "hdfs_bytes_read",
+            "map_input_records", "map_output_records", "map_output_bytes",
+            "cpu_time_ms", "duration_ms", "success_count");
+
+        System.out.println("  [PASS] MAP task: taskId=" + taskId
+            + ", hdfs_read=" + db.getDoubleValue("mr_task_metrics", "hdfs_bytes_read", where).longValue()
+            + ", map_in=" + db.getDoubleValue("mr_task_metrics", "map_input_records", where).longValue()
+            + ", map_out=" + db.getDoubleValue("mr_task_metrics", "map_output_records", where).longValue()
+            + ", cpu=" + db.getDoubleValue("mr_task_metrics", "cpu_time_ms", where).longValue());
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // Cross-table consistency: job ↔ task
+    // mr_task_metrics REDUCE — ALL columns verified
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    void testMRTaskMetrics_REDUCE_AllColumnsPopulated() throws Exception {
+        String jobName = "it-mr-reduce-" + System.currentTimeMillis();
+        MRJobResult result = submitMRWordCount(jobName);
+
+        db.waitForRows("mr_task_metrics", "job_id = '" + result.jobId + "'",
+            PROPAGATION_TIMEOUT_SEC);
+        String where = "job_id = '" + result.jobId + "' AND task_type = 'REDUCE'";
+
+        System.out.println("[mr_task_metrics REDUCE] job_id=" + result.jobId);
+
+        long reduceCount = db.getRowCount("mr_task_metrics", where);
+        assertTrue(reduceCount >= 1, "Should have at least 1 REDUCE task, got " + reduceCount);
+
+        // ── ALL dimension columns: non-null, non-empty ──
+        db.assertDimensionColumns("mr_task_metrics", where,
+            "task_id", "task_type", "job_id", "job_name", "user_name", "state");
+
+        assertEquals("REDUCE", db.getStringValue("mr_task_metrics", "task_type", where));
+        assertEquals("SUCCEEDED", db.getStringValue("mr_task_metrics", "state", where));
+
+        // ── task_id cross-validation ──
+        String taskId = db.getStringValue("mr_task_metrics", "task_id", where);
+        assertNotNull(taskId);
+        assertTrue(taskId.contains("_r_"),
+            "REDUCE task_id must contain '_r_', got: " + taskId);
+        assertFalse(taskId.contains("_m_"),
+            "REDUCE task_id must NOT contain '_m_' (container reuse bug), got: " + taskId);
+        assertTrue(taskId.matches("attempt_\\d+_\\d+_r_\\d+_\\d+"),
+            "task_id must match Hadoop attempt pattern: " + taskId);
+
+        // ── ALL metric columns: non-negative, NOT NULL ──
+        db.assertMetricColumnsNonNegative("mr_task_metrics", where,
+            "hdfs_bytes_read", "hdfs_bytes_written",
+            "file_bytes_read", "file_bytes_written",
+            "map_input_records", "map_output_records", "map_output_bytes",
+            "reduce_input_records", "reduce_output_records", "reduce_shuffle_bytes",
+            "spilled_records", "cpu_time_ms", "gc_time_ms",
+            "duration_ms", "success_count",
+            "hdfs_read_ops", "hdfs_write_ops", "hdfs_large_read_ops");
+
+        // ── REDUCE-specific: MUST be positive for WordCount ──
+        db.assertMetricColumnsPositive("mr_task_metrics", where,
+            "hdfs_bytes_written",
+            "reduce_input_records", "reduce_output_records", "reduce_shuffle_bytes",
+            "file_bytes_read", "file_bytes_written",
+            "spilled_records",
+            "cpu_time_ms", "duration_ms", "success_count");
+
+        System.out.println("  [PASS] REDUCE task: taskId=" + taskId
+            + ", hdfs_write=" + db.getDoubleValue("mr_task_metrics", "hdfs_bytes_written", where).longValue()
+            + ", reduce_in=" + db.getDoubleValue("mr_task_metrics", "reduce_input_records", where).longValue()
+            + ", shuffle=" + db.getDoubleValue("mr_task_metrics", "reduce_shuffle_bytes", where).longValue()
+            + ", file_write=" + db.getDoubleValue("mr_task_metrics", "file_bytes_written", where).longValue());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Cross-table consistency
     // ═══════════════════════════════════════════════════════════════
 
     @Test
@@ -212,18 +275,24 @@ class MRMetricsFieldVerificationIT {
         String jobWhere = "job_id = '" + result.jobId + "'";
         String taskWhere = "job_id = '" + result.jobId + "'";
 
-        // ── job_name must match across tables (if both are populated) ──
-        long taskCount = db.getRowCount("mr_task_metrics", taskWhere);
-        if (taskCount > 0) {
-            String jobNameFromJob = db.getStringValue("mr_job_metrics", "job_name", jobWhere);
-            String jobNameFromTask = db.getStringValue("mr_task_metrics", "job_name", taskWhere);
-            if (jobNameFromJob != null && jobNameFromTask != null) {
-                assertEquals(jobNameFromJob, jobNameFromTask,
-                    "job_name must match between mr_job_metrics and mr_task_metrics");
-            }
-        }
+        // ── Dimension consistency across tables ──
+        String jobNameFromJob = db.getStringValue("mr_job_metrics", "job_name", jobWhere);
+        String jobNameFromTask = db.getStringValue("mr_task_metrics", "job_name", taskWhere);
+        assertEquals(jobNameFromJob, jobNameFromTask,
+            "job_name must match between mr_job_metrics and mr_task_metrics");
 
-        System.out.println("  [PASS] Cross-table: job_name/user verified, tasks=" + taskCount);
+        String userFromJob = db.getStringValue("mr_job_metrics", "user_name", jobWhere);
+        String userFromTask = db.getStringValue("mr_task_metrics", "user_name", taskWhere);
+        assertEquals(userFromJob, userFromTask,
+            "user_name must match between mr_job_metrics and mr_task_metrics");
+
+        // ── Must have both MAP and REDUCE tasks ──
+        long mapCount = db.getRowCount("mr_task_metrics", taskWhere + " AND task_type = 'MAP'");
+        long reduceCount = db.getRowCount("mr_task_metrics", taskWhere + " AND task_type = 'REDUCE'");
+        assertTrue(mapCount >= 1, "Should have at least 1 MAP task");
+        assertTrue(reduceCount >= 1, "Should have at least 1 REDUCE task");
+
+        System.out.println("  [PASS] Cross-table: job_name/user consistent, MAP=" + mapCount + " REDUCE=" + reduceCount);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -245,17 +314,13 @@ class MRMetricsFieldVerificationIT {
         String inputPath = "/tmp/it-mr/" + jobName + "/input";
         String outputPath = "/tmp/it-mr/" + jobName + "/output";
 
-        // Clean up previous runs
-        runCommand(Arrays.asList(hadoop, "fs", "rm", "-rf", "-skipTrash",
+        runCommand(Arrays.asList(hadoop, "fs", "rm", "-R", "-skipTrash",
             "/tmp/it-mr/" + jobName), 30);
-
-        // Create input with known content
         runCommand(Arrays.asList(hadoop, "fs", "mkdir", "-p", inputPath), 30);
         runCommand(Arrays.asList("bash", "-c",
-            "echo 'hello world hello spark telemetry metrics verify field population test word count' | "
+            "echo 'hello world hello spark telemetry metrics verify field population test word count data hadoop mapreduce yarn hdfs' | "
             + hadoop + " fs -put -f - " + inputPath + "/data.txt"), 30);
 
-        // Find examples JAR
         File libDir = new File(hadoopHome, "share/hadoop/mapreduce");
         File[] jars = libDir.listFiles((d, name) ->
             name.startsWith("hadoop-mapreduce-examples-") && name.endsWith(".jar"));
@@ -263,7 +328,6 @@ class MRMetricsFieldVerificationIT {
             "No hadoop-mapreduce-examples JAR found in " + libDir);
         String examplesJar = jars[0].getAbsolutePath();
 
-        // Submit wordcount
         String output = runCommand(Arrays.asList(
             hadoop, "jar", examplesJar,
             "wordcount",
@@ -271,7 +335,6 @@ class MRMetricsFieldVerificationIT {
             inputPath, outputPath
         ), 120);
 
-        // Extract job ID
         Pattern p = Pattern.compile("job_\\d+_\\d+");
         Matcher m = p.matcher(output);
         assertTrue(m.find(), "Should find job ID in output:\n" + output);

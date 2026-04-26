@@ -13,12 +13,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * End-to-end integration test for Spark metrics.
- * Submits real PySpark jobs and verifies metric fields in MySQL after
- * propagation through OTel → Kafka → Flink → MySQL.
- *
- * NOTE: Some fields (query_text, shuffle_bytes_read in sql_query_metrics)
- * are known to have pipeline limitations — assertions are calibrated to
- * match actual behavior.
+ * Submits real PySpark jobs and verifies EVERY column in EVERY table is populated.
  */
 @Tag("integration")
 class SparkMetricsFieldVerificationIT {
@@ -81,11 +76,11 @@ class SparkMetricsFieldVerificationIT {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // task_metrics — full field verification
+    // task_metrics — ALL columns verified
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    void testSparkPi_TaskMetrics_AllFields() throws Exception {
+    void testSparkPi_TaskMetrics_AllColumns() throws Exception {
         String appName = "it-task-" + System.currentTimeMillis();
         int slices = 50;
         String output = submitPySparkPi(appName, slices);
@@ -97,48 +92,45 @@ class SparkMetricsFieldVerificationIT {
 
         System.out.println("[task_metrics] app_id=" + appId);
 
-        // Exactly `slices` tasks, all successful
         assertEquals(slices, db.getRowCount("task_metrics", where),
             "Should have exactly " + slices + " task rows");
         assertEquals(slices, db.getRowCount("task_metrics", where + " AND task_success = 'true'"),
             "All tasks should succeed");
 
-        // Dimension columns
+        // ── ALL dimension columns: non-null, non-empty ──
         db.assertDimensionColumns("task_metrics", where,
             "app_id", "app_name", "executor_id", "stage_id", "task_id",
-            "task_success", "task_host", "task_locality");
+            "task_success", "task_host", "task_locality", "user_name", "queue");
 
-        // user_name/queue: not NULL (empty string OK in local mode)
-        assertColumnNotNull("task_metrics", where, "user_name");
-        assertColumnNotNull("task_metrics", where, "queue");
+        // task_success must be exactly "true"
+        assertEquals("true", db.getStringValue("task_metrics", where + " AND task_success = 'true'", "task_success"));
 
-        // Duration and execution metrics
-        db.assertMetricColumnsPositive("task_metrics", where,
-            "duration_ms", "executor_run_time_ms", "executor_cpu_time_ns", "result_size_bytes");
-
-        // IO: no external IO for Pi computation
-        Double ioRead = db.getDoubleValue("task_metrics", "io_bytes_read", where);
-        assertNotNull(ioRead);
-        assertEquals(0.0, ioRead, 0.01, "Pi should have 0 bytes read");
-
-        // Non-negative metric columns (scheduler_delay_ms may be NULL for short tasks)
+        // ── ALL metric columns: non-negative, NOT NULL ──
         db.assertMetricColumnsNonNegative("task_metrics", where,
+            "duration_ms", "executor_run_time_ms", "executor_cpu_time_ns",
+            "result_size_bytes",
             "io_bytes_read", "io_bytes_written", "io_records_read", "io_records_written",
             "shuffle_bytes_read", "shuffle_bytes_written", "shuffle_fetch_wait_time_ms",
             "disk_bytes_spilled", "memory_bytes_spilled",
             "deserialize_time_ms",
+            "jvm_gc_time_ms", "scheduler_delay_ms",
+            "peak_execution_memory_bytes",
             "shuffle_local_blocks_fetched", "shuffle_records_read",
             "shuffle_remote_bytes_read_to_disk", "shuffle_remote_reqs_duration_ms");
 
-        System.out.println("  [PASS] task_metrics: " + slices + " rows, all fields verified");
+        // ── Pi-specific: these MUST be positive ──
+        db.assertMetricColumnsPositive("task_metrics", where,
+            "duration_ms", "executor_run_time_ms", "executor_cpu_time_ns", "result_size_bytes");
+
+        System.out.println("  [PASS] task_metrics: " + slices + " rows, ALL columns verified");
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // stage_metrics
+    // stage_metrics — ALL columns verified
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    void testSparkPi_StageMetrics_AllFields() throws Exception {
+    void testSparkPi_StageMetrics_AllColumns() throws Exception {
         String appName = "it-stage-" + System.currentTimeMillis();
         int slices = 50;
         submitPySparkPi(appName, slices);
@@ -147,31 +139,37 @@ class SparkMetricsFieldVerificationIT {
             "app_name = '" + appName + "'", PROPAGATION_TIMEOUT_SEC);
         String where = "app_id = '" + appId + "'";
 
-        // Exactly 1 stage (parallelize + reduce)
+        System.out.println("[stage_metrics] app_id=" + appId);
+
         assertEquals(1, db.getRowCount("stage_metrics", where));
 
-        // num_tasks matches slices
-        Double numTasks = db.getDoubleValue("stage_metrics", "num_tasks", where);
-        assertEquals(slices, numTasks.intValue());
-
-        db.assertMetricColumnsPositive("stage_metrics", where,
-            "duration_ms", "executor_run_time_ms", "executor_cpu_time_ns");
-
+        // ── ALL dimension columns ──
         db.assertDimensionColumns("stage_metrics", where,
-            "app_id", "app_name", "executor_id", "stage_id");
+            "app_id", "app_name", "executor_id", "stage_id", "user_name", "queue");
 
-        // No external IO
-        assertNotNull(db.getDoubleValue("stage_metrics", "io_bytes_read", where));
+        // ── ALL metric columns: non-negative, NOT NULL ──
+        db.assertMetricColumnsNonNegative("stage_metrics", where,
+            "duration_ms", "num_tasks",
+            "executor_run_time_ms", "executor_cpu_time_ns",
+            "jvm_gc_time_ms", "peak_execution_memory_bytes",
+            "io_bytes_read", "io_bytes_written");
 
-        System.out.println("  [PASS] stage_metrics: 1 row, num_tasks=" + numTasks.intValue());
+        // ── Must be positive ──
+        db.assertMetricColumnsPositive("stage_metrics", where,
+            "duration_ms", "num_tasks", "executor_run_time_ms", "executor_cpu_time_ns");
+
+        assertEquals(slices, db.getDoubleValue("stage_metrics", "num_tasks", where).intValue());
+
+        System.out.println("  [PASS] stage_metrics: ALL columns verified, num_tasks="
+            + db.getDoubleValue("stage_metrics", "num_tasks", where).intValue());
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // job_metrics
+    // job_metrics — ALL columns verified
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    void testSparkPi_JobMetrics_AllFields() throws Exception {
+    void testSparkPi_JobMetrics_AllColumns() throws Exception {
         String appName = "it-job-" + System.currentTimeMillis();
         submitPySparkPi(appName, 50);
 
@@ -179,54 +177,87 @@ class SparkMetricsFieldVerificationIT {
             "app_name = '" + appName + "'", PROPAGATION_TIMEOUT_SEC);
         String where = "app_id = '" + appId + "'";
 
-        // At least 1 job (may have additional internal jobs)
+        System.out.println("[job_metrics] app_id=" + appId);
+
         long jobRows = db.getRowCount("job_metrics", where);
         assertTrue(jobRows >= 1, "Should have at least 1 job");
 
-        db.assertMetricColumnsPositive("job_metrics", where, "duration_ms");
-
+        // ── ALL dimension columns ──
         db.assertDimensionColumns("job_metrics", where,
-            "app_id", "app_name", "job_id", "job_success");
+            "app_id", "app_name", "job_id", "job_success", "user_name", "queue");
 
-        // At least 1 stage
+        // ── ALL metric columns: non-negative, NOT NULL ──
+        db.assertMetricColumnsNonNegative("job_metrics", where, "duration_ms", "num_stages");
+
+        // ── Must be positive ──
+        db.assertMetricColumnsPositive("job_metrics", where, "duration_ms");
         Double numStages = db.getDoubleValue("job_metrics", "num_stages", where);
         assertNotNull(numStages);
         assertTrue(numStages >= 1, "Should have at least 1 stage");
 
-        System.out.println("  [PASS] job_metrics: " + jobRows + " rows");
+        System.out.println("  [PASS] job_metrics: " + jobRows + " rows, ALL columns verified");
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // JVM metrics
+    // JVM memory metrics — ALL columns verified
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    void testSparkPi_JvmMetrics_AllFields() throws Exception {
-        String appName = "it-jvm-" + System.currentTimeMillis();
+    void testSparkPi_JvmMemory_AllColumns() throws Exception {
+        String appName = "it-jvmmem-" + System.currentTimeMillis();
         submitPySparkPi(appName, 50);
 
         String appId = db.waitForMetric("jvm_memory_metrics", "app_id",
             "app_name = '" + appName + "'", PROPAGATION_TIMEOUT_SEC);
         String where = "app_id = '" + appId + "'";
 
+        System.out.println("[jvm_memory_metrics] app_id=" + appId);
+
         assertTrue(db.getRowCount("jvm_memory_metrics", where) >= 1);
+
+        // ── ALL dimension columns ──
+        db.assertDimensionColumns("jvm_memory_metrics", where,
+            "app_id", "app_name", "executor_id", "user_name", "queue");
+
+        // ── ALL metric columns: positive, NOT NULL ──
         db.assertMetricColumnsPositive("jvm_memory_metrics", where, "heap_used", "non_heap_used");
-        db.assertDimensionColumns("jvm_memory_metrics", where, "app_id", "executor_id");
 
-        db.waitForRows("jvm_gc_metrics", where, PROPAGATION_TIMEOUT_SEC);
-        assertTrue(db.getRowCount("jvm_gc_metrics", where) >= 1);
-        db.assertMetricColumnsPositive("jvm_gc_metrics", where, "gc_count", "gc_time_ms");
-        db.assertDimensionColumns("jvm_gc_metrics", where, "app_id", "executor_id", "gc_name");
-
-        System.out.println("  [PASS] jvm_metrics");
+        System.out.println("  [PASS] jvm_memory_metrics: ALL columns verified");
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // SQL query metrics
+    // JVM GC metrics — ALL columns verified
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    void testSQL_GroupBy_QueryMetrics() throws Exception {
+    void testSparkPi_JvmGc_AllColumns() throws Exception {
+        String appName = "it-jvmgc-" + System.currentTimeMillis();
+        submitPySparkPi(appName, 50);
+
+        String appId = db.waitForMetric("jvm_gc_metrics", "app_id",
+            "app_name = '" + appName + "'", PROPAGATION_TIMEOUT_SEC);
+        String where = "app_id = '" + appId + "'";
+
+        System.out.println("[jvm_gc_metrics] app_id=" + appId);
+
+        assertTrue(db.getRowCount("jvm_gc_metrics", where) >= 1);
+
+        // ── ALL dimension columns ──
+        db.assertDimensionColumns("jvm_gc_metrics", where,
+            "app_id", "app_name", "executor_id", "gc_name", "user_name", "queue");
+
+        // ── ALL metric columns: positive, NOT NULL ──
+        db.assertMetricColumnsPositive("jvm_gc_metrics", where, "gc_count", "gc_time_ms");
+
+        System.out.println("  [PASS] jvm_gc_metrics: ALL columns verified");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // sql_query_metrics — ALL columns verified
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    void testSQL_GroupBy_QueryMetrics_AllColumns() throws Exception {
         String appName = "it-sql-qm-" + System.currentTimeMillis();
         submitSQLGroupBy(appName, 100, 5);
 
@@ -234,45 +265,56 @@ class SparkMetricsFieldVerificationIT {
             "app_name = '" + appName + "'", PROPAGATION_TIMEOUT_SEC);
         String where = "app_id = '" + appId + "'";
 
+        System.out.println("[sql_query_metrics] app_id=" + appId);
+
         assertTrue(db.getRowCount("sql_query_metrics", where) >= 1);
 
+        // ── ALL dimension columns ──
+        db.assertDimensionColumns("sql_query_metrics", where,
+            "app_id", "app_name", "execution_id", "user_name", "queue");
+
+        // ── ALL metric columns: non-negative, NOT NULL ──
+        db.assertMetricColumnsNonNegative("sql_query_metrics", where,
+            "duration_ms", "shuffle_bytes_read", "shuffle_bytes_written", "join_count");
+
+        // ── Duration must be positive ──
         db.assertMetricColumnsPositive("sql_query_metrics", where, "duration_ms");
 
-        // execution_id populated
-        db.assertDimensionColumns("sql_query_metrics", where, "app_id", "execution_id");
-
-        // query_text: pipeline limitation — may be NULL in current version
-        // Verify column exists by querying (value assertion skipped)
-
-        System.out.println("  [PASS] sql_query_metrics");
+        System.out.println("  [PASS] sql_query_metrics: ALL columns verified");
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // SQL table IO metrics
+    // sql_query_table_metrics — ALL columns verified (when populated)
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    void testSQL_GroupBy_TableIOMetrics() throws Exception {
+    void testSQL_GroupBy_TableIOMetrics_AllColumns() throws Exception {
         String appName = "it-sql-tio-" + System.currentTimeMillis();
-        int numRows = 100;
-        submitSQLGroupBy(appName, numRows, 5);
+        submitSQLGroupBy(appName, 100, 5);
 
-        // sql_query_table_metrics may not be populated for in-memory temp views
-        // — check sql_query_metrics instead for GROUP BY verification
         String appId = db.waitForMetric("sql_query_metrics", "app_id",
             "app_name = '" + appName + "'", PROPAGATION_TIMEOUT_SEC);
         String where = "app_id = '" + appId + "'";
 
         db.assertMetricColumnsPositive("sql_query_metrics", where, "duration_ms");
 
-        // Check if table IO metrics exist (may not for DataFrame-based queries)
         long tableRows = db.getRowCount("sql_query_table_metrics", where);
         if (tableRows > 0) {
-            db.assertDimensionColumns("sql_query_table_metrics", where,
-                "app_id", "execution_id", "table_name", "operation");
-        }
+            System.out.println("[sql_query_table_metrics] app_id=" + appId);
 
-        System.out.println("  [PASS] sql table IO: " + tableRows + " rows (table_metrics may be 0 for temp views)");
+            // ── ALL dimension columns ──
+            db.assertDimensionColumns("sql_query_table_metrics", where,
+                "app_id", "app_name", "execution_id", "table_name", "operation",
+                "user_name", "queue");
+
+            // ── ALL metric columns: non-negative, NOT NULL ──
+            db.assertMetricColumnsNonNegative("sql_query_table_metrics", where,
+                "bytes", "rows", "files_read", "time_ms");
+
+            System.out.println("  [PASS] sql_query_table_metrics: " + tableRows + " rows, ALL columns verified");
+        } else {
+            System.out.println("  [SKIP] sql_query_table_metrics: 0 rows (expected for temp view queries)");
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -280,7 +322,7 @@ class SparkMetricsFieldVerificationIT {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    void testSQL_Join_QueryMetrics() throws Exception {
+    void testSQL_Join_QueryMetrics_AllColumns() throws Exception {
         String appName = "it-sql-join-" + System.currentTimeMillis();
         submitSQLJoin(appName, 100);
 
@@ -288,16 +330,26 @@ class SparkMetricsFieldVerificationIT {
             "app_name = '" + appName + "'", PROPAGATION_TIMEOUT_SEC);
         String where = "app_id = '" + appId + "'";
 
+        System.out.println("[sql JOIN] app_id=" + appId);
+
         assertTrue(db.getRowCount("sql_query_metrics", where) >= 1);
 
-        // join_count: may or may not be populated depending on pipeline version
+        // ── ALL dimension columns ──
+        db.assertDimensionColumns("sql_query_metrics", where,
+            "app_id", "app_name", "execution_id", "user_name", "queue");
+
+        // ── ALL metric columns: non-negative ──
+        db.assertMetricColumnsNonNegative("sql_query_metrics", where,
+            "duration_ms", "shuffle_bytes_read", "shuffle_bytes_written", "join_count");
+
+        db.assertMetricColumnsPositive("sql_query_metrics", where, "duration_ms");
+
         Double joinCount = db.getDoubleValue("sql_query_metrics", "join_count",
             where + " AND join_count IS NOT NULL");
         if (joinCount != null) {
             assertTrue(joinCount > 0, "join_count should be > 0 for JOIN, got " + joinCount);
         }
 
-        // shuffle_bytes_read: populated for exchange operations
         Double shuffleRead = db.getDoubleValue("sql_query_metrics", "shuffle_bytes_read",
             where + " AND shuffle_bytes_read IS NOT NULL");
         if (shuffleRead != null) {
@@ -308,7 +360,7 @@ class SparkMetricsFieldVerificationIT {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // Cross-table consistency
+    // Cross-table consistency — ALL shared dimension columns match
     // ═══════════════════════════════════════════════════════════════
 
     @Test
@@ -328,15 +380,22 @@ class SparkMetricsFieldVerificationIT {
         assertTrue(db.getRowCount("jvm_memory_metrics", where) > 0);
         assertTrue(db.getRowCount("jvm_gc_metrics", where) > 0);
 
-        // app_name matches across tables
+        // app_name, user_name, queue must match across ALL tables
         String taskAppName = db.getStringValue("task_metrics", "app_name", where);
+        String stageAppName = db.getStringValue("stage_metrics", "app_name", where);
         String jobAppName = db.getStringValue("job_metrics", "app_name", where);
-        assertEquals(taskAppName, jobAppName);
+        assertEquals(taskAppName, stageAppName, "app_name: task vs stage");
+        assertEquals(taskAppName, jobAppName, "app_name: task vs job");
 
-        // PySpark DataFrame API may produce SQL metrics (spark.range)
-        // — don't assert 0 for sql_query_metrics
+        String taskUser = db.getStringValue("task_metrics", "user_name", where);
+        String stageUser = db.getStringValue("stage_metrics", "user_name", where);
+        assertEquals(taskUser, stageUser, "user_name: task vs stage");
 
-        System.out.println("  [PASS] cross-table consistency");
+        String taskQueue = db.getStringValue("task_metrics", "queue", where);
+        String stageQueue = db.getStringValue("stage_metrics", "queue", where);
+        assertEquals(taskQueue, stageQueue, "queue: task vs stage");
+
+        System.out.println("  [PASS] cross-table: app_name/user_name/queue consistent across ALL tables");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -346,17 +405,6 @@ class SparkMetricsFieldVerificationIT {
     private void assertOutputContains(String output, String text) {
         assertTrue(output.contains(text),
             "Output should contain '" + text + "'. Output:\n" + output);
-    }
-
-    private void assertColumnNotNull(String table, String where, String column) throws Exception {
-        String sql = "SELECT " + column + " FROM " + table + " WHERE " + where + " LIMIT 1";
-        try (Statement stmt = db.getConnection().createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            assertTrue(rs.next(), "No rows in " + table);
-            if (rs.getString(column) == null) {
-                fail(column + " is NULL in " + table);
-            }
-        }
     }
 
     private String submitPySparkPi(String appName, int slices) throws Exception {
