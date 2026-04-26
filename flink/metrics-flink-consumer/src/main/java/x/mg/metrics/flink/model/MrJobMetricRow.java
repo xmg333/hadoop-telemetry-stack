@@ -11,6 +11,7 @@ public class MrJobMetricRow implements Serializable {
     private String userName;
     private String state;
     private String queue;
+    private String appName;
 
     // IO metrics
     private Double hdfsBytesRead;
@@ -68,6 +69,7 @@ public class MrJobMetricRow implements Serializable {
         row.userName = labels.getOrDefault("mr.job.user", "unknown");
         row.state = labels.getOrDefault("mr.job.state", "unknown");
         row.queue = labels.getOrDefault("mr.job.queue", "unknown");
+        row.appName = labels.getOrDefault("mr.job.name", "");  // job_name as app_name
         return row;
     }
 
@@ -103,6 +105,7 @@ public class MrJobMetricRow implements Serializable {
     public String getUserName() { return userName; }
     public String getState() { return state; }
     public String getQueue() { return queue; }
+    public String getAppName() { return appName; }
     public Double getHdfsBytesRead() { return hdfsBytesRead; }
     public Double getHdfsBytesWritten() { return hdfsBytesWritten; }
     public Double getFileBytesRead() { return fileBytesRead; }

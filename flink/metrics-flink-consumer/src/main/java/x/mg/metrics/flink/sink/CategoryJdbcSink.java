@@ -121,17 +121,17 @@ public class CategoryJdbcSink {
             flushed += insertMetricEvents(result.metricEventRows);
         }
         if (!result.taskBuckets.isEmpty()) {
-            flushed += insertHistogramBuckets("task_histogram_buckets", result.taskBuckets,
+            flushed += insertHistogramBuckets("spark_task_histogram", result.taskBuckets,
                 "timestamp_ms, app_id, executor_id, stage_id, task_id, task_success, metric_name, bucket_le, bucket_count",
                 this::bindTaskBucket);
         }
         if (!result.stageBuckets.isEmpty()) {
-            flushed += insertHistogramBuckets("stage_histogram_buckets", result.stageBuckets,
+            flushed += insertHistogramBuckets("spark_stage_histogram", result.stageBuckets,
                 "timestamp_ms, app_id, executor_id, stage_id, metric_name, bucket_le, bucket_count",
                 this::bindStageBucket);
         }
         if (!result.jobBuckets.isEmpty()) {
-            flushed += insertHistogramBuckets("job_histogram_buckets", result.jobBuckets,
+            flushed += insertHistogramBuckets("spark_job_histogram", result.jobBuckets,
                 "timestamp_ms, app_id, job_id, job_success, metric_name, bucket_le, bucket_count",
                 this::bindJobBucket);
         }
@@ -147,7 +147,7 @@ public class CategoryJdbcSink {
             + " hive_tbl=" + (result.hiveTableIoRows != null ? result.hiveTableIoRows.size() : 0)
             + " mr_job=" + (result.mrJobRows != null ? result.mrJobRows.size() : 0)
             + " mr_task=" + (result.mrTaskRows != null ? result.mrTaskRows.size() : 0)
-            + " metric_events=" + (result.metricEventRows != null ? result.metricEventRows.size() : 0)
+            + " unified_metrics=" + (result.metricEventRows != null ? result.metricEventRows.size() : 0)
             + " buckets=" + (result.taskBuckets.size() + result.stageBuckets.size() + result.jobBuckets.size())
             + ") | total accepted: " + accumulator.getTotalSamplesAccepted() + " samples, "
             + accumulator.getTotalBucketsAccepted() + " buckets, "
@@ -172,17 +172,17 @@ public class CategoryJdbcSink {
         if (result.mrTaskRows != null && !result.mrTaskRows.isEmpty()) flushed += insertMrTaskMetrics(result.mrTaskRows);
         if (result.metricEventRows != null && !result.metricEventRows.isEmpty()) flushed += insertMetricEvents(result.metricEventRows);
         if (!result.taskBuckets.isEmpty()) {
-            flushed += insertHistogramBuckets("task_histogram_buckets", result.taskBuckets,
+            flushed += insertHistogramBuckets("spark_task_histogram", result.taskBuckets,
                 "timestamp_ms, app_id, executor_id, stage_id, task_id, task_success, metric_name, bucket_le, bucket_count",
                 this::bindTaskBucket);
         }
         if (!result.stageBuckets.isEmpty()) {
-            flushed += insertHistogramBuckets("stage_histogram_buckets", result.stageBuckets,
+            flushed += insertHistogramBuckets("spark_stage_histogram", result.stageBuckets,
                 "timestamp_ms, app_id, executor_id, stage_id, metric_name, bucket_le, bucket_count",
                 this::bindStageBucket);
         }
         if (!result.jobBuckets.isEmpty()) {
-            flushed += insertHistogramBuckets("job_histogram_buckets", result.jobBuckets,
+            flushed += insertHistogramBuckets("spark_job_histogram", result.jobBuckets,
                 "timestamp_ms, app_id, job_id, job_success, metric_name, bucket_le, bucket_count",
                 this::bindJobBucket);
         }
@@ -217,7 +217,7 @@ public class CategoryJdbcSink {
     }
 
     private void createMySqlTables(Statement stmt) throws SQLException {
-        stmt.execute("CREATE TABLE IF NOT EXISTS task_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_task_metrics (" +
             "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "timestamp_ms BIGINT NOT NULL, " +
             "app_id VARCHAR(255) NOT NULL, " +
@@ -257,7 +257,7 @@ public class CategoryJdbcSink {
             "INDEX idx_app_time (app_id, timestamp_ms), " +
             "INDEX idx_stage (app_id, stage_id))");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS stage_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_stage_metrics (" +
             "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "timestamp_ms BIGINT NOT NULL, " +
             "app_id VARCHAR(255) NOT NULL, " +
@@ -276,7 +276,7 @@ public class CategoryJdbcSink {
             "io_bytes_written DOUBLE, " +
             "INDEX idx_app_time (app_id, timestamp_ms))");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS job_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_job_metrics (" +
             "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "timestamp_ms BIGINT NOT NULL, " +
             "app_id VARCHAR(255) NOT NULL, " +
@@ -289,7 +289,7 @@ public class CategoryJdbcSink {
             "num_stages DOUBLE, " +
             "INDEX idx_app_time (app_id, timestamp_ms))");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS jvm_memory_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_jvm_memory (" +
             "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "timestamp_ms BIGINT NOT NULL, " +
             "app_id VARCHAR(255) NOT NULL, " +
@@ -301,7 +301,7 @@ public class CategoryJdbcSink {
             "non_heap_used DOUBLE, " +
             "INDEX idx_app_time (app_id, timestamp_ms))");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS jvm_gc_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_jvm_gc (" +
             "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "timestamp_ms BIGINT NOT NULL, " +
             "app_id VARCHAR(255) NOT NULL, " +
@@ -314,7 +314,7 @@ public class CategoryJdbcSink {
             "gc_time_ms DOUBLE, " +
             "INDEX idx_app_time (app_id, timestamp_ms))");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS task_histogram_buckets (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_task_histogram (" +
             "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "timestamp_ms BIGINT NOT NULL, " +
             "app_id VARCHAR(255) NOT NULL, " +
@@ -327,7 +327,7 @@ public class CategoryJdbcSink {
             "bucket_count BIGINT NOT NULL, " +
             "INDEX idx_metric_time (metric_name, timestamp_ms))");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS stage_histogram_buckets (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_stage_histogram (" +
             "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "timestamp_ms BIGINT NOT NULL, " +
             "app_id VARCHAR(255) NOT NULL, " +
@@ -338,7 +338,7 @@ public class CategoryJdbcSink {
             "bucket_count BIGINT NOT NULL, " +
             "INDEX idx_metric_time (metric_name, timestamp_ms))");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS job_histogram_buckets (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_job_histogram (" +
             "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "timestamp_ms BIGINT NOT NULL, " +
             "app_id VARCHAR(255) NOT NULL, " +
@@ -349,7 +349,7 @@ public class CategoryJdbcSink {
             "bucket_count BIGINT NOT NULL, " +
             "INDEX idx_metric_time (metric_name, timestamp_ms))");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS stage_governance (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_stage_skew (" +
             "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "timestamp_ms BIGINT NOT NULL, " +
             "app_id VARCHAR(255) NOT NULL, " +
@@ -383,7 +383,7 @@ public class CategoryJdbcSink {
             "INDEX idx_app_time (app_id, timestamp_ms), " +
             "INDEX idx_stage (app_id, stage_id))");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS sql_query_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_sql_metrics (" +
             "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "timestamp_ms BIGINT NOT NULL, " +
             "app_id VARCHAR(255) NOT NULL, " +
@@ -398,7 +398,7 @@ public class CategoryJdbcSink {
             "query_text TEXT, " +
             "INDEX idx_app_time (app_id, timestamp_ms))");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS sql_query_table_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_sql_table (" +
             "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "timestamp_ms BIGINT NOT NULL, " +
             "app_id VARCHAR(255) NOT NULL, " +
@@ -421,6 +421,8 @@ public class CategoryJdbcSink {
             "query_id VARCHAR(255) NOT NULL, " +
             "operation VARCHAR(64), " +
             "user_name VARCHAR(255), " +
+            "app_name VARCHAR(255), " +
+            "queue VARCHAR(255), " +
             "success VARCHAR(16), " +
             "duration_ms DOUBLE, " +
             "success_count DOUBLE, " +
@@ -435,7 +437,7 @@ public class CategoryJdbcSink {
             "INDEX idx_operation_time (operation, timestamp_ms), " +
             "INDEX idx_engine_time (execution_engine, timestamp_ms))");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS hive_table_io_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS hive_query_table (" +
             "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "timestamp_ms BIGINT NOT NULL, " +
             "query_id VARCHAR(255) NOT NULL, " +
@@ -443,6 +445,7 @@ public class CategoryJdbcSink {
             "table_type VARCHAR(16) NOT NULL, " +
             "operation VARCHAR(64), " +
             "user_name VARCHAR(255), " +
+            "app_name VARCHAR(255), " +
             "input_table_count DOUBLE, " +
             "output_table_count DOUBLE, " +
             "execution_engine VARCHAR(32), " +
@@ -461,6 +464,7 @@ public class CategoryJdbcSink {
             "job_id VARCHAR(255) NOT NULL, " +
             "job_name VARCHAR(512), " +
             "user_name VARCHAR(255), " +
+            "app_name VARCHAR(255), " +
             "state VARCHAR(32), " +
             "queue VARCHAR(255), " +
             "hdfs_bytes_read DOUBLE, " +
@@ -519,15 +523,12 @@ public class CategoryJdbcSink {
             "hdfs_read_ops DOUBLE, " +
             "hdfs_write_ops DOUBLE, " +
             "hdfs_large_read_ops DOUBLE, " +
-            "file_read_ops DOUBLE, " +
-            "file_write_ops DOUBLE, " +
-            "file_large_read_ops DOUBLE, " +
             "INDEX idx_task_time (task_id, timestamp_ms), " +
             "INDEX idx_job_time (job_id, timestamp_ms), " +
             "INDEX idx_type_time (task_type, timestamp_ms))");
 
         // Unified wide table for cross-engine analytics
-        stmt.execute("CREATE TABLE IF NOT EXISTS metric_events (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS unified_metrics (" +
             "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
             "timestamp_ms BIGINT NOT NULL, " +
             "event_type VARCHAR(32) NOT NULL, " +
@@ -538,13 +539,13 @@ public class CategoryJdbcSink {
             "user_name VARCHAR(255), " +
             "queue VARCHAR(255), " +
             "duration_ms DOUBLE, " +
-            "io_bytes_read DOUBLE, " +
-            "io_bytes_written DOUBLE, " +
+            "bytes_read DOUBLE, " +
+            "bytes_written DOUBLE, " +
             "shuffle_bytes_read DOUBLE, " +
             "shuffle_bytes_written DOUBLE, " +
             "cpu_time_ms DOUBLE, " +
             "gc_time_ms DOUBLE, " +
-            "memory_bytes_spilled DOUBLE, " +
+            "bytes_spilled DOUBLE, " +
             "executor_id VARCHAR(64), " +
             "stage_id INT, " +
             "task_id VARCHAR(255), " +
@@ -574,7 +575,7 @@ public class CategoryJdbcSink {
             "bytes DOUBLE, " +
             "`rows` DOUBLE, " +
             "files_read DOUBLE, " +
-            "time_ms_col DOUBLE, " +
+            "time_ms DOUBLE, " +
             "heap_used DOUBLE, " +
             "non_heap_used DOUBLE, " +
             "gc_name VARCHAR(128), " +
@@ -605,9 +606,6 @@ public class CategoryJdbcSink {
             "hdfs_read_ops DOUBLE, " +
             "hdfs_write_ops DOUBLE, " +
             "hdfs_large_read_ops DOUBLE, " +
-            "file_read_ops DOUBLE, " +
-            "file_write_ops DOUBLE, " +
-            "file_large_read_ops DOUBLE, " +
             "operation VARCHAR(64), " +
             "table_type VARCHAR(16), " +
             "execution_engine VARCHAR(32), " +
@@ -615,8 +613,8 @@ public class CategoryJdbcSink {
             "failure_count DOUBLE, " +
             "input_rows DOUBLE, " +
             "output_rows DOUBLE, " +
-            "io_records_read DOUBLE, " +
-            "io_records_written DOUBLE, " +
+            "records_read DOUBLE, " +
+            "records_written DOUBLE, " +
             "query_text TEXT, " +
             "INDEX idx_engine_type_time (engine, event_type, timestamp_ms), " +
             "INDEX idx_app_time (app_id, timestamp_ms), " +
@@ -626,7 +624,7 @@ public class CategoryJdbcSink {
     }
 
     private void createClickHouseTables(Statement stmt) throws SQLException {
-        stmt.execute("CREATE TABLE IF NOT EXISTS task_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_task_metrics (" +
             "timestamp_ms DateTime64(3), " +
             "app_id String, " +
             "executor_id LowCardinality(String), " +
@@ -666,7 +664,7 @@ public class CategoryJdbcSink {
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (app_id, timestamp_ms)");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS stage_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_stage_metrics (" +
             "timestamp_ms DateTime64(3), " +
             "app_id String, " +
             "executor_id LowCardinality(String), " +
@@ -686,7 +684,7 @@ public class CategoryJdbcSink {
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (app_id, timestamp_ms)");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS job_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_job_metrics (" +
             "timestamp_ms DateTime64(3), " +
             "app_id String, " +
             "job_id Int32, " +
@@ -700,7 +698,7 @@ public class CategoryJdbcSink {
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (app_id, timestamp_ms)");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS jvm_memory_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_jvm_memory (" +
             "timestamp_ms DateTime64(3), " +
             "app_id String, " +
             "executor_id LowCardinality(String), " +
@@ -713,7 +711,7 @@ public class CategoryJdbcSink {
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (app_id, timestamp_ms)");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS jvm_gc_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_jvm_gc (" +
             "timestamp_ms DateTime64(3), " +
             "app_id String, " +
             "executor_id LowCardinality(String), " +
@@ -727,7 +725,7 @@ public class CategoryJdbcSink {
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (app_id, timestamp_ms)");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS task_histogram_buckets (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_task_histogram (" +
             "timestamp_ms DateTime64(3), " +
             "app_id String, " +
             "executor_id LowCardinality(String), " +
@@ -741,7 +739,7 @@ public class CategoryJdbcSink {
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (metric_name, timestamp_ms, bucket_le)");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS stage_histogram_buckets (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_stage_histogram (" +
             "timestamp_ms DateTime64(3), " +
             "app_id String, " +
             "executor_id LowCardinality(String), " +
@@ -753,7 +751,7 @@ public class CategoryJdbcSink {
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (metric_name, timestamp_ms, bucket_le)");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS job_histogram_buckets (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_job_histogram (" +
             "timestamp_ms DateTime64(3), " +
             "app_id String, " +
             "job_id Int32, " +
@@ -765,7 +763,7 @@ public class CategoryJdbcSink {
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (metric_name, timestamp_ms, bucket_le)");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS stage_governance (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_stage_skew (" +
             "timestamp_ms DateTime64(3), " +
             "app_id String, " +
             "stage_id Int32, " +
@@ -799,7 +797,7 @@ public class CategoryJdbcSink {
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (app_id, timestamp_ms)");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS sql_query_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_sql_metrics (" +
             "timestamp_ms DateTime64(3), " +
             "app_id String, " +
             "execution_id String, " +
@@ -815,7 +813,7 @@ public class CategoryJdbcSink {
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (app_id, timestamp_ms)");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS sql_query_table_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS spark_sql_table (" +
             "timestamp_ms DateTime64(3), " +
             "app_id String, " +
             "execution_id String, " +
@@ -837,6 +835,8 @@ public class CategoryJdbcSink {
             "query_id String, " +
             "operation LowCardinality(Nullable(String)), " +
             "user_name Nullable(String), " +
+            "app_name Nullable(String), " +
+            "queue Nullable(String), " +
             "success LowCardinality(Nullable(String)), " +
             "duration_ms Nullable(Float64), " +
             "success_count Nullable(Float64), " +
@@ -851,13 +851,14 @@ public class CategoryJdbcSink {
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (query_id, timestamp_ms)");
 
-        stmt.execute("CREATE TABLE IF NOT EXISTS hive_table_io_metrics (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS hive_query_table (" +
             "timestamp_ms DateTime64(3), " +
             "query_id String, " +
             "table_name String, " +
             "table_type LowCardinality(String), " +
             "operation LowCardinality(Nullable(String)), " +
             "user_name Nullable(String), " +
+            "app_name Nullable(String), " +
             "input_table_count Nullable(Float64), " +
             "output_table_count Nullable(Float64), " +
             "execution_engine LowCardinality(Nullable(String)), " +
@@ -875,6 +876,7 @@ public class CategoryJdbcSink {
             "job_id String, " +
             "job_name Nullable(String), " +
             "user_name Nullable(String), " +
+            "app_name Nullable(String), " +
             "state LowCardinality(Nullable(String)), " +
             "queue Nullable(String), " +
             "hdfs_bytes_read Nullable(Float64), " +
@@ -931,16 +933,13 @@ public class CategoryJdbcSink {
             "failure_count Nullable(Float64), " +
             "hdfs_read_ops Nullable(Float64), " +
             "hdfs_write_ops Nullable(Float64), " +
-            "hdfs_large_read_ops Nullable(Float64), " +
-            "file_read_ops Nullable(Float64), " +
-            "file_write_ops Nullable(Float64), " +
-            "file_large_read_ops Nullable(Float64)" +
+            "hdfs_large_read_ops Nullable(Float64)" +
             ") ENGINE = MergeTree() " +
             "PARTITION BY toYYYYMM(timestamp_ms) " +
             "ORDER BY (job_id, timestamp_ms)");
 
         // Unified wide table for cross-engine analytics (ClickHouse)
-        stmt.execute("CREATE TABLE IF NOT EXISTS metric_events (" +
+        stmt.execute("CREATE TABLE IF NOT EXISTS unified_metrics (" +
             "timestamp_ms DateTime64(3), " +
             "event_type LowCardinality(String), " +
             "engine LowCardinality(String), " +
@@ -950,13 +949,13 @@ public class CategoryJdbcSink {
             "user_name Nullable(String), " +
             "queue Nullable(String), " +
             "duration_ms Nullable(Float64), " +
-            "io_bytes_read Nullable(Float64), " +
-            "io_bytes_written Nullable(Float64), " +
+            "bytes_read Nullable(Float64), " +
+            "bytes_written Nullable(Float64), " +
             "shuffle_bytes_read Nullable(Float64), " +
             "shuffle_bytes_written Nullable(Float64), " +
             "cpu_time_ms Nullable(Float64), " +
             "gc_time_ms Nullable(Float64), " +
-            "memory_bytes_spilled Nullable(Float64), " +
+            "bytes_spilled Nullable(Float64), " +
             "executor_id Nullable(LowCardinality(String)), " +
             "stage_id Nullable(Int32), " +
             "task_id Nullable(String), " +
@@ -986,7 +985,7 @@ public class CategoryJdbcSink {
             "bytes Nullable(Float64), " +
             "rows Nullable(Float64), " +
             "files_read Nullable(Float64), " +
-            "time_ms_col Nullable(Float64), " +
+            "time_ms Nullable(Float64), " +
             "heap_used Nullable(Float64), " +
             "non_heap_used Nullable(Float64), " +
             "gc_name Nullable(LowCardinality(String)), " +
@@ -1017,9 +1016,6 @@ public class CategoryJdbcSink {
             "hdfs_read_ops Nullable(Float64), " +
             "hdfs_write_ops Nullable(Float64), " +
             "hdfs_large_read_ops Nullable(Float64), " +
-            "file_read_ops Nullable(Float64), " +
-            "file_write_ops Nullable(Float64), " +
-            "file_large_read_ops Nullable(Float64), " +
             "operation Nullable(LowCardinality(String)), " +
             "table_type Nullable(LowCardinality(String)), " +
             "execution_engine Nullable(LowCardinality(String)), " +
@@ -1027,8 +1023,8 @@ public class CategoryJdbcSink {
             "failure_count Nullable(Float64), " +
             "input_rows Nullable(Float64), " +
             "output_rows Nullable(Float64), " +
-            "io_records_read Nullable(Float64), " +
-            "io_records_written Nullable(Float64), " +
+            "records_read Nullable(Float64), " +
+            "records_written Nullable(Float64), " +
             "query_text Nullable(String)" +
             ") ENGINE = MergeTree() " +
             "PARTITION BY toYYYYMM(timestamp_ms) " +
@@ -1037,7 +1033,7 @@ public class CategoryJdbcSink {
 
     private int insertTaskMetrics(List<TaskMetricRow> rows) throws SQLException {
         String sql = isClickHouse
-            ? "INSERT INTO task_metrics (timestamp_ms, app_id, executor_id, stage_id, task_id, task_success, " +
+            ? "INSERT INTO spark_task_metrics (timestamp_ms, app_id, executor_id, stage_id, task_id, task_success, " +
               "task_host, task_locality, task_speculative, app_name, user_name, queue, duration_ms, io_bytes_read, io_bytes_written, " +
               "io_records_read, io_records_written, shuffle_bytes_read, shuffle_bytes_written, " +
               "shuffle_fetch_wait_time_ms, disk_bytes_spilled, memory_bytes_spilled, executor_run_time_ms, " +
@@ -1045,7 +1041,7 @@ public class CategoryJdbcSink {
               "jvm_gc_time_ms, scheduler_delay_ms, result_size_bytes, peak_execution_memory_bytes, " +
               "shuffle_local_blocks_fetched, shuffle_records_read, shuffle_remote_bytes_read_to_disk, " +
               "shuffle_remote_reqs_duration_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
-            : "INSERT INTO task_metrics (timestamp_ms, app_id, executor_id, stage_id, task_id, task_success, " +
+            : "INSERT INTO spark_task_metrics (timestamp_ms, app_id, executor_id, stage_id, task_id, task_success, " +
               "task_host, task_locality, task_speculative, app_name, user_name, queue, duration_ms, io_bytes_read, io_bytes_written, " +
               "io_records_read, io_records_written, shuffle_bytes_read, shuffle_bytes_written, " +
               "shuffle_fetch_wait_time_ms, disk_bytes_spilled, memory_bytes_spilled, executor_run_time_ms, " +
@@ -1101,7 +1097,7 @@ public class CategoryJdbcSink {
     }
 
     private int insertStageMetrics(List<StageMetricRow> rows) throws SQLException {
-        String sql = "INSERT INTO stage_metrics (timestamp_ms, app_id, executor_id, stage_id, " +
+        String sql = "INSERT INTO spark_stage_metrics (timestamp_ms, app_id, executor_id, stage_id, " +
             "app_name, user_name, queue, duration_ms, num_tasks, executor_run_time_ms, executor_cpu_time_ns, jvm_gc_time_ms, " +
             "peak_execution_memory_bytes, io_bytes_read, io_bytes_written) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
@@ -1131,7 +1127,7 @@ public class CategoryJdbcSink {
     }
 
     private int insertJobMetrics(List<JobMetricRow> rows) throws SQLException {
-        String sql = "INSERT INTO job_metrics (timestamp_ms, app_id, job_id, job_success, " +
+        String sql = "INSERT INTO spark_job_metrics (timestamp_ms, app_id, job_id, job_success, " +
             "app_name, user_name, queue, duration_ms, num_stages) VALUES (?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (JobMetricRow r : rows) {
@@ -1154,7 +1150,7 @@ public class CategoryJdbcSink {
     }
 
     private int insertJvmMemoryMetrics(List<JvmMemoryMetricRow> rows) throws SQLException {
-        String sql = "INSERT INTO jvm_memory_metrics (timestamp_ms, app_id, executor_id, " +
+        String sql = "INSERT INTO spark_jvm_memory (timestamp_ms, app_id, executor_id, " +
             "app_name, user_name, queue, heap_used, non_heap_used) VALUES (?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (JvmMemoryMetricRow r : rows) {
@@ -1176,7 +1172,7 @@ public class CategoryJdbcSink {
     }
 
     private int insertJvmGcMetrics(List<JvmGcMetricRow> rows) throws SQLException {
-        String sql = "INSERT INTO jvm_gc_metrics (timestamp_ms, app_id, executor_id, gc_name, " +
+        String sql = "INSERT INTO spark_jvm_gc (timestamp_ms, app_id, executor_id, gc_name, " +
             "app_name, user_name, queue, gc_count, gc_time_ms) VALUES (?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (JvmGcMetricRow r : rows) {
@@ -1199,7 +1195,7 @@ public class CategoryJdbcSink {
     }
 
     private int insertSqlQueryMetrics(List<SqlQueryMetricRow> rows) throws SQLException {
-        String sql = "INSERT INTO sql_query_metrics (timestamp_ms, app_id, execution_id, " +
+        String sql = "INSERT INTO spark_sql_metrics (timestamp_ms, app_id, execution_id, " +
             "app_name, user_name, queue, duration_ms, shuffle_bytes_read, shuffle_bytes_written, join_count, query_text) VALUES (?,?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (SqlQueryMetricRow r : rows) {
@@ -1224,7 +1220,7 @@ public class CategoryJdbcSink {
     }
 
     private int insertSqlTableIoMetrics(List<SqlTableIoMetricRow> rows) throws SQLException {
-        String sql = "INSERT INTO sql_query_table_metrics (timestamp_ms, app_id, execution_id, " +
+        String sql = "INSERT INTO spark_sql_table (timestamp_ms, app_id, execution_id, " +
             "table_name, operation, app_name, user_name, queue, bytes, `rows`, files_read, time_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (SqlTableIoMetricRow r : rows) {
@@ -1317,8 +1313,8 @@ public class CategoryJdbcSink {
 
     private int insertHiveQueryMetrics(List<HiveQueryMetricRow> rows) throws SQLException {
         String sql = "INSERT INTO hive_query_metrics (timestamp_ms, query_id, operation, user_name, " +
-            "success, duration_ms, success_count, failure_count, input_bytes, output_bytes, " +
-            "input_rows, output_rows, execution_engine, query_text) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            "app_name, queue, success, duration_ms, success_count, failure_count, input_bytes, output_bytes, " +
+            "input_rows, output_rows, execution_engine, query_text) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (HiveQueryMetricRow r : rows) {
             int i = 1;
@@ -1326,6 +1322,8 @@ public class CategoryJdbcSink {
             ps.setString(i++, r.getQueryId());
             ps.setString(i++, r.getOperation());
             ps.setString(i++, r.getUserName());
+            ps.setString(i++, r.getAppName());
+            ps.setString(i++, r.getQueue());
             ps.setString(i++, r.getSuccess());
             setDouble(ps, i++, r.getDurationMs());
             setDouble(ps, i++, r.getSuccessCount());
@@ -1345,10 +1343,10 @@ public class CategoryJdbcSink {
     }
 
     private int insertHiveTableIoMetrics(List<HiveTableIoMetricRow> rows) throws SQLException {
-        String sql = "INSERT INTO hive_table_io_metrics (timestamp_ms, query_id, table_name, " +
-            "table_type, operation, user_name, input_table_count, output_table_count, execution_engine, " +
+        String sql = "INSERT INTO hive_query_table (timestamp_ms, query_id, table_name, " +
+            "table_type, operation, user_name, app_name, input_table_count, output_table_count, execution_engine, " +
             "bytes, `rows`, files_read, time_ms, queue) " +
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         PreparedStatement ps = connection.prepareStatement(sql);
         for (HiveTableIoMetricRow r : rows) {
             int i = 1;
@@ -1358,6 +1356,7 @@ public class CategoryJdbcSink {
             ps.setString(i++, r.getTableType());
             ps.setString(i++, r.getOperation());
             ps.setString(i++, r.getUserName());
+            ps.setString(i++, r.getAppName());
             setDouble(ps, i++, r.getInputTableCount());
             setDouble(ps, i++, r.getOutputTableCount());
             ps.setString(i++, r.getExecutionEngine());
@@ -1376,17 +1375,17 @@ public class CategoryJdbcSink {
 
     private int insertMrJobMetrics(List<MrJobMetricRow> rows) throws SQLException {
         // Use UPSERT to avoid duplicate rows for the same job
-        String sql = "INSERT INTO mr_job_metrics (timestamp_ms, job_id, job_name, user_name, state, queue, " +
+        String sql = "INSERT INTO mr_job_metrics (timestamp_ms, job_id, job_name, user_name, app_name, state, queue, " +
             "hdfs_bytes_read, hdfs_bytes_written, file_bytes_read, file_bytes_written, " +
             "map_input_records, map_output_records, map_output_bytes, " +
             "reduce_input_records, reduce_output_records, reduce_shuffle_bytes, spilled_records, " +
             "cpu_time_ms, gc_time_ms, physical_memory_bytes, virtual_memory_bytes, committed_heap_bytes, " +
             "maps_duration_ms, reduces_duration_ms, elapsed_time_ms, launched_maps, launched_reduces, " +
             "start_time_ms, finish_time_ms) " +
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) " +
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) " +
             "ON DUPLICATE KEY UPDATE " +
             "timestamp_ms=VALUES(timestamp_ms), job_name=VALUES(job_name), user_name=VALUES(user_name), " +
-            "state=VALUES(state), queue=VALUES(queue), " +
+            "app_name=VALUES(app_name), state=VALUES(state), queue=VALUES(queue), " +
             "hdfs_bytes_read=IFNULL(VALUES(hdfs_bytes_read), hdfs_bytes_read), " +
             "hdfs_bytes_written=IFNULL(VALUES(hdfs_bytes_written), hdfs_bytes_written), " +
             "file_bytes_read=IFNULL(VALUES(file_bytes_read), file_bytes_read), " +
@@ -1417,6 +1416,7 @@ public class CategoryJdbcSink {
             ps.setString(i++, r.getJobId());
             ps.setString(i++, r.getJobName());
             ps.setString(i++, r.getUserName());
+            ps.setString(i++, r.getAppName());
             ps.setString(i++, r.getState());
             ps.setString(i++, r.getQueue());
             setDouble(ps, i++, r.getHdfsBytesRead());
@@ -1458,9 +1458,8 @@ public class CategoryJdbcSink {
             "reduce_input_records, reduce_output_records, reduce_shuffle_bytes, spilled_records, " +
             "cpu_time_ms, gc_time_ms, " +
             "duration_ms, success_count, failure_count, " +
-            "hdfs_read_ops, hdfs_write_ops, hdfs_large_read_ops, " +
-            "file_read_ops, file_write_ops, file_large_read_ops) " +
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) " +
+            "hdfs_read_ops, hdfs_write_ops, hdfs_large_read_ops) " +
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) " +
             "ON DUPLICATE KEY UPDATE ");
 
         // Build the UPDATE clause - only update non-null values
@@ -1486,10 +1485,7 @@ public class CategoryJdbcSink {
             "failure_count=IFNULL(VALUES(failure_count), failure_count)",
             "hdfs_read_ops=IFNULL(VALUES(hdfs_read_ops), hdfs_read_ops)",
             "hdfs_write_ops=IFNULL(VALUES(hdfs_write_ops), hdfs_write_ops)",
-            "hdfs_large_read_ops=IFNULL(VALUES(hdfs_large_read_ops), hdfs_large_read_ops)",
-            "file_read_ops=IFNULL(VALUES(file_read_ops), file_read_ops)",
-            "file_write_ops=IFNULL(VALUES(file_write_ops), file_write_ops)",
-            "file_large_read_ops=IFNULL(VALUES(file_large_read_ops), file_large_read_ops)"
+            "hdfs_large_read_ops=IFNULL(VALUES(hdfs_large_read_ops), hdfs_large_read_ops)"
         };
         sqlBuilder.append(String.join(", ", columns));
 
@@ -1524,9 +1520,6 @@ public class CategoryJdbcSink {
             setDouble(ps, i++, r.getHdfsReadOps());
             setDouble(ps, i++, r.getHdfsWriteOps());
             setDouble(ps, i++, r.getHdfsLargeReadOps());
-            setDouble(ps, i++, r.getFileReadOps());
-            setDouble(ps, i++, r.getFileWriteOps());
-            setDouble(ps, i++, r.getFileLargeReadOps());
             ps.addBatch();
         }
         ps.executeBatch();
@@ -1541,7 +1534,7 @@ public class CategoryJdbcSink {
         // v2: Add execution_engine column to hive tables (if not present)
         String[] hiveMigrations = {
             "ALTER TABLE hive_query_metrics ADD COLUMN IF NOT EXISTS execution_engine VARCHAR(32)",
-            "ALTER TABLE hive_table_io_metrics ADD COLUMN IF NOT EXISTS execution_engine VARCHAR(32)"
+            "ALTER TABLE hive_query_table ADD COLUMN IF NOT EXISTS execution_engine VARCHAR(32)"
         };
         for (String sql : hiveMigrations) {
             try {
@@ -1553,7 +1546,7 @@ public class CategoryJdbcSink {
         // Add index if not exists (MySQL 8.0+ supports IF NOT EXISTS for indexes)
         String[] indexMigrations = {
             "ALTER TABLE hive_query_metrics ADD INDEX IF NOT EXISTS idx_engine_time (execution_engine, timestamp_ms)",
-            "ALTER TABLE hive_table_io_metrics ADD INDEX IF NOT EXISTS idx_engine_time (execution_engine, timestamp_ms)"
+            "ALTER TABLE hive_query_table ADD INDEX IF NOT EXISTS idx_engine_time (execution_engine, timestamp_ms)"
         };
         for (String sql : indexMigrations) {
             try {
@@ -1569,10 +1562,7 @@ public class CategoryJdbcSink {
             "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS failure_count DOUBLE",
             "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_read_ops DOUBLE",
             "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_write_ops DOUBLE",
-            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_large_read_ops DOUBLE",
-            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS file_read_ops DOUBLE",
-            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS file_write_ops DOUBLE",
-            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS file_large_read_ops DOUBLE"
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_large_read_ops DOUBLE"
         };
         for (String sql : mrTaskMigrations) {
             try {
@@ -1607,27 +1597,27 @@ public class CategoryJdbcSink {
         }
         // v5: Add app_name, user_name, queue to Spark tables; queue to mr_task_metrics
         String[] sparkUserQueueMigrations = {
-            "ALTER TABLE task_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
-            "ALTER TABLE task_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
-            "ALTER TABLE task_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
-            "ALTER TABLE stage_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
-            "ALTER TABLE stage_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
-            "ALTER TABLE stage_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
-            "ALTER TABLE job_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
-            "ALTER TABLE job_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
-            "ALTER TABLE job_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
-            "ALTER TABLE jvm_memory_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
-            "ALTER TABLE jvm_memory_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
-            "ALTER TABLE jvm_memory_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
-            "ALTER TABLE jvm_gc_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
-            "ALTER TABLE jvm_gc_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
-            "ALTER TABLE jvm_gc_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
-            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
-            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
-            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
-            "ALTER TABLE sql_query_table_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
-            "ALTER TABLE sql_query_table_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
-            "ALTER TABLE sql_query_table_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE spark_task_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE spark_task_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE spark_task_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE spark_stage_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE spark_stage_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE spark_stage_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE spark_job_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE spark_job_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE spark_job_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE spark_jvm_memory ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE spark_jvm_memory ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE spark_jvm_memory ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE spark_jvm_gc ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE spark_jvm_gc ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE spark_jvm_gc ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE spark_sql_metrics ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE spark_sql_metrics ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE spark_sql_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
+            "ALTER TABLE spark_sql_table ADD COLUMN IF NOT EXISTS app_name VARCHAR(255)",
+            "ALTER TABLE spark_sql_table ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE spark_sql_table ADD COLUMN IF NOT EXISTS queue VARCHAR(255)",
             "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS queue VARCHAR(255)"
         };
         for (String sql : sparkUserQueueMigrations) {
@@ -1639,9 +1629,9 @@ public class CategoryJdbcSink {
         }
         // v6: Add query_text column
         String[] queryTextMigrations = {
-            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS query_text TEXT",
+            "ALTER TABLE spark_sql_metrics ADD COLUMN IF NOT EXISTS query_text TEXT",
             "ALTER TABLE hive_query_metrics ADD COLUMN IF NOT EXISTS query_text TEXT",
-            "ALTER TABLE metric_events ADD COLUMN IF NOT EXISTS query_text TEXT"
+            "ALTER TABLE unified_metrics ADD COLUMN IF NOT EXISTS query_text TEXT"
         };
         for (String sql : queryTextMigrations) {
             try { stmt.execute(sql); } catch (SQLException e) { LOG.log(Level.FINE, "Migration skipped: " + e.getMessage()); }
@@ -1652,7 +1642,7 @@ public class CategoryJdbcSink {
         // v2: Add execution_engine column to hive tables (if not present)
         String[] migrations = {
             "ALTER TABLE hive_query_metrics ADD COLUMN IF NOT EXISTS execution_engine LowCardinality(Nullable(String))",
-            "ALTER TABLE hive_table_io_metrics ADD COLUMN IF NOT EXISTS execution_engine LowCardinality(Nullable(String))"
+            "ALTER TABLE hive_query_table ADD COLUMN IF NOT EXISTS execution_engine LowCardinality(Nullable(String))"
         };
         for (String sql : migrations) {
             try {
@@ -1668,10 +1658,7 @@ public class CategoryJdbcSink {
             "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS failure_count Nullable(Float64)",
             "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_read_ops Nullable(Float64)",
             "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_write_ops Nullable(Float64)",
-            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_large_read_ops Nullable(Float64)",
-            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS file_read_ops Nullable(Float64)",
-            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS file_write_ops Nullable(Float64)",
-            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS file_large_read_ops Nullable(Float64)"
+            "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS hdfs_large_read_ops Nullable(Float64)"
         };
         for (String sql : mrTaskChMigrations) {
             try {
@@ -1694,27 +1681,27 @@ public class CategoryJdbcSink {
         }
         // v5: Add app_name, user_name, queue to Spark tables; queue to mr_task_metrics
         String[] sparkUserQueueChMigrations = {
-            "ALTER TABLE task_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
-            "ALTER TABLE task_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
-            "ALTER TABLE task_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
-            "ALTER TABLE stage_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
-            "ALTER TABLE stage_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
-            "ALTER TABLE stage_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
-            "ALTER TABLE job_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
-            "ALTER TABLE job_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
-            "ALTER TABLE job_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
-            "ALTER TABLE jvm_memory_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
-            "ALTER TABLE jvm_memory_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
-            "ALTER TABLE jvm_memory_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
-            "ALTER TABLE jvm_gc_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
-            "ALTER TABLE jvm_gc_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
-            "ALTER TABLE jvm_gc_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
-            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
-            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
-            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
-            "ALTER TABLE sql_query_table_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
-            "ALTER TABLE sql_query_table_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
-            "ALTER TABLE sql_query_table_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE spark_task_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE spark_task_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE spark_task_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE spark_stage_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE spark_stage_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE spark_stage_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE spark_job_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE spark_job_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE spark_job_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE spark_jvm_memory ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE spark_jvm_memory ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE spark_jvm_memory ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE spark_jvm_gc ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE spark_jvm_gc ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE spark_jvm_gc ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE spark_sql_metrics ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE spark_sql_metrics ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE spark_sql_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)",
+            "ALTER TABLE spark_sql_table ADD COLUMN IF NOT EXISTS app_name Nullable(String)",
+            "ALTER TABLE spark_sql_table ADD COLUMN IF NOT EXISTS user_name Nullable(String)",
+            "ALTER TABLE spark_sql_table ADD COLUMN IF NOT EXISTS queue Nullable(String)",
             "ALTER TABLE mr_task_metrics ADD COLUMN IF NOT EXISTS queue Nullable(String)"
         };
         for (String sql : sparkUserQueueChMigrations) {
@@ -1726,9 +1713,9 @@ public class CategoryJdbcSink {
         }
         // v6: Add query_text column
         String[] queryTextChMigrations = {
-            "ALTER TABLE sql_query_metrics ADD COLUMN IF NOT EXISTS query_text Nullable(String)",
+            "ALTER TABLE spark_sql_metrics ADD COLUMN IF NOT EXISTS query_text Nullable(String)",
             "ALTER TABLE hive_query_metrics ADD COLUMN IF NOT EXISTS query_text Nullable(String)",
-            "ALTER TABLE metric_events ADD COLUMN IF NOT EXISTS query_text Nullable(String)"
+            "ALTER TABLE unified_metrics ADD COLUMN IF NOT EXISTS query_text Nullable(String)"
         };
         for (String sql : queryTextChMigrations) {
             try { stmt.execute(sql); } catch (SQLException e) { LOG.log(Level.FINE, "Migration skipped: " + e.getMessage()); }
@@ -1739,8 +1726,8 @@ public class CategoryJdbcSink {
 
     private int insertMetricEvents(List<MetricEventRow> rows) throws SQLException {
         String columns = "timestamp_ms, event_type, engine, status, app_id, app_name, user_name, queue, "
-            + "duration_ms, io_bytes_read, io_bytes_written, shuffle_bytes_read, shuffle_bytes_written, "
-            + "cpu_time_ms, gc_time_ms, memory_bytes_spilled, "
+            + "duration_ms, bytes_read, bytes_written, shuffle_bytes_read, shuffle_bytes_written, "
+            + "cpu_time_ms, gc_time_ms, bytes_spilled, "
             + "executor_id, stage_id, task_id, task_host, task_locality, task_speculative, "
             + "executor_run_time_ms, executor_cpu_time_ns, deserialize_time_ms, deserialize_cpu_time_ns, "
             + "result_serialization_time_ms, scheduler_delay_ms, result_size_bytes, peak_execution_memory_bytes, "
@@ -1748,7 +1735,7 @@ public class CategoryJdbcSink {
             + "shuffle_remote_bytes_read_to_disk, shuffle_remote_reqs_duration_ms, "
             + "disk_bytes_spilled, shuffle_fetch_wait_time_ms, num_tasks, num_stages, "
             + "execution_id, join_count, "
-            + "table_name, table_operation, bytes, `rows`, files_read, time_ms_col, "
+            + "table_name, table_operation, bytes, `rows`, files_read, time_ms, "
             + "heap_used, non_heap_used, gc_name, gc_count, "
             + "job_id, job_name, task_type, map_output_bytes, "
             + "physical_memory_bytes, virtual_memory_bytes, committed_heap_bytes, "
@@ -1758,9 +1745,8 @@ public class CategoryJdbcSink {
             + "map_input_records, map_output_records, reduce_input_records, reduce_output_records, "
             + "reduce_shuffle_bytes, spilled_records, "
             + "hdfs_read_ops, hdfs_write_ops, hdfs_large_read_ops, "
-            + "file_read_ops, file_write_ops, file_large_read_ops, "
             + "operation, table_type, execution_engine, success_count, failure_count, "
-            + "input_rows, output_rows, io_records_read, io_records_written, query_text";
+            + "input_rows, output_rows, records_read, records_written, query_text";
 
         int colCount = columns.split(",").length;
         StringBuilder placeholders = new StringBuilder();
@@ -1769,7 +1755,7 @@ public class CategoryJdbcSink {
             placeholders.append("?");
         }
 
-        String sql = "INSERT INTO metric_events (" + columns + ") VALUES (" + placeholders + ")";
+        String sql = "INSERT INTO unified_metrics (" + columns + ") VALUES (" + placeholders + ")";
         PreparedStatement ps = connection.prepareStatement(sql);
 
         for (MetricEventRow r : rows) {
@@ -1783,13 +1769,13 @@ public class CategoryJdbcSink {
             ps.setString(i++, r.getUserName());
             ps.setString(i++, r.getQueue());
             setDouble(ps, i++, r.getDurationMs());
-            setDouble(ps, i++, r.getIoBytesRead());
-            setDouble(ps, i++, r.getIoBytesWritten());
+            setDouble(ps, i++, r.getBytesRead());
+            setDouble(ps, i++, r.getBytesWritten());
             setDouble(ps, i++, r.getShuffleBytesRead());
             setDouble(ps, i++, r.getShuffleBytesWritten());
             setDouble(ps, i++, r.getCpuTimeMs());
             setDouble(ps, i++, r.getGcTimeMs());
-            setDouble(ps, i++, r.getMemoryBytesSpilled());
+            setDouble(ps, i++, r.getBytesSpilled());
             ps.setString(i++, r.getExecutorId());
             setIntNullable(ps, i++, r.getStageId());
             ps.setString(i++, r.getTaskId());
@@ -1819,7 +1805,7 @@ public class CategoryJdbcSink {
             setDouble(ps, i++, r.getBytes());
             setDouble(ps, i++, r.getRows());
             setDouble(ps, i++, r.getFilesRead());
-            setDouble(ps, i++, r.getTimeMsCol());
+            setDouble(ps, i++, r.getTimeMs());
             setDouble(ps, i++, r.getHeapUsed());
             setDouble(ps, i++, r.getNonHeapUsed());
             ps.setString(i++, r.getGcName());
@@ -1850,9 +1836,6 @@ public class CategoryJdbcSink {
             setDouble(ps, i++, r.getHdfsReadOps());
             setDouble(ps, i++, r.getHdfsWriteOps());
             setDouble(ps, i++, r.getHdfsLargeReadOps());
-            setDouble(ps, i++, r.getFileReadOps());
-            setDouble(ps, i++, r.getFileWriteOps());
-            setDouble(ps, i++, r.getFileLargeReadOps());
             ps.setString(i++, r.getOperation());
             ps.setString(i++, r.getTableType());
             ps.setString(i++, r.getExecutionEngine());
@@ -1860,8 +1843,8 @@ public class CategoryJdbcSink {
             setDouble(ps, i++, r.getFailureCount());
             setDouble(ps, i++, r.getInputRows());
             setDouble(ps, i++, r.getOutputRows());
-            setDouble(ps, i++, r.getIoRecordsRead());
-            setDouble(ps, i++, r.getIoRecordsWritten());
+            setDouble(ps, i++, r.getRecordsRead());
+            setDouble(ps, i++, r.getRecordsWritten());
             ps.setString(i++, r.getQueryText());
             ps.addBatch();
         }
@@ -1874,7 +1857,7 @@ public class CategoryJdbcSink {
     // ==================== Helpers ====================
 
     private int insertStageGovernance(List<StageGovernanceRow> rows) throws SQLException {
-        String sql = "INSERT INTO stage_governance (timestamp_ms, app_id, stage_id, task_count, " +
+        String sql = "INSERT INTO spark_stage_skew (timestamp_ms, app_id, stage_id, task_count, " +
             "stage_duration_ms, avg_task_duration_ms, max_task_duration_ms, min_task_duration_ms, " +
             "duration_skew_ratio, total_bytes_read, total_bytes_written, total_shuffle_bytes_read, " +
             "total_shuffle_bytes_written, total_records_read, total_records_written, " +

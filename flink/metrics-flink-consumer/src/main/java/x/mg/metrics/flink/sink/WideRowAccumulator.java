@@ -22,7 +22,7 @@ public class WideRowAccumulator implements Serializable {
     private final Map<String, MrJobMetricRow> mrJobRows = new HashMap<>();
     private final Map<String, MrTaskMetricRow> mrTaskRows = new HashMap<>();
 
-    // Unified wide-table accumulator (metric_events)
+    // Unified wide-table accumulator (unified_metrics)
     private final Map<String, MetricEventRow> metricEventRows = new HashMap<>();
 
     private final List<HistogramBucket> taskBuckets = new ArrayList<>();
@@ -135,7 +135,7 @@ public class WideRowAccumulator implements Serializable {
                 return;
         }
 
-        // Also accumulate into the unified wide-table (metric_events)
+        // Also accumulate into the unified wide-table (unified_metrics)
         String eventKey = MetricCategoryClassifier.extractGroupKey(cat, sample.getLabels(), sample.getTimestampMs());
         metricEventRows.computeIfAbsent(eventKey,
             k -> MetricEventRow.fromLabels(sample.getTimestampMs(), cat, sample.getLabels()))

@@ -142,9 +142,6 @@ public class MetricCategoryClassifier {
         put("mr.task.io.hdfs_read_ops",                     MetricCategory.MR_TASK, "hdfs_read_ops",                false);
         put("mr.task.io.hdfs_write_ops",                    MetricCategory.MR_TASK, "hdfs_write_ops",               false);
         put("mr.task.io.hdfs_large_read_ops",               MetricCategory.MR_TASK, "hdfs_large_read_ops",          false);
-        put("mr.task.io.file_read_ops",                     MetricCategory.MR_TASK, "file_read_ops",                false);
-        put("mr.task.io.file_write_ops",                    MetricCategory.MR_TASK, "file_write_ops",               false);
-        put("mr.task.io.file_large_read_ops",               MetricCategory.MR_TASK, "file_large_read_ops",          false);
     }
 
     private static void put(String metricName, MetricCategory category, String columnName, boolean histogram) {

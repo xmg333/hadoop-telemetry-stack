@@ -6,7 +6,7 @@ import java.io.Serializable;
 import java.util.Map;
 
 /**
- * Unified wide-row model for the metric_events table.
+ * Unified wide-row model for the unified_metrics table.
  * Replaces 11 separate row models with a single class that uses
  * engine + event_type as discriminators and normalized common columns.
  */
@@ -26,13 +26,13 @@ public class MetricEventRow implements Serializable {
 
     // Normalized common metrics (cross-engine)
     private Double durationMs;
-    private Double ioBytesRead;
-    private Double ioBytesWritten;
+    private Double bytesRead;
+    private Double bytesWritten;
     private Double shuffleBytesRead;
     private Double shuffleBytesWritten;
     private Double cpuTimeMs;
     private Double gcTimeMs;
-    private Double memoryBytesSpilled;
+    private Double bytesSpilled;
 
     // Spark-specific dimensions
     private String executorId;
@@ -70,7 +70,7 @@ public class MetricEventRow implements Serializable {
     private Double bytes;
     private Double rows;
     private Double filesRead;
-    private Double timeMsCol;
+    private Double timeMs;
 
     // JVM-specific
     private Double heapUsed;
@@ -112,9 +112,6 @@ public class MetricEventRow implements Serializable {
     private Double hdfsReadOps;
     private Double hdfsWriteOps;
     private Double hdfsLargeReadOps;
-    private Double fileReadOps;
-    private Double fileWriteOps;
-    private Double fileLargeReadOps;
 
     // Hive-specific
     private String operation;
@@ -126,14 +123,11 @@ public class MetricEventRow implements Serializable {
     private Double outputRows;
 
     // IO records (Spark)
-    private Double ioRecordsRead;
-    private Double ioRecordsWritten;
+    private Double recordsRead;
+    private Double recordsWritten;
 
     // SQL/Hive query text
     private String queryText;
-
-    // Catch-all
-    private String labels;
 
     public MetricEventRow() {}
 
@@ -209,14 +203,18 @@ public class MetricEventRow implements Serializable {
             case HIVE_QUERY:
                 row.status = labels.getOrDefault("hive.query.success", "unknown");
                 row.appId = labels.getOrDefault("hive.query.id", "unknown");
+                row.appName = labels.getOrDefault("hive.query.id", "");  // query_id as app_name
                 row.userName = labels.getOrDefault("hive.query.user", "unknown");
+                row.queue = labels.getOrDefault("hive.query.queue", "");
                 row.operation = labels.getOrDefault("hive.query.operation", "unknown");
                 row.executionEngine = labels.getOrDefault("hive.query.execution_engine", "unknown");
                 row.queryText = labels.getOrDefault("hive.query.sql_text", null);
                 break;
             case HIVE_TABLE_IO:
                 row.appId = labels.getOrDefault("hive.query.id", "unknown");
+                row.appName = labels.getOrDefault("hive.query.id", "");  // query_id as app_name
                 row.userName = labels.getOrDefault("hive.query.user", "unknown");
+                row.queue = labels.getOrDefault("hive.query.queue", "");
                 row.operation = labels.getOrDefault("hive.query.operation", "unknown");
                 row.executionEngine = labels.getOrDefault("hive.query.execution_engine", "unknown");
                 row.tableName = labels.getOrDefault("hive.query.input_table",
@@ -303,8 +301,8 @@ public class MetricEventRow implements Serializable {
             if (fileBytesRead != null) readTotal += fileBytesRead;
             if (hdfsBytesWritten != null) writeTotal += hdfsBytesWritten;
             if (fileBytesWritten != null) writeTotal += fileBytesWritten;
-            if (readTotal > 0) ioBytesRead = readTotal;
-            if (writeTotal > 0) ioBytesWritten = writeTotal;
+            if (readTotal > 0) bytesRead = readTotal;
+            if (writeTotal > 0) bytesWritten = writeTotal;
 
             // MR reduce_shuffle_bytes → unified shuffleBytesRead
             if (reduceShuffleBytes != null && reduceShuffleBytes > 0) {
@@ -330,7 +328,7 @@ public class MetricEventRow implements Serializable {
             double spillTotal = 0;
             if (diskBytesSpilled != null) spillTotal += diskBytesSpilled;
             if (getSparkMemoryBytesSpilled() != null) spillTotal += getSparkMemoryBytesSpilled();
-            if (spillTotal > 0) memoryBytesSpilled = spillTotal;
+            if (spillTotal > 0) bytesSpilled = spillTotal;
         }
 
         if ("MR".equals(engine)) {
@@ -341,10 +339,10 @@ public class MetricEventRow implements Serializable {
         if ("HIVE".equals(engine)) {
             // Hive: input_bytes → ioBytesRead, output_bytes → ioBytesWritten
             if (getHiveInputBytes() != null && getHiveInputBytes() > 0) {
-                ioBytesRead = getHiveInputBytes();
+                bytesRead = getHiveInputBytes();
             }
             if (getHiveOutputBytes() != null && getHiveOutputBytes() > 0) {
-                ioBytesWritten = getHiveOutputBytes();
+                bytesWritten = getHiveOutputBytes();
             }
         }
     }
@@ -357,20 +355,25 @@ public class MetricEventRow implements Serializable {
             case "gc_time_ms": gcTimeMs = value; break;
 
             // Spark task metrics
-            case "io_bytes_read": ioBytesRead = value; break;
-            case "io_bytes_written": ioBytesWritten = value; break;
-            case "io_records_read": ioRecordsRead = value; break;
-            case "io_records_written": ioRecordsWritten = value; break;
+            case "io_bytes_read":
+            case "bytes_read": bytesRead = value; break;
+            case "io_bytes_written":
+            case "bytes_written": bytesWritten = value; break;
+            case "io_records_read":
+            case "records_read": recordsRead = value; break;
+            case "io_records_written":
+            case "records_written": recordsWritten = value; break;
             case "shuffle_bytes_read": shuffleBytesRead = value; break;
             case "shuffle_bytes_written": shuffleBytesWritten = value; break;
             case "shuffle_fetch_wait_time_ms": shuffleFetchWaitTimeMs = value; break;
             case "disk_bytes_spilled": diskBytesSpilled = value; break;
             case "memory_bytes_spilled":
+            case "bytes_spilled":
                 // For Spark, this is memory_bytes_spilled; for MR it's spilled_records count
                 if ("SPARK".equals(engine)) {
                     sparkMemoryBytesSpilled = value;
                 } else {
-                    memoryBytesSpilled = value;
+                    bytesSpilled = value;
                 }
                 break;
             case "executor_run_time_ms": executorRunTimeMs = value; break;
@@ -398,7 +401,7 @@ public class MetricEventRow implements Serializable {
             case "bytes": bytes = value; break;
             case "rows": rows = value; break;
             case "files_read": filesRead = value; break;
-            case "time_ms": timeMsCol = value; break;
+            case "time_ms": timeMs = value; break;
 
             // JVM metrics
             case "heap_used": heapUsed = value; break;
@@ -440,9 +443,6 @@ public class MetricEventRow implements Serializable {
             case "hdfs_read_ops": hdfsReadOps = value; break;
             case "hdfs_write_ops": hdfsWriteOps = value; break;
             case "hdfs_large_read_ops": hdfsLargeReadOps = value; break;
-            case "file_read_ops": fileReadOps = value; break;
-            case "file_write_ops": fileWriteOps = value; break;
-            case "file_large_read_ops": fileLargeReadOps = value; break;
         }
     }
 
@@ -470,13 +470,13 @@ public class MetricEventRow implements Serializable {
     public String getUserName() { return userName; }
     public String getQueue() { return queue; }
     public Double getDurationMs() { return durationMs; }
-    public Double getIoBytesRead() { return ioBytesRead; }
-    public Double getIoBytesWritten() { return ioBytesWritten; }
+    public Double getBytesRead() { return bytesRead; }
+    public Double getBytesWritten() { return bytesWritten; }
     public Double getShuffleBytesRead() { return shuffleBytesRead; }
     public Double getShuffleBytesWritten() { return shuffleBytesWritten; }
     public Double getCpuTimeMs() { return cpuTimeMs; }
     public Double getGcTimeMs() { return gcTimeMs; }
-    public Double getMemoryBytesSpilled() { return memoryBytesSpilled; }
+    public Double getBytesSpilled() { return bytesSpilled; }
     public String getExecutorId() { return executorId; }
     public Integer getStageId() { return stageId; }
     public String getTaskId() { return taskId; }
@@ -506,7 +506,7 @@ public class MetricEventRow implements Serializable {
     public Double getBytes() { return bytes; }
     public Double getRows() { return rows; }
     public Double getFilesRead() { return filesRead; }
-    public Double getTimeMsCol() { return timeMsCol; }
+    public Double getTimeMs() { return timeMs; }
     public Double getHeapUsed() { return heapUsed; }
     public Double getNonHeapUsed() { return nonHeapUsed; }
     public String getGcName() { return gcName; }
@@ -537,9 +537,6 @@ public class MetricEventRow implements Serializable {
     public Double getHdfsReadOps() { return hdfsReadOps; }
     public Double getHdfsWriteOps() { return hdfsWriteOps; }
     public Double getHdfsLargeReadOps() { return hdfsLargeReadOps; }
-    public Double getFileReadOps() { return fileReadOps; }
-    public Double getFileWriteOps() { return fileWriteOps; }
-    public Double getFileLargeReadOps() { return fileLargeReadOps; }
     public String getOperation() { return operation; }
     public String getTableType() { return tableType; }
     public String getExecutionEngine() { return executionEngine; }
@@ -547,10 +544,9 @@ public class MetricEventRow implements Serializable {
     public Double getFailureCount() { return failureCount; }
     public Double getInputRows() { return inputRows; }
     public Double getOutputRows() { return outputRows; }
-    public Double getIoRecordsRead() { return ioRecordsRead; }
-    public Double getIoRecordsWritten() { return ioRecordsWritten; }
+    public Double getRecordsRead() { return recordsRead; }
+    public Double getRecordsWritten() { return recordsWritten; }
     public String getQueryText() { return queryText; }
-    public String getLabels() { return labels; }
 
     // Internal getters for normalization
     private Double getJvmGcTimeMs() { return jvmGcTimeMs; }

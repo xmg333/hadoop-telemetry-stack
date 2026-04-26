@@ -40,9 +40,6 @@ public class MrTaskMetricRow implements Serializable {
     private Double hdfsReadOps;
     private Double hdfsWriteOps;
     private Double hdfsLargeReadOps;
-    private Double fileReadOps;
-    private Double fileWriteOps;
-    private Double fileLargeReadOps;
 
     public static MrTaskMetricRow fromLabels(long timestampMs, Map<String, String> labels) {
         MrTaskMetricRow row = new MrTaskMetricRow();
@@ -85,9 +82,6 @@ public class MrTaskMetricRow implements Serializable {
             case "hdfs_read_ops": hdfsReadOps = value; break;
             case "hdfs_write_ops": hdfsWriteOps = value; break;
             case "hdfs_large_read_ops": hdfsLargeReadOps = value; break;
-            case "file_read_ops": fileReadOps = value; break;
-            case "file_write_ops": fileWriteOps = value; break;
-            case "file_large_read_ops": fileLargeReadOps = value; break;
         }
     }
 
@@ -118,7 +112,4 @@ public class MrTaskMetricRow implements Serializable {
     public Double getHdfsReadOps() { return hdfsReadOps; }
     public Double getHdfsWriteOps() { return hdfsWriteOps; }
     public Double getHdfsLargeReadOps() { return hdfsLargeReadOps; }
-    public Double getFileReadOps() { return fileReadOps; }
-    public Double getFileWriteOps() { return fileWriteOps; }
-    public Double getFileLargeReadOps() { return fileLargeReadOps; }
 }

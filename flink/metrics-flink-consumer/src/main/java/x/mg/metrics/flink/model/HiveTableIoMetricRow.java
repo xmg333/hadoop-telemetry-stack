@@ -11,6 +11,7 @@ public class HiveTableIoMetricRow implements Serializable {
     private String tableType; // "input" or "output"
     private String operation;
     private String userName;
+    private String appName;
     private String executionEngine;
 
     private Double inputTableCount;
@@ -29,6 +30,7 @@ public class HiveTableIoMetricRow implements Serializable {
         row.queryId = labels.getOrDefault("hive.query.id", "unknown");
         row.operation = labels.getOrDefault("hive.query.operation", "unknown");
         row.userName = labels.getOrDefault("hive.query.user", "unknown");
+        row.appName = labels.getOrDefault("hive.query.id", "");  // query_id as app_name
         row.executionEngine = labels.getOrDefault("hive.query.execution_engine", "unknown");
         row.queue = labels.getOrDefault("hive.query.queue", null);
 
@@ -64,6 +66,7 @@ public class HiveTableIoMetricRow implements Serializable {
     public String getTableType() { return tableType; }
     public String getOperation() { return operation; }
     public String getUserName() { return userName; }
+    public String getAppName() { return appName; }
     public String getExecutionEngine() { return executionEngine; }
     public Double getInputTableCount() { return inputTableCount; }
     public Double getOutputTableCount() { return outputTableCount; }

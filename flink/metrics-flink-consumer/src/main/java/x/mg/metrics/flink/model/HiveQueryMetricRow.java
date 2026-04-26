@@ -9,6 +9,8 @@ public class HiveQueryMetricRow implements Serializable {
     private String queryId;
     private String operation;
     private String userName;
+    private String appName;
+    private String queue;
     private String success;
     private String executionEngine;
 
@@ -29,6 +31,8 @@ public class HiveQueryMetricRow implements Serializable {
         row.queryId = labels.getOrDefault("hive.query.id", "unknown");
         row.operation = labels.getOrDefault("hive.query.operation", "unknown");
         row.userName = labels.getOrDefault("hive.query.user", "unknown");
+        row.appName = labels.getOrDefault("hive.query.id", "");  // query_id as app_name
+        row.queue = labels.getOrDefault("hive.query.queue", "");
         row.success = labels.getOrDefault("hive.query.success", "unknown");
         row.executionEngine = labels.getOrDefault("hive.query.execution_engine", "unknown");
         row.queryText = labels.getOrDefault("hive.query.sql_text", null);
@@ -51,6 +55,8 @@ public class HiveQueryMetricRow implements Serializable {
     public String getQueryId() { return queryId; }
     public String getOperation() { return operation; }
     public String getUserName() { return userName; }
+    public String getAppName() { return appName; }
+    public String getQueue() { return queue; }
     public String getSuccess() { return success; }
     public String getExecutionEngine() { return executionEngine; }
     public Double getDurationMs() { return durationMs; }

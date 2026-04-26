@@ -87,9 +87,6 @@ class MrTaskMetricRowTest {
         row.setMetricColumn("hdfs_read_ops", 10.0);
         row.setMetricColumn("hdfs_write_ops", 5.0);
         row.setMetricColumn("hdfs_large_read_ops", 2.0);
-        row.setMetricColumn("file_read_ops", 20.0);
-        row.setMetricColumn("file_write_ops", 10.0);
-        row.setMetricColumn("file_large_read_ops", 3.0);
 
         assertEquals(256000.0, row.getHdfsBytesRead());
         assertEquals(128000.0, row.getHdfsBytesWritten());
@@ -110,9 +107,6 @@ class MrTaskMetricRowTest {
         assertEquals(10.0, row.getHdfsReadOps());
         assertEquals(5.0, row.getHdfsWriteOps());
         assertEquals(2.0, row.getHdfsLargeReadOps());
-        assertEquals(20.0, row.getFileReadOps());
-        assertEquals(10.0, row.getFileWriteOps());
-        assertEquals(3.0, row.getFileLargeReadOps());
     }
 
     @Test
