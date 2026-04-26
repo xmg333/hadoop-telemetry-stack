@@ -70,12 +70,6 @@ public class CounterMapping {
             "mr.task.io.hdfs_write_ops", "HDFS write operations", "{ops}"));
         mappings.add(new CounterMapping(FS_COUNTER, "HDFS_LARGE_READ_OPS",
             "mr.task.io.hdfs_large_read_ops", "HDFS large read operations", "{ops}"));
-        mappings.add(new CounterMapping(FS_COUNTER, "FILE_READ_OPS",
-            "mr.task.io.file_read_ops", "Local file read operations", "{ops}"));
-        mappings.add(new CounterMapping(FS_COUNTER, "FILE_WRITE_OPS",
-            "mr.task.io.file_write_ops", "Local file write operations", "{ops}"));
-        mappings.add(new CounterMapping(FS_COUNTER, "FILE_LARGE_READ_OPS",
-            "mr.task.io.file_large_read_ops", "Local file large read operations", "{ops}"));
 
         return Collections.unmodifiableList(mappings);
     }

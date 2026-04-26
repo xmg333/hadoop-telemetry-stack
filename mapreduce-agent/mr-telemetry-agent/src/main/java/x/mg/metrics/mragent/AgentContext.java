@@ -57,6 +57,21 @@ public class AgentContext {
         String taskType = detectTaskType(methodSignature);
         TaskIdentity identity = counterReader.extractTaskIdentity(context);
 
+        // Cross-validate: if task_id format doesn't match detected task type,
+        // the identity may be wrong due to YARN container reuse
+        String taskId = identity.getTaskId();
+        if (!"unknown".equals(taskId)) {
+            boolean idIsMap = taskId.contains("_m_");
+            boolean idIsReduce = taskId.contains("_r_");
+            if ("map".equals(taskType) && idIsReduce) {
+                LOG.warning("Task ID/type mismatch: taskType=map but taskId=" + taskId
+                    + " — possible container reuse identity leak");
+            } else if ("reduce".equals(taskType) && idIsMap) {
+                LOG.warning("Task ID/type mismatch: taskType=reduce but taskId=" + taskId
+                    + " — possible container reuse identity leak");
+            }
+        }
+
         LOG.info("Task run enter: type=" + taskType
             + ", taskId=" + identity.getTaskId() + ", contextClass="
             + (context != null ? context.getClass().getName() : "null"));

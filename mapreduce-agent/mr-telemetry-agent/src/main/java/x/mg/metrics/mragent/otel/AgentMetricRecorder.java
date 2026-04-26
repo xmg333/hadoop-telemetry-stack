@@ -68,8 +68,7 @@ public class AgentMetricRecorder {
      */
     public void recordDeltas(Map<String, Long> deltas, String taskType, TaskIdentity identity) {
         try {
-            Attributes attrs = buildAttributes(taskType, identity);
-
+            Attributes attrs = buildAttributes(taskType, identity, "");
             for (Map.Entry<String, Long> entry : deltas.entrySet()) {
                 LongCounter counter = counters.get(entry.getKey());
                 if (counter != null && entry.getValue() > 0) {
@@ -82,9 +81,10 @@ public class AgentMetricRecorder {
         }
     }
 
-    private Attributes buildAttributes(String taskType, TaskIdentity identity) {
+    private Attributes buildAttributes(String taskType, TaskIdentity identity, String taskState) {
         AttributesBuilder builder = Attributes.builder()
             .put("mr.task.type", taskType)
+            .put("mr.task.state", taskState)
             .put("mr.task.id", identity.getTaskId())
             .put("mr.job.id", identity.getJobId())
             .put("mr.job.name", identity.getJobName())
@@ -98,7 +98,8 @@ public class AgentMetricRecorder {
      */
     public void recordDuration(long durationMs, String taskType, TaskIdentity identity) {
         try {
-            Attributes attrs = buildAttributes(taskType, identity);
+            String state = "SUCCEEDED";
+            Attributes attrs = buildAttributes(taskType, identity, state);
             durationHistogram.record(durationMs, attrs);
         } catch (Exception e) {
             LOG.log(Level.FINE, "Failed to record task duration: " + e.getMessage());
@@ -110,7 +111,8 @@ public class AgentMetricRecorder {
      */
     public void recordTaskResult(boolean success, String taskType, TaskIdentity identity) {
         try {
-            Attributes attrs = buildAttributes(taskType, identity);
+            String state = success ? "SUCCEEDED" : "FAILED";
+            Attributes attrs = buildAttributes(taskType, identity, state);
             if (success) {
                 successCounter.add(1, attrs);
             } else {

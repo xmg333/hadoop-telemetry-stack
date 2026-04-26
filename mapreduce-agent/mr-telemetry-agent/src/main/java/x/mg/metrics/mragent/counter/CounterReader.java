@@ -73,11 +73,8 @@ public class CounterReader {
                 Method getScheme = stat.getClass().getMethod("getScheme");
                 String scheme = ((String) getScheme.invoke(stat)).toUpperCase();
 
-                Method getBytesRead = stat.getClass().getMethod("getBytesRead");
-                long bytesRead = ((Number) getBytesRead.invoke(stat)).longValue();
-
-                Method getBytesWritten = stat.getClass().getMethod("getBytesWritten");
-                long bytesWritten = ((Number) getBytesWritten.invoke(stat)).longValue();
+                // Skip FILE scheme — production uses HDFS, not local filesystem
+                if ("FILE".equals(scheme)) continue;
 
                 Method getReadOps = stat.getClass().getMethod("getReadOps");
                 long readOps = ((Number) getReadOps.invoke(stat)).longValue();
@@ -88,16 +85,21 @@ public class CounterReader {
                 Method getWriteOps = stat.getClass().getMethod("getWriteOps");
                 long writeOps = ((Number) getWriteOps.invoke(stat)).longValue();
 
-                String prefix = scheme.equals("FILE") ? "file" : scheme.toLowerCase();
+                String prefix = scheme.toLowerCase();
 
-                if (bytesRead > 0) result.put("mr.task.io." + prefix + "_bytes_read", bytesRead);
-                if (bytesWritten > 0) result.put("mr.task.io." + prefix + "_bytes_written", bytesWritten);
-                if (readOps > 0) result.put("mr.task.io." + prefix + "_read_ops", readOps);
-                if (writeOps > 0) result.put("mr.task.io." + prefix + "_write_ops", writeOps);
-                if (largeReadOps > 0) result.put("mr.task.io." + prefix + "_large_read_ops", largeReadOps);
+                System.err.println("[mr-telemetry-agent] FS stats: scheme=" + scheme
+                    + " readOps=" + readOps + " writeOps=" + writeOps
+                    + " largeReadOps=" + largeReadOps);
+
+                // Only merge ops — bytes come from getCounter() which is per-task accurate.
+                // FileSystem.Statistics are JVM-global and leak across tasks in container reuse.
+                if (readOps > 0) result.merge("mr.task.io." + prefix + "_read_ops", readOps, Math::max);
+                if (writeOps > 0) result.merge("mr.task.io." + prefix + "_write_ops", writeOps, Math::max);
+                if (largeReadOps > 0) result.merge("mr.task.io." + prefix + "_large_read_ops", largeReadOps, Math::max);
             }
         } catch (Exception e) {
-            System.err.println("[mr-telemetry-agent] FS stats failed: " + e.getMessage());
+            System.err.println("[mr-telemetry-agent] FS stats read failed: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -115,51 +117,80 @@ public class CounterReader {
 
     /**
      * Extract task identity from Context: task attempt ID, job ID, job name.
+     * Tries the OUTER context first for getTaskAttemptID() to avoid wrong IDs
+     * when YARN reuses a container (Mapper→Reducer in same JVM).
      */
     public TaskIdentity extractTaskIdentity(Object context) {
         if (context == null) return TaskIdentity.UNKNOWN;
 
         try {
-            Object unwrapped = unwrapContext(context);
-
             String taskId = "unknown";
             String jobId = "unknown";
             String jobName = "unknown";
             String user = "unknown";
             String queue = "unknown";
 
-            try {
-                Method m = unwrapped.getClass().getMethod("getTaskAttemptID");
-                taskId = safeToString(m.invoke(unwrapped));
-            } catch (NoSuchMethodException e) {
-                LOG.log(Level.FINE, "getTaskAttemptID not found on " + unwrapped.getClass().getName());
-            }
+            // Try outer context first for task attempt ID — the outermost context
+            // passed to Mapper.run()/Reducer.run() has the correct TaskAttemptID
+            // even in YARN container reuse scenarios.
+            taskId = tryGetTaskAttemptID(context);
+            jobId = tryGetJobID(context);
+            String[] nameUserQueue = tryGetNameUserQueue(context);
 
-            try {
-                Method m = unwrapped.getClass().getMethod("getJobID");
-                jobId = safeToString(m.invoke(unwrapped));
-            } catch (NoSuchMethodException e) {
-                LOG.log(Level.FINE, "getJobID not found on " + unwrapped.getClass().getName());
-            }
-
-            try {
-                Method m = unwrapped.getClass().getMethod("getConfiguration");
-                Object config = m.invoke(unwrapped);
-                if (config != null) {
-                    Method getMethod = config.getClass().getMethod("get", String.class, String.class);
-                    jobName = (String) getMethod.invoke(config, "mapreduce.job.name", "unknown");
-                    user = (String) getMethod.invoke(config, "mapreduce.job.user.name", "unknown");
-                    queue = (String) getMethod.invoke(config, "mapreduce.job.queuename", "unknown");
+            // If outer context didn't yield results, try unwrapped
+            if ("unknown".equals(taskId) || "unknown".equals(jobId)) {
+                Object unwrapped = unwrapContext(context);
+                if (!unwrapped.equals(context)) {
+                    if ("unknown".equals(taskId)) taskId = tryGetTaskAttemptID(unwrapped);
+                    if ("unknown".equals(jobId)) jobId = tryGetJobID(unwrapped);
+                    if ("unknown".equals(nameUserQueue[0])) nameUserQueue = tryGetNameUserQueue(unwrapped);
                 }
-            } catch (NoSuchMethodException e) {
-                LOG.log(Level.FINE, "getConfiguration not found on " + unwrapped.getClass().getName());
             }
+
+            jobName = nameUserQueue[0];
+            user = nameUserQueue[1];
+            queue = nameUserQueue[2];
 
             return new TaskIdentity(taskId, jobId, jobName, user, queue);
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Failed to extract task identity: " + e.getMessage());
             return TaskIdentity.UNKNOWN;
         }
+    }
+
+    private String tryGetTaskAttemptID(Object obj) {
+        try {
+            Method m = obj.getClass().getMethod("getTaskAttemptID");
+            return safeToString(m.invoke(obj));
+        } catch (Exception e) {
+            return "unknown";
+        }
+    }
+
+    private String tryGetJobID(Object obj) {
+        try {
+            Method m = obj.getClass().getMethod("getJobID");
+            return safeToString(m.invoke(obj));
+        } catch (Exception e) {
+            return "unknown";
+        }
+    }
+
+    private String[] tryGetNameUserQueue(Object obj) {
+        String[] result = {"unknown", "unknown", "unknown"};
+        try {
+            Method m = obj.getClass().getMethod("getConfiguration");
+            Object config = m.invoke(obj);
+            if (config != null) {
+                Method getMethod = config.getClass().getMethod("get", String.class, String.class);
+                result[0] = (String) getMethod.invoke(config, "mapreduce.job.name", "unknown");
+                result[1] = (String) getMethod.invoke(config, "mapreduce.job.user.name", "unknown");
+                result[2] = (String) getMethod.invoke(config, "mapreduce.job.queuename", "unknown");
+            }
+        } catch (Exception e) {
+            // stay with defaults
+        }
+        return result;
     }
 
     /**
@@ -175,10 +206,26 @@ public class CounterReader {
             // continue unwrapping
         }
 
-        // Look for mapContext/reduceContext field (WrappedMapper/WrappedReducer)
-        Object innerContext = getFieldRecursive(context, "mapContext");
-        if (innerContext == null) {
+        // Use context class name to determine which field to check first.
+        // Checking mapContext before reduceContext on a WrappedReducer could
+        // accidentally pick up a stale mapContext from a parent class in the
+        // hierarchy when YARN reuses a container (Mapper→Reducer in same JVM).
+        String className = context.getClass().getName().toLowerCase();
+        boolean likelyReducer = className.contains("reducer");
+        boolean likelyMapper = className.contains("mapper");
+
+        Object innerContext;
+        if (likelyReducer) {
             innerContext = getFieldRecursive(context, "reduceContext");
+            if (innerContext == null) innerContext = getFieldRecursive(context, "mapContext");
+        } else if (likelyMapper) {
+            innerContext = getFieldRecursive(context, "mapContext");
+            if (innerContext == null) innerContext = getFieldRecursive(context, "reduceContext");
+        } else {
+            // Unknown wrapper — try reduceContext first (map is more common, but
+            // getting a stale mapContext in a reducer is worse than vice versa)
+            innerContext = getFieldRecursive(context, "reduceContext");
+            if (innerContext == null) innerContext = getFieldRecursive(context, "mapContext");
         }
 
         if (innerContext != null) {
