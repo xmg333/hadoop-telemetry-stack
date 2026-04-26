@@ -38,6 +38,7 @@ public class MRMetricRecorder {
     private final LongCounter mapOutputBytesCounter;
     private final LongCounter launchedMapsCounter;
     private final LongCounter launchedReducesCounter;
+    private final LongCounter committedHeapBytesCounter;
     private final LongCounter elapsedTimeCounter;
 
     // Task-level counters (same OTel names as Agent's CounterMapping.ALL)
@@ -101,6 +102,8 @@ public class MRMetricRecorder {
                 .setDescription("Launched maps").setUnit("{tasks}").build();
         this.launchedReducesCounter = meter.counterBuilder("mr.job.launched_reduces")
                 .setDescription("Launched reduces").setUnit("{tasks}").build();
+        this.committedHeapBytesCounter = meter.counterBuilder("mr.job.committed_heap_bytes")
+                .setDescription("Committed heap bytes").setUnit("By").build();
         this.elapsedTimeCounter = meter.counterBuilder("mr.job.elapsed_time_ms")
                 .setDescription("Job elapsed time").setUnit("ms").build();
 
@@ -165,6 +168,7 @@ public class MRMetricRecorder {
             mapOutputBytesCounter.add(m.getMapOutputBytes(), attrs);
             launchedMapsCounter.add(m.getTotalMaps(), attrs);
             launchedReducesCounter.add(m.getTotalReduces(), attrs);
+            committedHeapBytesCounter.add(m.getCommittedHeapBytes(), attrs);
             elapsedTimeCounter.add(m.getElapsedTime(), attrs);
         } catch (Exception e) {
             // Don't let recording failures propagate
