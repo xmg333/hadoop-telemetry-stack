@@ -23,7 +23,6 @@ public class SparkMetricEvent {
     private String applicationName;
     private String user;
     private String queue;
-    private String attemptId;
     private String executorId;
     private int stageId;
     private int stageAttemptNumber;
@@ -75,9 +74,6 @@ public class SparkMetricEvent {
 
     public String getQueue() { return queue; }
     public void setQueue(String queue) { this.queue = queue; }
-
-    public String getAttemptId() { return attemptId; }
-    public void setAttemptId(String attemptId) { this.attemptId = attemptId; }
 
     public String getExecutorId() { return executorId; }
     public void setExecutorId(String executorId) { this.executorId = executorId; }

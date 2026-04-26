@@ -37,7 +37,7 @@ class MetricRecorderTest {
                 .setMeterProvider(meterProvider)
                 .build();
         config = new TelemetryConfig();
-        recorder = new MetricRecorder(openTelemetry, config);
+        recorder = new DefaultMetricRecorder(openTelemetry, config);
     }
 
     private MetricData findMetric(String name) {

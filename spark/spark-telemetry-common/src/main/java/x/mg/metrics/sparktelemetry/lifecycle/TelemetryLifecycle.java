@@ -5,6 +5,8 @@ import x.mg.metrics.sparktelemetry.config.TelemetryConfig;
 import x.mg.metrics.sparktelemetry.model.SparkMetricEvent;
 import x.mg.metrics.sparktelemetry.otel.MetricRecorder;
 import x.mg.metrics.sparktelemetry.otel.OtelRegistry;
+import x.mg.metrics.sparktelemetry.otel.DefaultMetricRecorder;
+import x.mg.metrics.sparktelemetry.otel.DefaultOtelRegistry;
 
 import java.util.Map;
 import java.util.LinkedHashMap;
@@ -65,9 +67,9 @@ public class TelemetryLifecycle {
         }
         this.queue = queueVal;
         if (initializeOtel) {
-            this.otelRegistry = new OtelRegistry(config);
+            this.otelRegistry = new DefaultOtelRegistry(config);
             this.otelRegistry.start();
-            this.metricRecorder = new MetricRecorder(otelRegistry.getOpenTelemetry(), config);
+            this.metricRecorder = new DefaultMetricRecorder(otelRegistry.getOpenTelemetry(), config);
         } else {
             this.otelRegistry = null;
             this.metricRecorder = null;

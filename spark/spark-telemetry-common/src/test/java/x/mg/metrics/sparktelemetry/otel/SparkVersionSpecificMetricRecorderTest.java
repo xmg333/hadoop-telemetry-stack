@@ -30,7 +30,7 @@ class SparkVersionSpecificMetricRecorderTest {
         OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
                 .setMeterProvider(meterProvider)
                 .build();
-        recorder = new MetricRecorder(openTelemetry, new TelemetryConfig());
+        recorder = new DefaultMetricRecorder(openTelemetry, new TelemetryConfig());
     }
 
     private MetricData findMetric(String name) {
