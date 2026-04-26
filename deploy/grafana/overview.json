@@ -64,7 +64,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT COUNT(DISTINCT app_id) AS value FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
+          "rawSql": "SELECT COUNT(DISTINCT app_id) AS value FROM spark_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
           "format": "table",
           "refId": "A"
         }
@@ -305,7 +305,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT SUM(CASE WHEN job_success='true' THEN 1 ELSE 0 END) AS 'Spark OK', SUM(CASE WHEN job_success='false' AND duration_ms IS NULL AND NOT EXISTS (SELECT 1 FROM job_metrics j2 WHERE j2.app_id = job_metrics.app_id AND j2.job_success='true') THEN 1 ELSE 0 END) AS 'Spark Fail', (SELECT COUNT(DISTINCT job_id) FROM mr_job_metrics WHERE state='SUCCEEDED' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)) AS 'MR OK', (SELECT COUNT(DISTINCT job_id) FROM mr_job_metrics WHERE state!='SUCCEEDED' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)) AS 'MR Fail', (SELECT COUNT(*) FROM hive_query_metrics WHERE success='true' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)) AS 'Hive OK', (SELECT COUNT(*) FROM hive_query_metrics WHERE success='false' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)) AS 'Hive Fail' FROM job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
+          "rawSql": "SELECT SUM(CASE WHEN job_success='true' THEN 1 ELSE 0 END) AS 'Spark OK', SUM(CASE WHEN job_success='false' AND duration_ms IS NULL AND NOT EXISTS (SELECT 1 FROM spark_job_metrics j2 WHERE j2.app_id = spark_job_metrics.app_id AND j2.job_success='true') THEN 1 ELSE 0 END) AS 'Spark Fail', (SELECT COUNT(DISTINCT job_id) FROM mr_job_metrics WHERE state='SUCCEEDED' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)) AS 'MR OK', (SELECT COUNT(DISTINCT job_id) FROM mr_job_metrics WHERE state!='SUCCEEDED' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)) AS 'MR Fail', (SELECT COUNT(*) FROM hive_query_metrics WHERE success='true' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)) AS 'Hive OK', (SELECT COUNT(*) FROM hive_query_metrics WHERE success='false' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)) AS 'Hive Fail' FROM spark_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
           "format": "table",
           "refId": "A"
         }
@@ -358,7 +358,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(io_bytes_read + io_bytes_written) AS 'Spark' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(io_bytes_read + io_bytes_written) AS 'Spark' FROM spark_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "refId": "A"
         },
@@ -419,7 +419,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(duration_ms) AS 'Spark Jobs' FROM job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(duration_ms) AS 'Spark Jobs' FROM spark_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "refId": "A"
         },
@@ -473,7 +473,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT 'Spark' AS engine, app_id AS id, stage_id, task_id, duration_ms, FROM_UNIXTIME(timestamp_ms/1000) AS time FROM task_metrics WHERE task_success='false' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) UNION ALL SELECT 'MR' AS engine, job_id AS id, NULL AS stage_id, task_id, cpu_time_ms AS duration_ms, FROM_UNIXTIME(timestamp_ms/1000) AS time FROM mr_task_metrics WHERE state != 'SUCCEEDED' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) ORDER BY time DESC LIMIT 50",
+          "rawSql": "SELECT 'Spark' AS engine, app_id AS id, stage_id, task_id, duration_ms, FROM_UNIXTIME(timestamp_ms/1000) AS time FROM spark_task_metrics WHERE task_success='false' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) UNION ALL SELECT 'MR' AS engine, job_id AS id, NULL AS stage_id, task_id, cpu_time_ms AS duration_ms, FROM_UNIXTIME(timestamp_ms/1000) AS time FROM mr_task_metrics WHERE state != 'SUCCEEDED' AND timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) ORDER BY time DESC LIMIT 50",
           "format": "table",
           "refId": "A"
         }

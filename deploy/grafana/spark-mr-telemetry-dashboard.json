@@ -86,7 +86,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
+          "rawSql": "SELECT COUNT(*) AS value FROM spark_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
           "format": "table"
         }
       ]
@@ -142,7 +142,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM stage_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
+          "rawSql": "SELECT COUNT(*) AS value FROM spark_stage_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
           "format": "table"
         }
       ]
@@ -202,7 +202,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM stage_governance WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_skew_ratio > 2",
+          "rawSql": "SELECT COUNT(*) AS value FROM spark_stage_skew WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_skew_ratio > 2",
           "format": "table"
         }
       ]
@@ -269,7 +269,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT AVG(cpu_efficiency) AS value FROM stage_governance WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND cpu_efficiency IS NOT NULL",
+          "rawSql": "SELECT AVG(cpu_efficiency) AS value FROM spark_stage_skew WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND cpu_efficiency IS NOT NULL",
           "format": "table"
         }
       ]
@@ -303,22 +303,22 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(io_bytes_read) AS 'Bytes Read' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND io_bytes_read IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(io_bytes_read) AS 'Bytes Read' FROM spark_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND io_bytes_read IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(io_bytes_written) AS 'Bytes Written' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND io_bytes_written IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(io_bytes_written) AS 'Bytes Written' FROM spark_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND io_bytes_written IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "C",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(shuffle_bytes_read) AS 'Shuffle Read' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND shuffle_bytes_read IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(shuffle_bytes_read) AS 'Shuffle Read' FROM spark_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND shuffle_bytes_read IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "D",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(shuffle_bytes_written) AS 'Shuffle Written' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND shuffle_bytes_written IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(shuffle_bytes_written) AS 'Shuffle Written' FROM spark_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND shuffle_bytes_written IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         }
       ]
@@ -352,17 +352,17 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(duration_ms) AS 'Avg Duration' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(duration_ms) AS 'Avg Duration' FROM spark_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, MAX(duration_ms) AS 'Max Duration' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, MAX(duration_ms) AS 'Max Duration' FROM spark_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "C",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, MIN(duration_ms) AS 'Min Duration' FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, MIN(duration_ms) AS 'Min Duration' FROM spark_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         }
       ]
@@ -396,12 +396,12 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(heap_used) AS 'Heap Used' FROM jvm_memory_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND heap_used IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(heap_used) AS 'Heap Used' FROM spark_jvm_memory WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND heap_used IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(non_heap_used) AS 'Non-Heap Used' FROM jvm_memory_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND non_heap_used IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(non_heap_used) AS 'Non-Heap Used' FROM spark_jvm_memory WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND non_heap_used IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         }
       ]
@@ -458,12 +458,12 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(gc_count) AS 'GC Count' FROM jvm_gc_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND gc_count IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(gc_count) AS 'GC Count' FROM spark_jvm_gc WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND gc_count IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(gc_time_ms) AS 'GC Time' FROM jvm_gc_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND gc_time_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, SUM(gc_time_ms) AS 'GC Time' FROM spark_jvm_gc WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND gc_time_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         }
       ]
@@ -521,12 +521,12 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(duration_ms) AS 'Stage Duration' FROM stage_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(duration_ms) AS 'Stage Duration' FROM spark_stage_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(num_tasks) AS 'Task Count' FROM stage_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND num_tasks IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(num_tasks) AS 'Task Count' FROM spark_stage_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND num_tasks IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         }
       ]
@@ -596,7 +596,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT app_id, job_id, job_success, duration_ms, num_stages, FROM_UNIXTIME(timestamp_ms/1000) AS completed_at FROM job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 100",
+          "rawSql": "SELECT app_id, job_id, job_success, duration_ms, num_stages, FROM_UNIXTIME(timestamp_ms/1000) AS completed_at FROM spark_job_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 100",
           "format": "table"
         }
       ]
@@ -786,7 +786,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT app_id, stage_id, task_count, stage_duration_ms, avg_task_duration_ms, max_task_duration_ms, min_task_duration_ms, duration_skew_ratio, io_read_skew_ratio, io_write_skew_ratio, shuffle_read_skew_ratio FROM stage_governance WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 50",
+          "rawSql": "SELECT app_id, stage_id, task_count, stage_duration_ms, avg_task_duration_ms, max_task_duration_ms, min_task_duration_ms, duration_skew_ratio, io_read_skew_ratio, io_write_skew_ratio, shuffle_read_skew_ratio FROM spark_stage_skew WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 50",
           "format": "table"
         }
       ]
@@ -1027,7 +1027,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT app_id, stage_id, task_count, cpu_efficiency, gc_overhead_ratio, shuffle_wait_ratio, spill_ratio, deserialize_overhead, scheduler_delay_ratio FROM stage_governance WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 50",
+          "rawSql": "SELECT app_id, stage_id, task_count, cpu_efficiency, gc_overhead_ratio, shuffle_wait_ratio, spill_ratio, deserialize_overhead, scheduler_delay_ratio FROM spark_stage_skew WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 50",
           "format": "table"
         }
       ]
@@ -1064,7 +1064,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT ROUND(bucket_le) AS 'Bucket LE (ms)', SUM(bucket_count) AS 'Count' FROM task_histogram_buckets WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND metric_name = 'spark.task.duration_ms' AND app_id IN ($app_id) GROUP BY bucket_le ORDER BY bucket_le",
+          "rawSql": "SELECT ROUND(bucket_le) AS 'Bucket LE (ms)', SUM(bucket_count) AS 'Count' FROM spark_task_histogram WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND metric_name = 'spark.task.duration_ms' AND app_id IN ($app_id) GROUP BY bucket_le ORDER BY bucket_le",
           "format": "table"
         }
       ]
@@ -1223,7 +1223,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT app_id, stage_id, task_count, total_bytes_read, total_bytes_written, total_shuffle_bytes_read, total_shuffle_bytes_written, total_records_read, total_records_written, avg_output_bytes_per_task, avg_output_records_per_task, small_output_task_count FROM stage_governance WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 50",
+          "rawSql": "SELECT app_id, stage_id, task_count, total_bytes_read, total_bytes_written, total_shuffle_bytes_read, total_shuffle_bytes_written, total_records_read, total_records_written, avg_output_bytes_per_task, avg_output_records_per_task, small_output_task_count FROM spark_stage_skew WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 50",
           "format": "table"
         }
       ]
@@ -1426,7 +1426,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id, executor_id, stage_id, task_id, task_success, duration_ms, io_bytes_read, io_bytes_written, shuffle_bytes_read, shuffle_bytes_written, shuffle_fetch_wait_time_ms, executor_run_time_ms, executor_cpu_time_ns, jvm_gc_time_ms, disk_bytes_spilled, memory_bytes_spilled FROM task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 200",
+          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id, executor_id, stage_id, task_id, task_success, duration_ms, io_bytes_read, io_bytes_written, shuffle_bytes_read, shuffle_bytes_written, shuffle_fetch_wait_time_ms, executor_run_time_ms, executor_cpu_time_ns, jvm_gc_time_ms, disk_bytes_spilled, memory_bytes_spilled FROM spark_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 200",
           "format": "table"
         }
       ]
@@ -1482,7 +1482,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
+          "rawSql": "SELECT COUNT(*) AS value FROM spark_sql_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
           "format": "table"
         }
       ]
@@ -1542,7 +1542,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT AVG(duration_ms) AS value FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL",
+          "rawSql": "SELECT AVG(duration_ms) AS value FROM spark_sql_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL",
           "format": "table"
         }
       ]
@@ -1594,7 +1594,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COALESCE(SUM(join_count), 0) AS value FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
+          "rawSql": "SELECT COALESCE(SUM(join_count), 0) AS value FROM spark_sql_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
           "format": "table"
         }
       ]
@@ -1646,7 +1646,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM sql_query_table_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
+          "rawSql": "SELECT COUNT(*) AS value FROM spark_sql_table WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id)",
           "format": "table"
         }
       ]
@@ -1680,12 +1680,12 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(duration_ms) AS 'Avg Duration' FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, AVG(duration_ms) AS 'Avg Duration' FROM spark_sql_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, MAX(duration_ms) AS 'Max Duration' FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, MAX(duration_ms) AS 'Max Duration' FROM spark_sql_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) AND duration_ms IS NOT NULL GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         }
       ]
@@ -1719,12 +1719,12 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, COALESCE(SUM(shuffle_bytes_read), 0) AS 'Shuffle Read' FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, COALESCE(SUM(shuffle_bytes_read), 0) AS 'Shuffle Read' FROM spark_sql_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, COALESCE(SUM(shuffle_bytes_written), 0) AS 'Shuffle Written' FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time, COALESCE(SUM(shuffle_bytes_written), 0) AS 'Shuffle Written' FROM spark_sql_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         }
       ]
@@ -1807,7 +1807,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id, execution_id, table_name, operation, bytes, `rows`, files_read, time_ms FROM sql_query_table_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 200",
+          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id, execution_id, table_name, operation, bytes, `rows`, files_read, time_ms FROM spark_sql_table WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 200",
           "format": "table"
         }
       ]
@@ -1874,7 +1874,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id, execution_id, duration_ms, shuffle_bytes_read, shuffle_bytes_written, join_count FROM sql_query_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 100",
+          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id, execution_id, duration_ms, shuffle_bytes_read, shuffle_bytes_written, join_count FROM spark_sql_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND app_id IN ($app_id) ORDER BY timestamp_ms DESC LIMIT 100",
           "format": "table"
         }
       ]
@@ -2042,7 +2042,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM hive_table_io_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
+          "rawSql": "SELECT COUNT(*) AS value FROM hive_query_table WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)",
           "format": "table"
         }
       ]
@@ -2446,7 +2446,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, table_name, table_type, operation, user_name FROM hive_table_io_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND operation IN ($hive_operation) ORDER BY timestamp_ms DESC LIMIT 200",
+          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, table_name, table_type, operation, user_name FROM hive_query_table WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND operation IN ($hive_operation) ORDER BY timestamp_ms DESC LIMIT 200",
           "format": "table"
         }
       ]
@@ -2476,13 +2476,13 @@
           "type": "mysql",
           "uid": "DS_MYSQL"
         },
-        "definition": "SELECT DISTINCT app_id FROM task_metrics ORDER BY app_id",
+        "definition": "SELECT DISTINCT app_id FROM spark_task_metrics ORDER BY app_id",
         "includeAll": true,
         "label": "App ID",
         "multi": true,
         "name": "app_id",
         "options": [],
-        "query": "SELECT DISTINCT app_id FROM task_metrics ORDER BY app_id",
+        "query": "SELECT DISTINCT app_id FROM spark_task_metrics ORDER BY app_id",
         "queryValue": "",
         "refresh": 2,
         "regex": "",
@@ -2504,13 +2504,13 @@
           "type": "mysql",
           "uid": "DS_MYSQL"
         },
-        "definition": "SELECT DISTINCT operation FROM hive_query_metrics WHERE operation IS NOT NULL ORDER BY operation",
+        "definition": "SELECT DISTINCT operation FROM hive_query_metrics WHERE operation IS NOT NULL UNION SELECT '__none__' ORDER BY operation",
         "includeAll": true,
         "label": "Hive Operation",
         "multi": true,
         "name": "hive_operation",
         "options": [],
-        "query": "SELECT DISTINCT operation FROM hive_query_metrics WHERE operation IS NOT NULL ORDER BY operation",
+        "query": "SELECT DISTINCT operation FROM hive_query_metrics WHERE operation IS NOT NULL UNION SELECT '__none__' ORDER BY operation",
         "queryValue": "",
         "refresh": 2,
         "regex": "",

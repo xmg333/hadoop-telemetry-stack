@@ -20,7 +20,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms/3600000)*3600) AS time, engine, COUNT(*) AS task_count, COUNT(DISTINCT app_id) AS app_count FROM metric_events WHERE event_type IN ('TASK','MR_TASK') AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,engine ORDER BY 1,2",
+          "rawSql": "SELECT (FLOOR(timestamp_ms/3600000)*3600) AS time, engine, COUNT(*) AS task_count, COUNT(DISTINCT app_id) AS app_count FROM unified_metrics WHERE event_type IN ('TASK','MR_TASK') AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,engine ORDER BY 1,2",
           "format": "time_series",
           "refId": "A"
         }
@@ -46,7 +46,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, app_id, AVG(heap_used)/1073741824 AS avg_heap_gb, MAX(heap_used)/1073741824 AS max_heap_gb FROM metric_events WHERE event_type='JVM_MEMORY' AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,app_id ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, app_id, AVG(heap_used)/1073741824 AS avg_heap_gb, MAX(heap_used)/1073741824 AS max_heap_gb FROM unified_metrics WHERE event_type='JVM_MEMORY' AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,app_id ORDER BY 1",
           "format": "time_series",
           "refId": "A"
         }
@@ -72,7 +72,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, gc_name, SUM(gc_count) AS total_gc_count, SUM(gc_time_ms) AS total_gc_time_ms FROM metric_events WHERE event_type='JVM_GC' AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,gc_name ORDER BY 1",
+          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, gc_name, SUM(gc_count) AS total_gc_count, SUM(gc_time_ms) AS total_gc_time_ms FROM unified_metrics WHERE event_type='JVM_GC' AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,gc_name ORDER BY 1",
           "format": "time_series",
           "refId": "A"
         }
@@ -98,7 +98,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT DATE(FROM_UNIXTIME(timestamp_ms/1000)) AS time, engine, COUNT(*) AS job_count, AVG(duration_ms) AS avg_duration_ms FROM metric_events WHERE event_type IN ('JOB','MR_JOB','HIVE_QUERY') AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,engine ORDER BY 1,2",
+          "rawSql": "SELECT DATE(FROM_UNIXTIME(timestamp_ms/1000)) AS time, engine, COUNT(*) AS job_count, AVG(duration_ms) AS avg_duration_ms FROM unified_metrics WHERE event_type IN ('JOB','MR_JOB','HIVE_QUERY') AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,engine ORDER BY 1,2",
           "format": "time_series",
           "refId": "A"
         }

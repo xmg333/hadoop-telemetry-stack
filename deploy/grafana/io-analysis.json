@@ -20,7 +20,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, engine, SUM(io_bytes_read)/1073741824 AS read_gb, SUM(io_bytes_written)/1073741824 AS write_gb FROM metric_events WHERE event_type IN ('TASK','MR_JOB','HIVE_QUERY') AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,engine ORDER BY 1,2",
+          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, engine, SUM(bytes_read)/1073741824 AS read_gb, SUM(bytes_written)/1073741824 AS write_gb FROM unified_metrics WHERE event_type IN ('TASK','MR_JOB','HIVE_QUERY') AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,engine ORDER BY 1,2",
           "format": "time_series",
           "refId": "A"
         }
@@ -46,7 +46,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT app_name, SUM(shuffle_bytes_read)/1073741824 AS shuffle_read_gb, SUM(shuffle_bytes_written)/1073741824 AS shuffle_write_gb, SUM(shuffle_bytes_read+shuffle_bytes_written)/1073741824 AS total_shuffle_gb, COUNT(*) AS task_count FROM metric_events WHERE event_type IN ('TASK','SQL_QUERY') AND (shuffle_bytes_read>0 OR shuffle_bytes_written>0) AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY app_name ORDER BY total_shuffle_gb DESC LIMIT 15",
+          "rawSql": "SELECT app_name, SUM(shuffle_bytes_read)/1073741824 AS shuffle_read_gb, SUM(shuffle_bytes_written)/1073741824 AS shuffle_write_gb, SUM(shuffle_bytes_read+shuffle_bytes_written)/1073741824 AS total_shuffle_gb, COUNT(*) AS task_count FROM unified_metrics WHERE event_type IN ('TASK','SQL_QUERY') AND (shuffle_bytes_read>0 OR shuffle_bytes_written>0) AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY app_name ORDER BY total_shuffle_gb DESC LIMIT 15",
           "format": "table",
           "refId": "A"
         }
@@ -69,7 +69,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, engine, SUM(memory_bytes_spilled)/1073741824 AS spill_gb FROM metric_events WHERE event_type IN ('TASK','MR_TASK') AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,engine ORDER BY 1,2",
+          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, engine, SUM(bytes_spilled)/1073741824 AS spill_gb FROM unified_metrics WHERE event_type IN ('TASK','MR_TASK') AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,engine ORDER BY 1,2",
           "format": "time_series",
           "refId": "A"
         }
@@ -95,7 +95,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT table_name, engine, SUM(CASE WHEN table_type='input' OR table_operation='scan' THEN COALESCE(bytes,0) ELSE 0 END)/1073741824 AS read_gb, SUM(CASE WHEN table_type='output' OR table_operation='write' THEN COALESCE(bytes,0) ELSE 0 END)/1073741824 AS write_gb, COUNT(*) AS access_count FROM metric_events WHERE event_type IN ('SQL_TABLE_IO','HIVE_TABLE_IO') AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY table_name,engine ORDER BY read_gb+write_gb DESC LIMIT 20",
+          "rawSql": "SELECT table_name, engine, SUM(CASE WHEN table_type='input' OR table_operation='scan' THEN COALESCE(bytes,0) ELSE 0 END)/1073741824 AS read_gb, SUM(CASE WHEN table_type='output' OR table_operation='write' THEN COALESCE(bytes,0) ELSE 0 END)/1073741824 AS write_gb, COUNT(*) AS access_count FROM unified_metrics WHERE event_type IN ('SQL_TABLE_IO','HIVE_TABLE_IO') AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY table_name,engine ORDER BY read_gb+write_gb DESC LIMIT 20",
           "format": "table",
           "refId": "A"
         }

@@ -61,8 +61,8 @@
           "type": "mysql",
           "uid": "DS_MYSQL"
         },
-        "definition": "SELECT DISTINCT operation FROM hive_query_metrics WHERE execution_engine='mr' AND operation IS NOT NULL ORDER BY operation",
-        "query": "SELECT DISTINCT operation FROM hive_query_metrics WHERE execution_engine='mr' AND operation IS NOT NULL ORDER BY operation",
+        "definition": "SELECT DISTINCT operation FROM hive_query_metrics WHERE execution_engine='mr' AND operation IS NOT NULL UNION SELECT '__none__' ORDER BY operation",
+        "query": "SELECT DISTINCT operation FROM hive_query_metrics WHERE execution_engine='mr' AND operation IS NOT NULL UNION SELECT '__none__' ORDER BY operation",
         "refresh": 2,
         "multi": true,
         "includeAll": true,
@@ -199,7 +199,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT COUNT(*) AS value FROM hive_table_io_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND execution_engine='mr'",
+          "rawSql": "SELECT COUNT(*) AS value FROM hive_query_table WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND execution_engine='mr'",
           "format": "table",
           "refId": "A"
         }
@@ -415,7 +415,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, table_name, table_type, operation, user_name FROM hive_table_io_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND execution_engine='mr' AND operation IN ($hive_operation) ORDER BY timestamp_ms DESC LIMIT 200",
+          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, table_name, table_type, operation, user_name FROM hive_query_table WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND execution_engine='mr' AND operation IN ($hive_operation) ORDER BY timestamp_ms DESC LIMIT 200",
           "format": "table",
           "refId": "A"
         }

@@ -11,14 +11,14 @@
     "list": [
       {
         "current": {},
-        "definition": "SELECT DISTINCT app_id FROM metric_events WHERE event_type='TASK' ORDER BY app_id",
+        "definition": "SELECT DISTINCT app_id FROM unified_metrics WHERE event_type='TASK' ORDER BY app_id",
         "hide": 0,
         "includeAll": true,
         "label": "Application",
         "multi": true,
         "name": "app_id",
         "options": [],
-        "query": "SELECT DISTINCT app_id FROM metric_events WHERE event_type='TASK' ORDER BY app_id",
+        "query": "SELECT DISTINCT app_id FROM unified_metrics WHERE event_type='TASK' ORDER BY app_id",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -40,7 +40,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT app_name, stage_id, duration_ms, executor_run_time_ms, gc_time_ms, shuffle_fetch_wait_time_ms, ROUND(gc_time_ms/NULLIF(duration_ms,0)*100,1) AS gc_pct, ROUND(shuffle_fetch_wait_time_ms/NULLIF(duration_ms,0)*100,1) AS shuffle_wait_pct, num_tasks FROM metric_events WHERE event_type='STAGE' AND duration_ms IS NOT NULL AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) ORDER BY duration_ms DESC LIMIT 20",
+          "rawSql": "SELECT app_name, stage_id, duration_ms, executor_run_time_ms, gc_time_ms, shuffle_fetch_wait_time_ms, ROUND(gc_time_ms/NULLIF(duration_ms,0)*100,1) AS gc_pct, ROUND(shuffle_fetch_wait_time_ms/NULLIF(duration_ms,0)*100,1) AS shuffle_wait_pct, num_tasks FROM unified_metrics WHERE event_type='STAGE' AND duration_ms IS NOT NULL AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) ORDER BY duration_ms DESC LIMIT 20",
           "format": "table",
           "refId": "A"
         }
@@ -64,7 +64,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, engine, ROUND(AVG(gc_time_ms/NULLIF(duration_ms,0))*100,1) AS avg_gc_pct FROM metric_events WHERE event_type IN ('TASK','MR_TASK') AND gc_time_ms IS NOT NULL AND duration_ms>0 AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,engine ORDER BY 1,2",
+          "rawSql": "SELECT (FLOOR(timestamp_ms/$__interval_ms)*$__interval_ms/1000) AS time, engine, ROUND(AVG(gc_time_ms/NULLIF(duration_ms,0))*100,1) AS avg_gc_pct FROM unified_metrics WHERE event_type IN ('TASK','MR_TASK') AND gc_time_ms IS NOT NULL AND duration_ms>0 AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY 1,engine ORDER BY 1,2",
           "format": "time_series",
           "refId": "A"
         }
@@ -91,7 +91,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT app_id, stage_id, task_count, duration_skew_ratio, io_read_skew_ratio, shuffle_read_skew_ratio, gc_overhead_ratio, shuffle_wait_ratio FROM stage_governance WHERE (duration_skew_ratio>2 OR io_read_skew_ratio>2 OR shuffle_read_skew_ratio>2) AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) ORDER BY duration_skew_ratio DESC LIMIT 20",
+          "rawSql": "SELECT app_id, stage_id, task_count, duration_skew_ratio, io_read_skew_ratio, shuffle_read_skew_ratio, gc_overhead_ratio, shuffle_wait_ratio FROM spark_stage_skew WHERE (duration_skew_ratio>2 OR io_read_skew_ratio>2 OR shuffle_read_skew_ratio>2) AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) ORDER BY duration_skew_ratio DESC LIMIT 20",
           "format": "table",
           "refId": "A"
         }
@@ -116,7 +116,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT COUNT(DISTINCT stage_id) AS value FROM stage_governance WHERE duration_skew_ratio>2 AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000)",
+          "rawSql": "SELECT COUNT(DISTINCT stage_id) AS value FROM spark_stage_skew WHERE duration_skew_ratio>2 AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000)",
           "format": "table",
           "refId": "A"
         }
@@ -154,7 +154,7 @@
       "datasource": {"type": "mysql", "uid": "DS_MYSQL"},
       "targets": [
         {
-          "rawSql": "SELECT ROUND(AVG(cpu_efficiency)*100,1) AS value FROM stage_governance WHERE timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000)",
+          "rawSql": "SELECT ROUND(AVG(cpu_efficiency)*100,1) AS value FROM spark_stage_skew WHERE timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000)",
           "format": "table",
           "refId": "A"
         }

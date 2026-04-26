@@ -17,14 +17,14 @@
     "list": [
       {
         "current": {},
-        "definition": "SELECT DISTINCT operation FROM metric_events WHERE event_type='HIVE_QUERY' AND operation IS NOT NULL ORDER BY operation",
+        "definition": "SELECT DISTINCT operation FROM unified_metrics WHERE event_type='HIVE_QUERY' AND operation IS NOT NULL UNION SELECT '__none__' ORDER BY operation",
         "hide": 0,
         "includeAll": true,
         "label": "Operation",
         "multi": true,
         "name": "hive_operation",
         "options": [],
-        "query": "SELECT DISTINCT operation FROM metric_events WHERE event_type='HIVE_QUERY' AND operation IS NOT NULL ORDER BY operation",
+        "query": "SELECT DISTINCT operation FROM unified_metrics WHERE event_type='HIVE_QUERY' AND operation IS NOT NULL UNION SELECT '__none__' ORDER BY operation",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -60,7 +60,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id AS query_id, operation, user_name, duration_ms, COALESCE(io_bytes_read,0)/1073741824 AS 'Input GB (est.)', COALESCE(io_bytes_written,0)/1073741824 AS 'Output GB (est.)', COALESCE(input_rows,0) AS 'Rows In (est.)', COALESCE(output_rows,0) AS 'Rows Out (est.)', execution_engine FROM metric_events WHERE event_type='HIVE_QUERY' AND duration_ms IS NOT NULL AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) ORDER BY duration_ms DESC LIMIT 20",
+          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id AS query_id, operation, user_name, duration_ms, COALESCE(bytes_read,0)/1073741824 AS 'Input GB (est.)', COALESCE(bytes_written,0)/1073741824 AS 'Output GB (est.)', COALESCE(input_rows,0) AS 'Rows In (est.)', COALESCE(output_rows,0) AS 'Rows Out (est.)', execution_engine FROM unified_metrics WHERE event_type='HIVE_QUERY' AND duration_ms IS NOT NULL AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) ORDER BY duration_ms DESC LIMIT 20",
           "format": "table",
           "refId": "A"
         }
@@ -131,7 +131,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT operation AS metric, COUNT(*) AS value FROM metric_events WHERE event_type='HIVE_QUERY' AND operation IS NOT NULL AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY operation ORDER BY value DESC",
+          "rawSql": "SELECT operation AS metric, COUNT(*) AS value FROM unified_metrics WHERE event_type='HIVE_QUERY' AND operation IS NOT NULL AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY operation ORDER BY value DESC",
           "format": "table",
           "refId": "A"
         }
@@ -184,7 +184,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT table_name, SUM(CASE WHEN table_type='input' THEN 1 ELSE 0 END) AS read_count, SUM(CASE WHEN table_type='output' THEN 1 ELSE 0 END) AS write_count, COUNT(DISTINCT app_id) AS query_count FROM metric_events WHERE event_type='HIVE_TABLE_IO' AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY table_name ORDER BY read_count+write_count DESC LIMIT 20",
+          "rawSql": "SELECT table_name, SUM(CASE WHEN table_type='input' THEN 1 ELSE 0 END) AS read_count, SUM(CASE WHEN table_type='output' THEN 1 ELSE 0 END) AS write_count, COUNT(DISTINCT app_id) AS query_count FROM unified_metrics WHERE event_type='HIVE_TABLE_IO' AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY table_name ORDER BY read_count+write_count DESC LIMIT 20",
           "format": "table",
           "refId": "A"
         }
@@ -218,7 +218,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT execution_engine, COUNT(*) AS query_count, AVG(duration_ms) AS avg_duration_ms, ROUND(SUM(CASE WHEN status='true' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0),1) AS success_rate_pct FROM metric_events WHERE event_type='HIVE_QUERY' AND execution_engine IS NOT NULL AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY execution_engine",
+          "rawSql": "SELECT execution_engine, COUNT(*) AS query_count, AVG(duration_ms) AS avg_duration_ms, ROUND(SUM(CASE WHEN status='true' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0),1) AS success_rate_pct FROM unified_metrics WHERE event_type='HIVE_QUERY' AND execution_engine IS NOT NULL AND timestamp_ms>=($__unixEpochFrom()*1000) AND timestamp_ms<=($__unixEpochTo()*1000) GROUP BY execution_engine",
           "format": "table",
           "refId": "A"
         }

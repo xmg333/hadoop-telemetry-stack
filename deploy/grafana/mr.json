@@ -793,7 +793,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, task_id, task_type, job_id, duration_ms, success_count, map_input_records, map_output_records, map_output_bytes, reduce_input_records, reduce_output_records, reduce_shuffle_bytes, spilled_records, hdfs_bytes_read, hdfs_bytes_written, hdfs_read_ops, hdfs_write_ops, file_read_ops, file_write_ops FROM mr_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND job_id IN ($mr_job_id) ORDER BY timestamp_ms DESC LIMIT 200",
+          "rawSql": "SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, task_id, task_type, job_id, duration_ms, success_count, map_input_records, map_output_records, map_output_bytes, reduce_input_records, reduce_output_records, reduce_shuffle_bytes, spilled_records, hdfs_bytes_read, hdfs_bytes_written, hdfs_read_ops, hdfs_write_ops FROM mr_task_metrics WHERE timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000) AND job_id IN ($mr_job_id) ORDER BY timestamp_ms DESC LIMIT 200",
           "format": "table",
           "refId": "A"
         }
