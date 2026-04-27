@@ -92,7 +92,7 @@ public class DefaultMetricRecorder implements MetricRecorder {
     private volatile MemoryMetrics latestMemory;
     private volatile Attributes latestSystemAttrs;
 
-    public MetricRecorder(OpenTelemetry openTelemetry, TelemetryConfig config) {
+    public DefaultMetricRecorder(OpenTelemetry openTelemetry, TelemetryConfig config) {
         this.meter = openTelemetry.getMeter(METER_NAME);
         this.config = config;
 
