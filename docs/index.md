@@ -174,6 +174,8 @@ integration-tests/                  # 集成测试（Spark 3）
 
 详细的部署指南、配置参数、指标参考、排查手册见 [部署指南](deployment-guide.md)。
 
+打包与发布流程见 [发布指南](release.md)。
+
 ## K8s 测试环境
 
 已迁移至裸节点测试，不再依赖 Kubernetes。详见 [集成测试 README](../integration-tests/README.md)。
