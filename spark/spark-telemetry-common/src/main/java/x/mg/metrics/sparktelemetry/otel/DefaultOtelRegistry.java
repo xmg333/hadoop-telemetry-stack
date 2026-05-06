@@ -14,6 +14,7 @@ import io.opentelemetry.sdk.resources.Resource;
 import x.mg.metrics.sparktelemetry.config.TelemetryConfig;
 
 import io.opentelemetry.sdk.common.CompletableResultCode;
+import io.opentelemetry.sdk.metrics.export.MetricExporter;
 
 import java.time.Duration;
 import java.util.Map;
@@ -51,6 +52,7 @@ public class DefaultOtelRegistry implements OtelRegistry {
             // Build OTLP exporter
             OtlpGrpcMetricExporterBuilder exporterBuilder = OtlpGrpcMetricExporter.builder()
                     .setEndpoint(config.getOtelEndpoint())
+                    .setCompression("gzip")
                     .setAggregationTemporalitySelector(AggregationTemporalitySelector.deltaPreferred());
 
             // Build resource
@@ -58,12 +60,13 @@ public class DefaultOtelRegistry implements OtelRegistry {
 
             // Build meter provider with periodic reader
             long intervalMs = config.getExportIntervalMs();
+            MetricExporter exporter = new SplittingMetricExporter(
+                    exporterBuilder.build(), config.getExportMaxDataPoints());
             meterProvider = SdkMeterProvider.builder()
                     .setResource(resource)
                     .registerMetricReader(
-                            PeriodicMetricReader.builder(
-                                    exporterBuilder.build()
-                            ).setInterval(Duration.ofMillis(intervalMs)).build()
+                            PeriodicMetricReader.builder(exporter)
+                                    .setInterval(Duration.ofMillis(intervalMs)).build()
                     )
                     .build();
 

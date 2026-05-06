@@ -15,6 +15,7 @@ public final class ConfigKeys {
     public static final String OTEL_EXPORTER_PROTOCOL = "spark-telemetry.otel.exporter.protocol";
     public static final String OTEL_SERVICE_NAME = "spark-telemetry.otel.service.name";
     public static final String OTEL_EXPORT_INTERVAL_MS = "spark-telemetry.otel.export.interval.ms";
+    public static final String OTEL_EXPORT_MAX_DATA_POINTS = "spark-telemetry.otel.export.max-data-points-per-batch";
     public static final String OTEL_RESOURCE_ATTRIBUTES = "spark-telemetry.otel.resource.attributes";
 
     // Metrics - Listener
@@ -54,4 +55,5 @@ public final class ConfigKeys {
     public static final String DEFAULT_PROTOCOL = "grpc";
     public static final String DEFAULT_SERVICE_NAME = "spark-application";
     public static final long DEFAULT_EXPORT_INTERVAL_MS = 10000L;
+    public static final int DEFAULT_EXPORT_MAX_DATA_POINTS = 5000;
 }

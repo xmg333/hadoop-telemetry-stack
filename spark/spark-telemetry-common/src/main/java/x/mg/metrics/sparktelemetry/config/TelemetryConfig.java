@@ -122,6 +122,11 @@ public class TelemetryConfig {
         return getLong(ConfigKeys.PREFIX + ".otel.export.interval.ms", ConfigKeys.DEFAULT_EXPORT_INTERVAL_MS);
     }
 
+    public int getExportMaxDataPoints() {
+        return (int) getLong(ConfigKeys.PREFIX + ".otel.export.max-data-points-per-batch",
+                ConfigKeys.DEFAULT_EXPORT_MAX_DATA_POINTS);
+    }
+
     public boolean isListenerEnabled() {
         return getBoolean(ConfigKeys.PREFIX + ".metrics.listener.enabled", true);
     }
