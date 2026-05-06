@@ -77,7 +77,18 @@ class SparkTelemetryQueryExecutionListener extends QueryExecutionListener {
     val tableMetrics = new java.util.ArrayList[SqlTableIOMetrics]()
     collectPlanMetrics(qe.executedPlan, queryMetrics, tableMetrics)
 
-    (queryMetrics, tableMetrics)
+    // Deduplicate table metrics: same (tableName, operation) should appear once
+    val deduped = new java.util.ArrayList[SqlTableIOMetrics]()
+    val seen = new java.util.HashSet[String]()
+    for (i <- 0 until tableMetrics.size()) {
+      val m = tableMetrics.get(i)
+      val key = m.getTableName + "|" + m.getOperation
+      if (seen.add(key)) {
+        deduped.add(m)
+      }
+    }
+
+    (queryMetrics, deduped)
   }
 
   private def collectPlanMetrics(plan: SparkPlan, qm: SqlExecutionMetrics, tm: java.util.List[SqlTableIOMetrics]): Unit = {

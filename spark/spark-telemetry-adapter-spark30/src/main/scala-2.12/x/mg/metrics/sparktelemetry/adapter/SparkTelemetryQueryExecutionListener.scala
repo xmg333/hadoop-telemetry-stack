@@ -58,7 +58,18 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
     // Propagate executionId to table metrics (0L for Spark 3.0.x)
     tableMetrics.asScala.foreach(_.setExecutionId(0L))
 
-    (queryMetrics, tableMetrics)
+    // Deduplicate table metrics: same (tableName, operation) should appear once
+    val deduped = new java.util.ArrayList[SqlTableIOMetrics]()
+    val seen = new java.util.HashSet[String]()
+    for (i <- 0 until tableMetrics.size()) {
+      val m = tableMetrics.get(i)
+      val key = m.getTableName + "|" + m.getOperation
+      if (seen.add(key)) {
+        deduped.add(m)
+      }
+    }
+
+    (queryMetrics, deduped)
   }
 
   /**
@@ -76,19 +87,19 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
     // Unwrap AQE wrappers that hide inner plans
     plan match {
       case a: AdaptiveSparkPlanExec =>
-        // AdaptiveSparkPlanExec extends LeafExecNode, children=Nil
-        // initialPlan() returns the INITIAL plan (before AQE optimizations).
-        // currentPhysicalPlan (private[sql]) holds the FINAL plan with
-        // ShuffleQueryStageExec nodes that contain actual shuffle stats.
+        // AQE re-optimization (reOptimize) may create new FileSourceScanExec instances
+        // with fresh (zero) driver-side metrics (numFiles, filesSize, scanTime).
+        // Executor-accumulated metrics (numOutputRows) survive via accumulator ID matching,
+        // but driver-side set() calls are lost on the new instances.
+        // initialPlan retains the ORIGINAL instances with correct driver metrics.
+        visit(a.initialPlan, qm, tm)
+        // Collect AQE-specific shuffle bytes from ShuffleQueryStageExec in the final plan.
         try {
           val method = a.getClass.getDeclaredMethod("currentPhysicalPlan")
           method.setAccessible(true)
           val finalPlan = method.invoke(a).asInstanceOf[SparkPlan]
-          if (finalPlan != null) visit(finalPlan, qm, tm)
-          else visit(a.initialPlan, qm, tm)
-        } catch {
-          case _: Exception => visit(a.initialPlan, qm, tm)
-        }
+          if (finalPlan != null) collectShuffleStageBytes(finalPlan, qm)
+        } catch { case _: Exception => }
         return
       case sqs: ShuffleQueryStageExec =>
         // ShuffleQueryStageExec holds shuffle stats (bytesWritten) that are
@@ -173,6 +184,8 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
         tableMetric.setTableName(resolveWriteTableName(w.cmd))
         tableMetric.setRows(metricValue(w, "numOutputRows"))
         tableMetric.setBytes(metricValue(w, "numOutputBytes"))
+        tableMetric.setTimeMs(metricValue(w, "writeTime", "taskCommitTime"))
+        tableMetric.setFilesRead(metricValue(w, "numFiles"))
         tm.add(tableMetric)
 
       case _ =>
@@ -182,8 +195,41 @@ class SparkTelemetryQueryExecutionListener(confMap: Map[String, String]) extends
     plan.children.foreach(c => visit(c, qm, tm))
   }
 
+  private def collectShuffleStageBytes(plan: SparkPlan, qm: SqlExecutionMetrics): Unit = {
+    plan match {
+      case sqs: ShuffleQueryStageExec =>
+        try {
+          val method = sqs.getClass.getDeclaredMethod("mapOutputStatistics")
+          method.setAccessible(true)
+          val stats = method.invoke(sqs)
+          if (stats != null) {
+            val bytesField = stats.getClass.getDeclaredField("bytesWritten")
+            bytesField.setAccessible(true)
+            val bytes = bytesField.getLong(stats)
+            if (bytes > 0) {
+              qm.setShuffleBytesWritten(Math.max(qm.getShuffleBytesWritten, bytes))
+              qm.setShuffleBytesRead(Math.max(qm.getShuffleBytesRead, bytes))
+            }
+          }
+        } catch { case _: Exception => }
+      case _ =>
+    }
+    plan.children.foreach(c => collectShuffleStageBytes(c, qm))
+  }
+
   private def metricValue(plan: SparkPlan, name: String): Long = {
     plan.metrics.get(name).map(_.value).getOrElse(0L)
+  }
+
+  /** Try multiple metric names in order (first non-zero wins); for cross-version compatibility. */
+  private def metricValue(plan: SparkPlan, name: String, fallbacks: String*): Long = {
+    val v = plan.metrics.get(name).map(_.value).getOrElse(0L)
+    if (v > 0) return v
+    fallbacks.foreach { n =>
+      val fv = plan.metrics.get(n).map(_.value).getOrElse(0L)
+      if (fv > 0) return fv
+    }
+    0L
   }
 
   private def extractFileScanTableName(scan: FileSourceScanExec): String = {
