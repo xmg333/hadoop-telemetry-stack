@@ -37,6 +37,7 @@ public class HiveOtelRegistry {
         try {
             OtlpGrpcMetricExporter exporter = OtlpGrpcMetricExporter.builder()
                 .setEndpoint(config.getOtelEndpoint())
+                .setCompression("gzip")
                 .setAggregationTemporalitySelector(AggregationTemporalitySelector.deltaPreferred())
                 .build();
 

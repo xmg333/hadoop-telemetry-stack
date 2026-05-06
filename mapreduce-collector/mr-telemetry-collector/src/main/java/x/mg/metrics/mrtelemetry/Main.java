@@ -39,6 +39,7 @@ public class Main {
             // Initialize OTel SDK
             OtlpGrpcMetricExporterBuilder exporterBuilder = OtlpGrpcMetricExporter.builder()
                     .setEndpoint(config.getOtelEndpoint())
+                    .setCompression("gzip")
                     .setAggregationTemporalitySelector(AggregationTemporalitySelector.deltaPreferred());
 
             Resource resource = Resource.create(

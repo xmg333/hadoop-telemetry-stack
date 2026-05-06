@@ -41,6 +41,7 @@ public class AgentOtelRegistry {
         try {
             OtlpGrpcMetricExporter exporter = OtlpGrpcMetricExporter.builder()
                 .setEndpoint(config.getOtelEndpoint())
+                .setCompression("gzip")
                 .setAggregationTemporalitySelector(AggregationTemporalitySelector.deltaPreferred())
                 .build();
 
