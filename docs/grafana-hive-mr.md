@@ -1,31 +1,31 @@
-# Hive on MR 查询透视
+# Hive on MR Query Deep Dive
 
-## 概述
-本仪表盘展示以 MR 为执行引擎的 Hive 查询指标，帮助回答以下问题：
-- Hive on MR 有多少查询？平均耗时和 IO 量如何？
-- 操作类型分布如何（QUERY / CTAS / INSERT 等）？
-- 各操作的耗时趋势如何变化？
-- 具体查询的详情和表 IO 血缘如何？
+## Overview
+This dashboard displays Hive query metrics for queries using MR as the execution engine. It helps answer the following questions:
+- How many Hive on MR queries are there? What are the average duration and IO volume?
+- What is the operation type distribution (QUERY / CTAS / INSERT, etc.)?
+- How do the duration trends for each operation change over time?
+- What are the details of specific queries and their table IO lineage?
 
-## 前置条件
+## Prerequisites
 
-数据源：`hive_query_metrics`、`hive_table_io_metrics`（过滤 `execution_engine='mr'`）
+Data sources: `hive_query_metrics`, `hive_table_io_metrics` (filtered by `execution_engine='mr'`)
 
-Grafana 变量：
-:   `$hive_operation` — Hive 操作类型（多选，含 All）
+Grafana variables:
+:   `$hive_operation` — Hive operation type (multi-select, includes All)
 :   `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
 
-变量查询：`SELECT DISTINCT operation FROM hive_query_metrics WHERE execution_engine='mr' AND operation IS NOT NULL ORDER BY operation`
+Variable query: `SELECT DISTINCT operation FROM hive_query_metrics WHERE execution_engine='mr' AND operation IS NOT NULL ORDER BY operation`
 
-## 面板说明
+## Panel Descriptions
 
-### 概览统计（y=0，4 个 stat）
+### Overview Statistics (y=0, 4 stats)
 
-#### Total Hive-MR Queries（stat）
+#### Total Hive-MR Queries (stat)
 
-**用途**: 展示时间范围内 Hive on MR 查询总数。
+**Purpose**: Displays the total number of Hive on MR queries within the time range.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT COUNT(*) AS value
 FROM hive_query_metrics
@@ -34,37 +34,37 @@ WHERE timestamp_ms >= ($__unixEpochFrom() * 1000)
   AND execution_engine='mr'
 ```
 
-#### Avg Hive-MR Duration（stat）
+#### Avg Hive-MR Duration (stat)
 
-**用途**: 展示平均查询耗时。阈值：<5s 绿色，5-30s 黄色，>30s 红色。
+**Purpose**: Displays the average query duration. Thresholds: <5s green, 5-30s yellow, >30s red.
 
-#### Hive-MR IO Bytes（stat）
+#### Hive-MR IO Bytes (stat)
 
-**用途**: 展示总输入字节量。
+**Purpose**: Displays the total input byte count.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT SUM(input_bytes) AS value
 FROM hive_query_metrics WHERE execution_engine='mr' AND input_bytes IS NOT NULL
 ```
 
-#### Hive-MR Table Events（stat）
+#### Hive-MR Table Events (stat)
 
-**用途**: 展示表 IO 事件总数。
+**Purpose**: Displays the total number of table IO events.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT COUNT(*) AS value
 FROM hive_table_io_metrics WHERE execution_engine='mr'
 ```
 
-### 操作分布与耗时趋势（y=4）
+### Operation Distribution and Duration Trends (y=4)
 
-#### Operation Distribution（piechart）
+#### Operation Distribution (piechart)
 
-**用途**: 以环形图展示各操作类型的查询数量分布（QUERY / CREATETABLE / INSERT 等）。
+**Purpose**: Shows the query count distribution by operation type (QUERY / CREATETABLE / INSERT, etc.) using a donut chart.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT operation AS metric, COUNT(*) AS value
 FROM hive_query_metrics
@@ -72,13 +72,13 @@ WHERE execution_engine='mr' AND operation IS NOT NULL
 GROUP BY operation ORDER BY value DESC
 ```
 
-**使用建议**: 如果 QUERY 占比过高但 INSERT/CTAS 很少，说明查询多、写入少，可能是即席查询为主的工作负载。
+**Usage**: If QUERY accounts for a very high proportion while INSERT/CTAS is low, this suggests a read-heavy workload dominated by ad-hoc queries.
 
-#### Duration by Operation（timeseries）
+#### Duration by Operation (timeseries)
 
-**用途**: 按操作类型展示平均耗时趋势，支持通过 `$hive_operation` 变量过滤。
+**Purpose**: Shows average duration trends by operation type, filterable by the `$hive_operation` variable.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT (FLOOR(timestamp_ms / $__interval_ms) * $__interval_ms / 1000) AS time,
        operation AS metric, AVG(duration_ms) AS value
@@ -88,15 +88,15 @@ WHERE execution_engine='mr' AND duration_ms IS NOT NULL
 GROUP BY 1, 2 ORDER BY 1, 2
 ```
 
-**使用建议**: 某操作耗时突增可能与数据量变化或底层 MR Job 异常有关。
+**Usage**: A sudden increase in duration for a specific operation may be related to data volume changes or underlying MR Job anomalies.
 
-### 详情表格（y=12）
+### Detail Tables (y=12)
 
-#### Query Detail（table）
+#### Query Detail (table)
 
-**用途**: 展示最近 200 条 Hive on MR 查询的完整详情。
+**Purpose**: Displays complete details for the most recent 200 Hive on MR queries.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, operation, user_name,
        success, duration_ms, input_bytes, output_bytes, input_rows, output_rows
@@ -105,22 +105,22 @@ WHERE execution_engine='mr' AND operation IN ($hive_operation)
 ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `query_id` | Hive 查询唯一 ID | - |
-| `operation` | 操作类型 | - |
-| `success` | OK（绿色）/ FAIL（红色） | - |
-| `input_bytes` | 输入字节数 | bytes |
-| `output_bytes` | 输出字节数 | bytes |
-| `input_rows` / `output_rows` | 输入/输出行数 | 条 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `query_id` | Hive query unique ID | - |
+| `operation` | Operation type | - |
+| `success` | OK (green) / FAIL (red) | - |
+| `input_bytes` | Input bytes | bytes |
+| `output_bytes` | Output bytes | bytes |
+| `input_rows` / `output_rows` | Input/output row count | count |
 
-#### Table IO Detail（table）
+#### Table IO Detail (table)
 
-**用途**: 展示表级别的 IO 血缘关系（哪些表被读/写）。
+**Purpose**: Displays table-level IO lineage (which tables are read/written).
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, table_name,
        table_type, operation, user_name
@@ -129,25 +129,25 @@ WHERE execution_engine='mr' AND operation IN ($hive_operation)
 ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 |
-|------|------|
-| `table_name` | 表名 |
-| `table_type` | INPUT（蓝色）/ OUTPUT（绿色） |
-| `operation` | 操作类型 |
+| Column | Description |
+|--------|-------------|
+| `table_name` | Table name |
+| `table_type` | INPUT (blue) / OUTPUT (green) |
+| `operation` | Operation type |
 
-**使用建议**: 通过此面板追踪数据血缘，了解哪些表被频繁读取或写入。
+**Usage**: Use this panel to trace data lineage and understand which tables are frequently read or written.
 
-## 导航
-顶部导航栏可快速切换到：
-- **Overview** — 平台总览
-- **Spark** — Spark 引擎详细透视
-- **MapReduce** — MR 引擎详细透视
-- **Hive on Spark** — Hive on Spark 查询分析
-- **Spark / MR / Hive** — 全引擎综合仪表盘
+## Navigation
+The top navigation bar provides quick access to:
+- **Overview** — Platform overview
+- **Spark** — Spark engine detailed view
+- **MapReduce** — MR engine detailed view
+- **Hive on Spark** — Hive on Spark query analysis
+- **Spark / MR / Hive** — All-engine consolidated dashboard
 
-## 注意事项
-- `execution_engine='mr'` 过滤条件依赖 Hive Hook 上报时的 `hive.execution.engine` 配置
-- Hive 3.x 默认执行引擎可能为 Tez，需确保配置为 `mr` 才会在此面板出现
-- 表 IO 数据依赖 `hive.exec.post.hooks` 正确配置
+## Notes
+- The `execution_engine='mr'` filter depends on the `hive.execution.engine` configuration reported by the Hive Hook.
+- Hive 3.x defaults to Tez as the execution engine; ensure it is configured to `mr` for queries to appear in this dashboard.
+- Table IO data depends on `hive.exec.post.hooks` being correctly configured.

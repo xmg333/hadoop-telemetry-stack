@@ -137,28 +137,28 @@ phase1_preflight() {
 
     # Check JARs exist
     local spark_jar
-    spark_jar=$(ls /home/xmg333/spark-telemetry-listener/spark/spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*-SNAPSHOT.jar 2>/dev/null || true)
+    spark_jar=$(ls $PROJECT_ROOT/spark/spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*-SNAPSHOT.jar 2>/dev/null || true)
     if [[ -z "$spark_jar" ]]; then
         fail "Spark omnipackage JAR not found. Run: ./build-omni.sh"
         exit 1
     fi
 
     local mr_jar
-    mr_jar=$(ls /home/xmg333/spark-telemetry-listener/mapreduce-collector/mr-telemetry-dist/target/mr-telemetry-dist-*-SNAPSHOT.jar 2>/dev/null || true)
+    mr_jar=$(ls $PROJECT_ROOT/mapreduce-collector/mr-telemetry-dist/target/mr-telemetry-dist-*-SNAPSHOT.jar 2>/dev/null || true)
     if [[ -z "$mr_jar" ]]; then
         fail "MR collector JAR not found. Run: mvn clean package -Pspark-3 -DskipTests"
         exit 1
     fi
 
     local flink_jar
-    flink_jar=$(ls /home/xmg333/spark-telemetry-listener/flink/metrics-flink-consumer-dist/target/metrics-flink-consumer-dist-*-SNAPSHOT.jar 2>/dev/null || true)
+    flink_jar=$(ls $PROJECT_ROOT/flink/metrics-flink-consumer-dist/target/metrics-flink-consumer-dist-*-SNAPSHOT.jar 2>/dev/null || true)
     if [[ -z "$flink_jar" ]]; then
         fail "Flink consumer JAR not found. Run: mvn clean package -Pspark-3 -DskipTests"
         exit 1
     fi
 
     local hive_jar
-    hive_jar=$(ls /home/xmg333/spark-telemetry-listener/hive/hive-telemetry-hook-dist/target/hive-telemetry-hook-dist-*-SNAPSHOT.jar 2>/dev/null || true)
+    hive_jar=$(ls $PROJECT_ROOT/hive/hive-telemetry-hook-dist/target/hive-telemetry-hook-dist-*-SNAPSHOT.jar 2>/dev/null || true)
     if [[ -z "$hive_jar" ]]; then
         warn "Hive hook JAR not found. Hive benchmark will be skipped. Run: mvn clean package -Pspark-3 -DskipTests"
     fi
@@ -253,7 +253,7 @@ flink-consumer {
     clickhouse {
       url = "jdbc:clickhouse://${CLICKHOUSE_IP}:8123/metrics_db"
       user = "default"
-      password = ""
+      password = "CHANGE_ME"
       batch.size = 5000
       flush.interval.ms = 3000
     }
@@ -280,7 +280,7 @@ flink-consumer {
     mysql {
       url = "jdbc:mysql://${MYSQL_IP}:3306/metrics_db"
       user = "metrics"
-      password = "metrics"
+      password = "CHANGE_ME"
       batch.size = 1000
       flush.interval.ms = 5000
     }
@@ -462,7 +462,7 @@ PYEOF'
     # Deploy Hive hook JAR and prepare Hive benchmark tables (if Hive available)
     if [[ "$HIVE_AVAILABLE" == "true" ]]; then
         local hive_jar
-        hive_jar=$(ls /home/xmg333/spark-telemetry-listener/hive/hive-telemetry-hook-dist/target/hive-telemetry-hook-dist-*-SNAPSHOT.jar 2>/dev/null || true)
+        hive_jar=$(ls $PROJECT_ROOT/hive/hive-telemetry-hook-dist/target/hive-telemetry-hook-dist-*-SNAPSHOT.jar 2>/dev/null || true)
         if [[ -n "$hive_jar" ]]; then
             log "Deploying Hive hook JAR to hadoop3..."
             kubectl cp "$hive_jar" "$HADOOP3_POD":/opt/hive/lib/hive-telemetry-hook.jar
@@ -1401,7 +1401,7 @@ trap cleanup EXIT
 ##############################################################################
 # Main
 ##############################################################################
-cd /home/xmg333/spark-telemetry-listener
+cd $PROJECT_ROOT
 
 log "Starting benchmark (duration=${BENCHMARK_DURATION}s, sink=${SINK_TYPE})"
 echo ""

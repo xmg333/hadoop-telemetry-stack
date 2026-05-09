@@ -1,23 +1,23 @@
-# 数据吞吐与 IO 分析
+# Data Throughput and IO Analysis
 
-## 概述
-本仪表盘从数据 IO 视角出发，帮助回答以下问题：
-- 各引擎的数据读写吞吐量趋势如何？
-- 哪些应用/Stage 的 Shuffle 数据量最大？
-- 是否存在 Spill（内存溢写）问题？
-- 哪些表的 IO 最频繁？
+## Overview
+This dashboard approaches analysis from a data IO perspective, helping answer the following questions:
+- What are the data read/write throughput trends for each engine?
+- Which applications/Stages have the largest Shuffle data volume?
+- Are there Spill (memory overflow) issues?
+- Which tables have the most frequent IO?
 
-## 前置条件
-- 数据源：`metric_events` 大宽表、`sql_query_table_metrics` 表（由 Flink Consumer 写入）
-- Grafana 变量：`$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
+## Prerequisites
+- Data sources: `metric_events` wide table, `sql_query_table_metrics` table (written by Flink Consumer)
+- Grafana variables: `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
 
-## 面板说明
+## Panel Descriptions
 
-### 跨引擎数据吞吐趋势（timeseries）
+### Cross-Engine Data Throughput Trend (timeseries)
 
-**用途**: 展示各引擎（SPARK / MR / HIVE）随时间变化的 IO 吞吐量趋势，帮助理解集群数据流动情况。
+**Purpose**: Shows IO throughput trends over time for each engine (SPARK / MR / HIVE), helping understand cluster data flow patterns.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ( Floor(timestamp_ms / $__interval_ms) * $__interval_ms / 1000 ) AS time,
        engine,
@@ -34,22 +34,22 @@ ORDER  BY 1,
           2
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `time` | 时间桶 | Unix 时间戳 |
-| `engine` | 执行引擎（SPARK / MR / HIVE） | - |
-| `read_gb` | 该时段内读取数据总量 | GB |
-| `write_gb` | 该时段内写入数据总量 | GB |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `time` | Time bucket | Unix timestamp |
+| `engine` | Execution engine (SPARK / MR / HIVE) | - |
+| `read_gb` | Total data read during this period | GB |
+| `write_gb` | Total data written during this period | GB |
 
-**使用建议**: 吞吐量突然下降可能意味着上游数据源不可用或任务调度异常。可对比不同引擎的 IO 模式，判断是否有必要将部分 MR 作业迁移到 Spark 以提高 IO 效率。
+**Usage**: A sudden drop in throughput may indicate that upstream data sources are unavailable or task scheduling is abnormal. Compare the IO patterns of different engines to determine whether some MR jobs could be migrated to Spark for better IO efficiency.
 
-### Shuffle 数据量排行（table）
+### Shuffle Data Volume Ranking (table)
 
-**用途**: 列出 Shuffle 读写数据量最大的前 15 个应用，定位 Shuffle 瓶颈。
+**Purpose**: Lists the top 15 applications by Shuffle read/write data volume to identify Shuffle bottlenecks.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT app_id,
        app_name,
@@ -69,25 +69,25 @@ ORDER  BY shuffle_total_gb DESC
 LIMIT  15
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `app_id` | Spark 应用 ID | - |
-| `app_name` | 应用名称 | - |
-| `shuffle_read_gb` | Shuffle 读取总量 | GB |
-| `shuffle_write_gb` | Shuffle 写入总量 | GB |
-| `shuffle_total_gb` | Shuffle 总数据量 | GB |
-| `shuffle_wait_sec` | Shuffle 等待时间总计 | 秒 |
-| `task_count` | 任务数 | 个 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `app_id` | Spark application ID | - |
+| `app_name` | Application name | - |
+| `shuffle_read_gb` | Total Shuffle read | GB |
+| `shuffle_write_gb` | Total Shuffle write | GB |
+| `shuffle_total_gb` | Total Shuffle data volume | GB |
+| `shuffle_wait_sec` | Total Shuffle wait time | seconds |
+| `task_count` | Number of tasks | count |
 
-**使用建议**: Shuffle 数据量过大的应用应考虑优化 Join 策略（如 Broadcast Join）、增加分区数或使用 Bucket 表。`shuffle_wait_sec` 高说明网络或磁盘 IO 成为瓶颈。
+**Usage**: Applications with excessive Shuffle data should consider optimizing Join strategies (e.g., Broadcast Join), increasing partitions, or using Bucket tables. High `shuffle_wait_sec` indicates that network or disk IO has become a bottleneck.
 
-### Spill 分析（timeseries）
+### Spill Analysis (timeseries)
 
-**用途**: 展示各应用的内存溢写（Spill）趋势，检测内存配置不足导致的问题。
+**Purpose**: Shows the memory spill trend for each application, detecting problems caused by insufficient memory configuration.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ( Floor(timestamp_ms / $__interval_ms) * $__interval_ms / 1000 ) AS time,
        app_id,
@@ -104,22 +104,22 @@ ORDER  BY 1,
           2
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `time` | 时间桶 | Unix 时间戳 |
-| `app_id` | Spark 应用 ID | - |
-| `spill_gb` | 内存 Spill 总量（含内存和磁盘溢写） | GB |
-| `disk_spill_gb` | 磁盘 Spill 总量 | GB |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `time` | Time bucket | Unix timestamp |
+| `app_id` | Spark application ID | - |
+| `spill_gb` | Total memory Spill (including memory and disk spill) | GB |
+| `disk_spill_gb` | Total disk Spill | GB |
 
-**使用建议**: Spill 数据量大意味着 Executor 内存不足以容纳所有 Shuffle 数据。建议增大 `spark.executor.memory`、调整 `spark.memory.fraction`，或增加分区数以减少单任务数据量。持续的 Spill 会导致严重的磁盘 IO 和性能下降。
+**Usage**: Large Spill volumes indicate that Executor memory is insufficient to hold all Shuffle data. Increase `spark.executor.memory`, adjust `spark.memory.fraction`, or increase the number of partitions to reduce per-task data volume. Persistent Spill leads to severe disk IO and performance degradation.
 
-### 热点表 IO 分析（table）
+### Hot Table IO Analysis (table)
 
-**用途**: 基于 SQL Table IO 数据，统计读写频次和数据量最高的表，识别热点数据源。
+**Purpose**: Based on SQL Table IO data, identifies the tables with the highest read/write frequency and data volume, pinpointing hot data sources.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT table_name,
        operation,
@@ -136,21 +136,21 @@ ORDER  BY total_gb DESC
 LIMIT  20
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `table_name` | 表名（完整库名.表名） | - |
-| `operation` | 操作类型（SCAN / WRITE 等） | - |
-| `access_count` | 被访问次数 | 次 |
-| `total_gb` | 累计 IO 数据量 | GB |
-| `total_million_rows` | 累计处理行数 | 百万行 |
-| `avg_scan_ms` | 平均扫描耗时 | 毫秒 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `table_name` | Table name (full database.table) | - |
+| `operation` | Operation type (SCAN / WRITE, etc.) | - |
+| `access_count` | Number of times accessed | count |
+| `total_gb` | Cumulative IO data volume | GB |
+| `total_million_rows` | Cumulative rows processed | million rows |
+| `avg_scan_ms` | Average scan duration | milliseconds |
 
-**使用建议**: 访问频次高但 `avg_scan_ms` 也高的表适合做分区优化或缓存。写入量异常大的表需检查是否存在小文件问题。该面板仅包含 Spark SQL 的表 IO 数据（通过 `SQL_TABLE_IO` 事件采集）。
+**Usage**: Tables with high access frequency and high `avg_scan_ms` are suitable candidates for partitioning optimization or caching. Tables with abnormally large write volumes should be checked for small file issues. This panel only includes Spark SQL table IO data (collected via `SQL_TABLE_IO` events).
 
-## 注意事项
-- IO 字段（`io_bytes_read`、`io_bytes_written`）为标准化字段：Spark 来自 Task 指标，MR 来自 `hdfs_bytes_read + file_bytes_read` 的汇总，Hive 来自 `input_bytes / output_bytes`。
-- Shuffle 指标仅适用于 Spark（MR 的 Shuffle 通过 `reduce_shuffle_bytes` 体现，在 MR_JOB 级别）。
-- 热点表 IO 面板依赖 Spark SQL 的 `SQL_TABLE_IO` 事件，需开启 `spark.telemetry.metrics.sql` 相关配置。
-- 对于 ClickHouse 数据源，`sql_query_table_metrics` 表中的 `` `rows` `` 列为保留字，需用反引号包裹。
+## Notes
+- IO fields (`io_bytes_read`, `io_bytes_written`) are standardized fields: for Spark they come from Task metrics, for MR they are aggregated from `hdfs_bytes_read + file_bytes_read`, and for Hive they come from `input_bytes / output_bytes`.
+- Shuffle metrics apply only to Spark (MR Shuffle is represented by `reduce_shuffle_bytes` at the MR_JOB level).
+- The Hot Table IO panel depends on Spark SQL `SQL_TABLE_IO` events; enable the `spark.telemetry.metrics.sql` related configuration.
+- For ClickHouse data sources, the `` `rows` `` column in `sql_query_table_metrics` is a reserved word and must be wrapped in backticks.

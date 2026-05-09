@@ -230,6 +230,38 @@ Distribution modules use `maven-shade-plugin` to create self-contained JARs. OTe
 
 `deploy/otel-collector/` has the OTel Collector pipeline config. `deploy/grafana/` has Grafana dashboard JSON files. `deploy/sql/` has database migration scripts.
 
+### Release Process
+
+```bash
+# 1. Set version (e.g. 1.1.1)
+mvn versions:set -DnewVersion=1.1.1 -DgenerateBackupPoms=false
+
+# 2. Build omnipackage
+chmod +x build-omni.sh && ./build-omni.sh
+
+# 3. Commit version bump and tag
+git add -A && git commit -m "release: v1.1.1"
+git tag v1.1.1
+git push origin master --tags
+
+# 4. Deploy Maven artifacts (default profile modules)
+mvn deploy -Prdc -DskipTests
+
+# 5. Deploy omnipackage (omni profile)
+mvn deploy -Prdc,omni -DskipTests -pl spark/spark-telemetry-dist-omni
+
+# 6. Build release tar.gz and deploy
+./release.sh
+mvn deploy:deploy-file \
+  -DgroupId=x.mg.metrics \
+  -DartifactId=yarn-telemetry \
+  -Dversion=1.1.1 \
+  -Dpackaging=tar.gz \
+  -Dfile=dist/yarn-telemetry-1.1.1.tar.gz \
+  -DrepositoryId=YOUR_REPO_ID \
+  -Durl=https://packages.example.com/YOUR_NAMESPACE/maven/YOUR_REPO_ID
+```
+
 ## Critical Lesson: Test-Driven Metric Field Verification
 
 This project's core purpose is **capturing metrics from Spark/Hive/MapReduce and propagating them end-to-end to storage**. A recurring class of bugs is: **a metric field (user_name, queue, executionId, etc.) exists in the schema but is never actually populated by the source adapter**. These bugs are invisible without tests because:

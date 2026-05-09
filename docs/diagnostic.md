@@ -1,46 +1,46 @@
-# 遥测诊断工具
+# Telemetry Diagnostic Tool
 
-交互式诊断工具，用于检查 OTel Collector、Kafka、MySQL、Grafana 面板等后端组件的健康状态，以及 Spark Plugin、Hive Hook、MR Collector 等应用配置的正确性。
+An interactive diagnostic tool for checking the health of backend components (OTel Collector, Kafka, MySQL, Grafana dashboards, etc.) and verifying the correctness of application configurations (Spark Plugin, Hive Hook, MR Collector, etc.).
 
-## 功能
+## Features
 
-- **应用诊断**：检查 Spark Plugin、Hive Hook、MR Collector 配置
-- **后端诊断**：检查 OTel Collector、Kafka、MySQL 健康状态
-- **Grafana 面板检查**：扫描 Dashboard JSON 文件，提取 SQL 查询并在 MySQL 中执行验证
-- **数据流验证**：端到端数据流检查
-- **中文输出**：诊断结果以中文显示
+- **Application diagnostics**: Check Spark Plugin, Hive Hook, MR Collector configuration
+- **Backend diagnostics**: Check OTel Collector, Kafka, MySQL health status
+- **Grafana dashboard check**: Scan Dashboard JSON files, extract SQL queries and execute validation against MySQL
+- **Data flow validation**: End-to-end data flow checks
+- **Chinese output**: Diagnostic results are displayed in Chinese
 
-## 构建
+## Build
 
 ```bash
 mvn clean package -pl diagnostic/diagnostic-core -am -DskipTests
 ```
 
-## 运行
+## Run
 
 ```bash
-# 交互式 CLI（JLine 终端）
+# Interactive CLI (JLine terminal)
 java -jar diagnostic/diagnostic-core/target/diagnostic-core-1.0.0-SNAPSHOT.jar
 
-# 指定配置文件
+# Specify config file
 java -jar diagnostic/diagnostic-core/target/diagnostic-core-1.0.0-SNAPSHOT.jar \
   --config /path/to/diagnostic.conf
 ```
 
-## 配置文件
+## Configuration File
 
-配置文件位于 `diagnostic/diagnostic-core/src/main/resources/diagnostic.conf`：
+The config file is located at `diagnostic/diagnostic-core/src/main/resources/diagnostic.conf`:
 
 ```hocon
 diagnostic {
-  # OTel Collector 配置
+  # OTel Collector configuration
   otel-collector {
     endpoint = "http://localhost:4317"
     health-check-port = 13133
     timeout-ms = 5000
   }
 
-  # Kafka 配置
+  # Kafka configuration
   kafka {
     bootstrap-servers = "localhost:9092"
     metrics-topic = "telemetry-metrics"
@@ -48,7 +48,7 @@ diagnostic {
     timeout-ms = 5000
   }
 
-  # MySQL 配置
+  # MySQL configuration
   mysql {
     host = "localhost"
     port = 3306
@@ -58,7 +58,7 @@ diagnostic {
     timeout-ms = 5000
   }
 
-  # 启用/禁用特定检查
+  # Enable/disable specific checks
   spark {
     plugins-config.enabled = true
   }
@@ -73,149 +73,149 @@ diagnostic {
 }
 ```
 
-## 诊断流程
+## Diagnostic Flow
 
 ```
-初始化 (INIT)
-  ↓
-加载配置 (LOAD_CONFIG)
-  ↓
-检查 Spark Plugin (CHECK_SPARK_PLUGIN)
-  ↓
-检查 Hive Hook (CHECK_HIVE_HOOK)
-  ↓
-检查 MR Collector (CHECK_MR_COLLECTOR)
-  ↓
-检查 OTel Collector (CHECK_OTEL_COLLECTOR)
-  ↓
-检查 Kafka (CHECK_KAFKA)
-  ↓
-检查 MySQL (CHECK_MYSQL)
-  ↓
-检查 Grafana 面板 (CHECK_GRAFANA)
-  ↓
-数据流验证 (DATA_FLOW_CHECK)
-  ↓
-生成报告 (GENERATE_REPORT)
+Initialization (INIT)
+  |
+Load Configuration (LOAD_CONFIG)
+  |
+Check Spark Plugin (CHECK_SPARK_PLUGIN)
+  |
+Check Hive Hook (CHECK_HIVE_HOOK)
+  |
+Check MR Collector (CHECK_MR_COLLECTOR)
+  |
+Check OTel Collector (CHECK_OTEL_COLLECTOR)
+  |
+Check Kafka (CHECK_KAFKA)
+  |
+Check MySQL (CHECK_MYSQL)
+  |
+Check Grafana Dashboards (CHECK_GRAFANA)
+  |
+Data Flow Validation (DATA_FLOW_CHECK)
+  |
+Generate Report (GENERATE_REPORT)
 ```
 
-## 检查项说明
+## Check Descriptions
 
-| 检查项 | 说明 |
-|--------|------|
-| Spark Plugin | 检查 SPARK_HOME、JAR 存在性、`spark.plugins` 配置 |
-| Hive Hook | 检查 HIVE_HOME、JAR 存在性、`hive.exec.post.hooks` 配置 |
-| MR Collector | 检查配置文件、History Server 连通性 |
-| OTel Collector | HTTP Health Check（端口 13133）、gRPC 端口连通性（端口 4317） |
-| Kafka | Kafka AdminClient 连通性、Topic `telemetry-metrics` 存在性 |
-| MySQL | JDBC 连通性、15 张分类表 + `metric_events` 宽表存在性、列 schema 验证、行数统计 |
-| Grafana 面板 | 扫描 `deploy/grafana/*.json`，提取 `rawSql` 查询在 MySQL 中执行，报告返回 0 行或全 NULL 列的面板 |
-| 数据流 | 提交 Spark/MR/Hive 测试作业，验证 Kafka offset 变化、MySQL 行数增长 |
+| Check Item | Description |
+|------------|-------------|
+| Spark Plugin | Checks SPARK_HOME, JAR existence, `spark.plugins` configuration |
+| Hive Hook | Checks HIVE_HOME, JAR existence, `hive.exec.post.hooks` configuration |
+| MR Collector | Checks configuration file, History Server connectivity |
+| OTel Collector | HTTP Health Check (port 13133), gRPC port connectivity (port 4317) |
+| Kafka | Kafka AdminClient connectivity, topic `telemetry-metrics` existence |
+| MySQL | JDBC connectivity, existence of 15 category tables + `metric_events` wide table, column schema validation, row count statistics |
+| Grafana Dashboards | Scan `deploy/grafana/*.json`, extract `rawSql` queries and execute against MySQL, report panels returning 0 rows or all-NULL columns |
+| Data Flow | Submit Spark/MR/Hive test jobs, verify Kafka offset changes, MySQL row count growth |
 
-## 输出示例
+## Output Example
 
 ```
-╔══════════════════════════════════════════════════════╗
-║     遥测诊断工具                                     ║
-║     Telemetry Diagnostic Tool                        ║
-╚══════════════════════════════════════════════════════╝
++----------------------------------------------------+
+|      Telemetry Diagnostic Tool                      |
+|      Telemetry Diagnostic Tool                      |
++----------------------------------------------------+
 
-▶ 初始化
-▶ 加载配置
-▶ 检查 Spark Plugin
-  ✓ JAR 文件存在
-  ✓ spark.plugins 已配置
-▶ 检查 OTel Collector
-  ✓ Health Check 通过 (200)
-  ✓ gRPC 端口 4317 可达
-▶ 检查 Kafka
-  ✓ Broker 连接成功
-  ✓ Topic telemetry-metrics 存在
-▶ 检查 MySQL
-  ✓ 连接成功 (metrics@localhost:3306/metrics_db)
-  ✓ 16/16 表存在
-  ✓ 全部列 schema 验证通过
-▶ 检查 Grafana 面板
-  ✓ 13 个 Dashboard JSON 扫描完成
-  ✓ 全部 SQL 查询执行成功
-▶ 数据流验证
-  ✓ Spark 测试作业提交成功
-  ✓ Kafka offset 增长验证通过
-  ✓ MySQL 行数增长验证通过
-▶ 生成报告
+> Initializing
+> Loading configuration
+> Checking Spark Plugin
+  / JAR file exists
+  / spark.plugins configured
+> Checking OTel Collector
+  / Health Check passed (200)
+  / gRPC port 4317 reachable
+> Checking Kafka
+  / Broker connected successfully
+  / Topic telemetry-metrics exists
+> Checking MySQL
+  / Connected successfully (metrics@localhost:3306/metrics_db)
+  / 16/16 tables exist
+  / All column schema validations passed
+> Checking Grafana Dashboards
+  / 13 Dashboard JSON files scanned
+  / All SQL queries executed successfully
+> Data Flow Validation
+  / Spark test job submitted successfully
+  / Kafka offset growth verified
+  / MySQL row count growth verified
+> Generating report
 ```
 
-## 模块结构
+## Module Structure
 
 ```
 diagnostic/
-├── diagnostic-core/
-│   ├── src/main/java/x/mg/metrics/diagnostic/
-│   │   ├── DiagnosticApp.java              # 主入口
-│   │   ├── config/
-│   │   │   └── DiagnosticConfig.java       # 配置加载
-│   │   ├── state/
-│   │   │   ├── DiagnosticState.java        # 状态枚举
-│   │   │   ├── DiagnosticStateMachine.java # 状态机
-│   │   │   ├── DiagnosticContext.java      # 诊断上下文
-│   │   │   ├── StateHandler.java           # 状态处理器接口
-│   │   │   └── handlers/                   # 状态处理器实现
-│   │   │       ├── InitHandler.java
-│   │   │       ├── LoadConfigHandler.java
-│   │   │       ├── CheckSparkPluginHandler.java
-│   │   │       ├── CheckHiveHookHandler.java
-│   │   │       ├── CheckMrCollectorHandler.java
-│   │   │       ├── CheckOtelCollectorHandler.java
-│   │   │       ├── CheckKafkaHandler.java
-│   │   │       ├── CheckMySqlHandler.java
-│   │   │       ├── GrafanaSqlCheckHandler.java
-│   │   │       ├── DataFlowCheckHandler.java
-│   │   │       └── GenerateReportHandler.java
-│   │   ├── checks/                         # 检查器
-│   │   │   ├── CheckItem.java              # 检查结果
-│   │   │   ├── SparkPluginChecker.java
-│   │   │   ├── HiveHookChecker.java
-│   │   │   ├── OtelCollectorChecker.java
-│   │   │   ├── KafkaChecker.java
-│   │   │   └── MySQLChecker.java
-│   │   ├── report/
-│   │   │   └── DiagnosticReport.java       # 诊断报告
-│   │   └── ui/
-│   │       ├── AnsiColors.java             # ANSI 颜色定义
-│   │       └── CheckPrinter.java           # 检查结果格式化输出
-│   └── src/main/resources/
-│       └── diagnostic.conf                 # 配置文件
-└── pom.xml
++-- diagnostic-core/
+|   +-- src/main/java/x/mg/metrics/diagnostic/
+|   |   +-- DiagnosticApp.java              # Main entry point
+|   |   +-- config/
+|   |   |   +-- DiagnosticConfig.java       # Config loading
+|   |   +-- state/
+|   |   |   +-- DiagnosticState.java        # State enum
+|   |   |   +-- DiagnosticStateMachine.java # State machine
+|   |   |   +-- DiagnosticContext.java      # Diagnostic context
+|   |   |   +-- StateHandler.java           # State handler interface
+|   |   |   +-- handlers/                   # State handler implementations
+|   |   |       +-- InitHandler.java
+|   |   |       +-- LoadConfigHandler.java
+|   |   |       +-- CheckSparkPluginHandler.java
+|   |   |       +-- CheckHiveHookHandler.java
+|   |   |       +-- CheckMrCollectorHandler.java
+|   |   |       +-- CheckOtelCollectorHandler.java
+|   |   |       +-- CheckKafkaHandler.java
+|   |   |       +-- CheckMySqlHandler.java
+|   |   |       +-- GrafanaSqlCheckHandler.java
+|   |   |       +-- DataFlowCheckHandler.java
+|   |   |       +-- GenerateReportHandler.java
+|   |   +-- checks/                         # Checkers
+|   |   |   +-- CheckItem.java              # Check result
+|   |   |   +-- SparkPluginChecker.java
+|   |   |   +-- HiveHookChecker.java
+|   |   |   +-- OtelCollectorChecker.java
+|   |   |   +-- KafkaChecker.java
+|   |   |   +-- MySQLChecker.java
+|   |   +-- report/
+|   |   |   +-- DiagnosticReport.java       # Diagnostic report
+|   |   +-- ui/
+|   |       +-- AnsiColors.java             # ANSI color definitions
+|   |       +-- CheckPrinter.java           # Check result formatting output
+|   +-- src/main/resources/
+|       +-- diagnostic.conf                 # Configuration file
++-- pom.xml
 ```
 
-## 状态机设计
+## State Machine Design
 
-状态机采用状态模式设计，每个状态对应一个状态处理器：
+The state machine uses the State pattern -- each state corresponds to a state handler:
 
-- 每个检查无论成败都继续下一个，不中断整个诊断流程
-- 异常状态记录错误信息后跳转到下一个正常状态
-- 只有 `EXIT_SUCCESS` 和 `EXIT_FAILURE` 为终止状态
+- Each check continues to the next regardless of success or failure, without interrupting the entire diagnostic flow
+- Error states record the error message then transition to the next normal state
+- Only `EXIT_SUCCESS` and `EXIT_FAILURE` are terminal states
 
-## 扩展指南
+## Extension Guide
 
-### 添加新的状态处理器
+### Adding a New State Handler
 
-1. 在 `DiagnosticState` 枚举中添加新状态
-2. 在 `handlers` 包中创建新的处理器类，实现 `StateHandler` 接口
-3. 在 `DiagnosticStateMachine.getHandler()` 中添加状态映射
-4. 在 `DiagnosticStateMachine.nextAfter()` 中定义异常后的下一个状态
+1. Add a new state to the `DiagnosticState` enum
+2. Create a new handler class in the `handlers` package implementing the `StateHandler` interface
+3. Add the state mapping in `DiagnosticStateMachine.getHandler()`
+4. Define the next state after an error in `DiagnosticStateMachine.nextAfter()`
 
-### 添加新的检查器
+### Adding a New Checker
 
-1. 在 `checks` 包中创建新的检查器类
-2. 在对应的状态处理器中使用检查器
+1. Create a new checker class in the `checks` package
+2. Use the checker in the corresponding state handler
 
-## 故障排查
+## Troubleshooting
 
-| 问题 | 原因 | 解决 |
-|------|------|------|
-| `Unable to create a system terminal` | JLine 警告 | 不影响功能，可使用哑终端运行 |
-| Spark Plugin 检查失败 | 环境中没有 Spark | 预期行为，工具继续执行后续检查 |
-| Kafka 连接失败 | Broker 未运行或地址错误 | 确保 Kafka 运行且 `bootstrap.servers` 正确 |
-| MySQL 连接失败 | 服务未运行或凭据错误 | 确保 MySQL 运行且数据库/用户名/密码正确 |
-| Grafana 面板检查全失败 | MySQL 中无数据 | 先运行 Spark/MR/Hive 作业产生数据，再执行诊断 |
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| `Unable to create a system terminal` | JLine warning | Does not affect functionality; can run with a dumb terminal |
+| Spark Plugin check fails | No Spark in environment | Expected behavior; the tool continues to subsequent checks |
+| Kafka connection failed | Broker not running or incorrect address | Ensure Kafka is running and `bootstrap.servers` is correct |
+| MySQL connection failed | Service not running or wrong credentials | Ensure MySQL is running and database/user/password are correct |
+| Grafana dashboard check all failed | No data in MySQL | Run Spark/MR/Hive jobs to generate data first, then execute diagnostics |

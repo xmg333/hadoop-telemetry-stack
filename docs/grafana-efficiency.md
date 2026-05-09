@@ -1,23 +1,23 @@
-# 综合效率评分
+# Comprehensive Efficiency Score
 
-## 概述
-本仪表盘从整体效率评估视角出发，帮助回答以下问题：
-- 各应用的资源效率评分如何？
-- 不同队列的效率是否有显著差异？
-- 数据倾斜问题在全局范围内的严重程度如何？
+## Overview
+This dashboard approaches analysis from an overall efficiency evaluation perspective, helping answer the following questions:
+- What are the resource efficiency scores for each application?
+- Are there significant efficiency differences between queues?
+- How severe is the data skew problem at a global scale?
 
-## 前置条件
-- 数据源：`metric_events` 大宽表、`stage_governance` 表（由 Flink Consumer 写入）
-- Grafana 变量：`$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
-- `stage_governance` 表中的效率指标（`cpu_efficiency`、`gc_overhead_ratio` 等）由 Flink Consumer 在 Stage 完成时自动计算
+## Prerequisites
+- Data sources: `metric_events` wide table, `stage_governance` table (written by Flink Consumer)
+- Grafana variables: `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
+- Efficiency metrics in the `stage_governance` table (`cpu_efficiency`, `gc_overhead_ratio`, etc.) are automatically computed by the Flink Consumer upon Stage completion.
 
-## 面板说明
+## Panel Descriptions
 
-### 应用效率评分（table）
+### Application Efficiency Score (table)
 
-**用途**: 综合各维度指标为每个应用计算效率评分，快速定位低效应用。
+**Purpose**: Calculates an efficiency score for each application by combining metrics across multiple dimensions, enabling rapid identification of inefficient applications.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT app_id,
        app_name,
@@ -50,28 +50,28 @@ ORDER  BY overall_eff_pct ASC
 LIMIT  20
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `app_id` | 应用/作业 ID | - |
-| `app_name` | 应用名称 | - |
-| `engine` | 执行引擎（SPARK / MR） | - |
-| `stage_count` | Stage 数（仅 Spark） | 个 |
-| `task_count` | 任务总数 | 个 |
-| `cpu_hours` | 累计 CPU 时间 | 小时 |
-| `avg_cpu_eff_pct` | 平均 CPU 效率（CPU 时间 / 执行时间） | % |
-| `avg_gc_pct` | 平均 GC 开销占比 | % |
-| `spill_ratio_pct` | Spill 数据量占读取量的比例 | % |
-| `overall_eff_pct` | 综合效率评分（CPU 时间 / 挂钟时间） | % |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `app_id` | Application/job ID | - |
+| `app_name` | Application name | - |
+| `engine` | Execution engine (SPARK / MR) | - |
+| `stage_count` | Number of Stages (Spark only) | count |
+| `task_count` | Total number of tasks | count |
+| `cpu_hours` | Cumulative CPU time | hours |
+| `avg_cpu_eff_pct` | Average CPU efficiency (CPU time / execution time) | % |
+| `avg_gc_pct` | Average GC overhead ratio | % |
+| `spill_ratio_pct` | Ratio of Spill data volume to read volume | % |
+| `overall_eff_pct` | Comprehensive efficiency score (CPU time / wall clock time) | % |
 
-**使用建议**: 按 `overall_eff_pct` 升序排列，排名靠前的应用效率最低，是优化重点。`avg_cpu_eff_pct` 低于 50% 说明 CPU 大量时间在等待 IO 或 GC。`spill_ratio_pct` 大于 10% 说明内存配置不足。`overall_eff_pct` 考虑了并行度因素，低于 30% 的应用建议增加并行度。
+**Usage**: Sorted by `overall_eff_pct` in ascending order; the top-ranked applications have the lowest efficiency and are optimization priorities. An `avg_cpu_eff_pct` below 50% indicates that CPU spends a significant amount of time waiting for IO or GC. A `spill_ratio_pct` greater than 10% indicates insufficient memory configuration. Since `overall_eff_pct` accounts for parallelism factors, applications below 30% should consider increasing parallelism.
 
-### 队列效率对比（table）
+### Queue Efficiency Comparison (table)
 
-**用途**: 对比各 YARN 队列的资源使用效率，评估队列间资源分配的合理性。
+**Purpose**: Compares resource usage efficiency across YARN queues, evaluating the fairness of resource allocation between queues.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT queue,
        engine,
@@ -97,27 +97,27 @@ HAVING cpu_hours > 0
 ORDER  BY efficiency_pct ASC
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `queue` | YARN 队列名称 | - |
-| `engine` | 执行引擎 | - |
-| `app_count` | 队列内应用数 | 个 |
-| `cpu_hours` | 累计 CPU 时间 | 小时 |
-| `wall_clock_hours` | 累计挂钟时间 | 小时 |
-| `efficiency_pct` | 综合效率（CPU / 挂钟时间） | % |
-| `gc_overhead_pct` | GC 开销占比 | % |
-| `total_spill_gb` | 总 Spill 数据量 | GB |
-| `avg_shuffle_wait_pct` | 平均 Shuffle 等待占比 | % |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `queue` | YARN queue name | - |
+| `engine` | Execution engine | - |
+| `app_count` | Number of applications in the queue | count |
+| `cpu_hours` | Cumulative CPU time | hours |
+| `wall_clock_hours` | Cumulative wall clock time | hours |
+| `efficiency_pct` | Overall efficiency (CPU / wall clock time) | % |
+| `gc_overhead_pct` | GC overhead ratio | % |
+| `total_spill_gb` | Total Spill data volume | GB |
+| `avg_shuffle_wait_pct` | Average Shuffle wait ratio | % |
 
-**使用建议**: 效率最低的队列应优先优化。如果高资源队列的效率也很低，说明资源分配过多但未充分利用，可考虑缩减队列配额。`avg_shuffle_wait_pct` 高的队列可能存在网络瓶颈或 Shuffle 服务过载。
+**Usage**: The least efficient queues should be optimized first. If a high-resource queue also has low efficiency, it indicates that resources are over-allocated but underutilized; consider reducing the queue quota. Queues with high `avg_shuffle_wait_pct` may have network bottlenecks or overloaded Shuffle services.
 
-### 数据倾斜问题汇总（table）
+### Data Skew Issue Summary (table)
 
-**用途**: 汇总所有检测到的数据倾斜问题，按严重程度排序，提供全局视角的问题清单。
+**Purpose**: Summarizes all detected data skew issues, sorted by severity, providing a global view of the problem list.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT app_id,
        stage_id,
@@ -147,28 +147,28 @@ ORDER  BY duration_skew_ratio DESC
 LIMIT  30
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `app_id` | Spark 应用 ID | - |
-| `stage_id` | Stage 编号 | - |
-| `task_count` | Stage 内任务数 | 个 |
-| `stage_duration_sec` | Stage 执行时长 | 秒 |
-| `duration_skew` | 时长倾斜率（max/avg） | 倍数 |
-| `io_read_skew` | 读 IO 倾斜率 | 倍数 |
-| `shuffle_skew` | Shuffle 读倾斜率 | 倍数 |
-| `cpu_eff_pct` | 该 Stage 的 CPU 效率 | % |
-| `gc_pct` | GC 开销占比 | % |
-| `spill_pct` | Spill 占比 | % |
-| `shuffle_wait_pct` | Shuffle 等待占比 | % |
-| `scheduler_delay_pct` | 调度延迟占比 | % |
-| `severity` | 严重程度等级（CRITICAL / HIGH / MEDIUM / LOW） | - |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `app_id` | Spark application ID | - |
+| `stage_id` | Stage number | - |
+| `task_count` | Number of tasks in the Stage | count |
+| `stage_duration_sec` | Stage execution duration | seconds |
+| `duration_skew` | Duration skew ratio (max/avg) | multiplier |
+| `io_read_skew` | Read IO skew ratio | multiplier |
+| `shuffle_skew` | Shuffle read skew ratio | multiplier |
+| `cpu_eff_pct` | CPU efficiency for this Stage | % |
+| `gc_pct` | GC overhead ratio | % |
+| `spill_pct` | Spill ratio | % |
+| `shuffle_wait_pct` | Shuffle wait ratio | % |
+| `scheduler_delay_pct` | Scheduler delay ratio | % |
+| `severity` | Severity level (CRITICAL / HIGH / MEDIUM / LOW) | - |
 
-**使用建议**: 优先处理 CRITICAL 和 HIGH 级别的倾斜。`severity` 字段由查询动态计算，可作为 Grafana 列样式的依据（红色/黄色/绿色）。结合 `cpu_eff_pct`、`gc_pct`、`spill_pct` 等指标可判断倾斜导致的连锁影响。`scheduler_delay_pct` 高可能是由于 Executor 资源不足导致任务排队。
+**Usage**: Prioritize CRITICAL and HIGH severity skew issues. The `severity` field is dynamically computed by the query and can be used as a basis for Grafana column styling (red/yellow/green). Combined metrics such as `cpu_eff_pct`, `gc_pct`, and `spill_pct` help determine the cascading impact of skew. High `scheduler_delay_pct` may be caused by task queuing due to insufficient Executor resources.
 
-## 注意事项
-- 综合效率评分（`overall_eff_pct`）为简化指标，实际效率受并行度、IO 模式等多种因素影响。高并行度应用的 `overall_eff_pct` 可能超过 100%（因为多个 CPU 核心同时工作）。
-- 队列效率面板依赖 `queue` 字段，该字段由 v4+ 版本的 Flink Consumer 写入。MR 任务的 `queue` 字段来自 YARN API，Spark 任务的 `queue` 字段来自 `spark.yarn.queue` 配置。
-- `stage_governance` 表的数据在 Stage 完成后由 Flink Consumer 的 `StageTaskAccumulator` 计算生成。如果一个 Stage 有多个批次刷新，只在最后一个批次（Stage 完成时）生成治理记录。
-- 倾斜严重程度的阈值（2.0 / 3.0 / 5.0）为经验值，对于特定业务场景可能需要调整。建议先观察一段时间的历史数据再确定合适的阈值。
+## Notes
+- The comprehensive efficiency score (`overall_eff_pct`) is a simplified metric. Actual efficiency is influenced by multiple factors including parallelism and IO patterns. For high-parallelism applications, `overall_eff_pct` may exceed 100% (because multiple CPU cores work simultaneously).
+- The queue efficiency panel depends on the `queue` field, which is written by the v4+ version of the Flink Consumer. The `queue` field for MR tasks comes from the YARN API, while for Spark tasks it comes from the `spark.yarn.queue` configuration.
+- Data in the `stage_governance` table is computed by the Flink Consumer's `StageTaskAccumulator` after Stage completion. If a Stage has multiple batch flushes, governance records are only generated on the last batch (when the Stage completes).
+- Skew severity thresholds (2.0 / 3.0 / 5.0) are empirical values and may need adjustment for specific business scenarios. Observe historical data over a period before determining appropriate thresholds.

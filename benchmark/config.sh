@@ -1,13 +1,13 @@
 #!/bin/bash
 # Benchmark global configuration
-# All paths refer to the REMOTE server (192.168.10.65)
+# All paths refer to the REMOTE server
 
 set -euo pipefail
 
 # ============================================================
 # Remote Server
 # ============================================================
-export BENCHMARK_SERVER="root@192.168.10.65"
+export BENCHMARK_SERVER="root@<BENCHMARK_SERVER_IP>"
 export SSH_KEY="$HOME/.ssh/id_rsa"
 export SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o ConnectTimeout=10"
 
@@ -22,7 +22,7 @@ export RESULTS_DIR="/root/benchmark-results"
 # MySQL (Docker container on remote)
 export MYSQL_CONTAINER="mysql"
 export MYSQL_USER="root"
-export MYSQL_PASS="root123"
+export MYSQL_PASS="CHANGE_ME"
 export MYSQL_DB="telemetry"
 
 # ============================================================

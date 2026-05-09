@@ -1,7 +1,7 @@
 #!/bin/bash
 # Main benchmark entry point
 # Runs HiBench workloads with and without telemetry plugin/agent/hook
-# on server 192.168.10.65
+# on benchmark server
 
 set -uo pipefail
 

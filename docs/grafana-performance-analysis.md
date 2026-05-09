@@ -1,24 +1,24 @@
-# 性能异常与瓶颈分析
+# Performance Anomaly and Bottleneck Analysis
 
-## 概述
-本仪表盘从性能诊断视角出发，帮助回答以下问题：
-- 哪些 Stage 执行时间最长？
-- GC 开销占比是否异常？
-- 是否存在数据倾斜问题？
-- 整体 CPU 效率如何？
+## Overview
+This dashboard approaches analysis from a performance diagnostics perspective, helping answer the following questions:
+- Which Stages have the longest execution times?
+- Is the GC overhead ratio abnormal?
+- Are there data skew issues?
+- What is the overall CPU efficiency?
 
-## 前置条件
-- 数据源：`metric_events` 大宽表、`stage_governance` 表（由 Flink Consumer 写入）
-- Grafana 变量：`$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
-- `stage_governance` 表由 Flink Consumer 在 Stage 完成时自动计算并写入，包含倾斜率、效率评分等预聚合指标
+## Prerequisites
+- Data sources: `metric_events` wide table, `stage_governance` table (written by Flink Consumer)
+- Grafana variables: `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
+- The `stage_governance` table is automatically computed and written by the Flink Consumer upon Stage completion, containing pre-aggregated metrics such as skew ratios and efficiency scores.
 
-## 面板说明
+## Panel Descriptions
 
-### 最慢 Stage TOP 20（table）
+### Slowest Stage TOP 20 (table)
 
-**用途**: 列出执行时间最长的 20 个 Stage，帮助定位性能瓶颈所在的 Stage 和应用。
+**Purpose**: Lists the 20 Stages with the longest execution times, helping identify performance bottleneck Stages and applications.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT app_id,
        stage_id,
@@ -38,27 +38,27 @@ ORDER  BY duration_ms DESC
 LIMIT  20
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `app_id` | Spark 应用 ID | - |
-| `stage_id` | Stage 编号 | - |
-| `duration_sec` | Stage 执行时长 | 秒 |
-| `num_tasks` | Stage 内任务总数 | 个 |
-| `executor_run_sec` | 累计 Executor 运行时间 | 秒 |
-| `gc_sec` | 累计 GC 时间 | 秒 |
-| `peak_mem_gb` | 峰值执行内存 | GB |
-| `read_gb` | 读取数据量 | GB |
-| `write_gb` | 写入数据量 | GB |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `app_id` | Spark application ID | - |
+| `stage_id` | Stage number | - |
+| `duration_sec` | Stage execution duration | seconds |
+| `num_tasks` | Total number of tasks in the Stage | count |
+| `executor_run_sec` | Cumulative Executor runtime | seconds |
+| `gc_sec` | Cumulative GC time | seconds |
+| `peak_mem_gb` | Peak execution memory | GB |
+| `read_gb` | Data read volume | GB |
+| `write_gb` | Data written volume | GB |
 
-**使用建议**: 优先关注 `duration_sec` 远大于 `executor_run_sec / num_tasks` 的 Stage，说明存在调度延迟或任务倾斜。`gc_sec` 占比高时建议增大 Executor 内存或优化数据结构。
+**Usage**: Prioritize Stages where `duration_sec` is significantly larger than `executor_run_sec / num_tasks`, as this indicates scheduling delay or task skew. When `gc_sec` accounts for a high proportion, consider increasing Executor memory or optimizing data structures.
 
-### GC 开销占比趋势（timeseries）
+### GC Overhead Ratio Trend (timeseries)
 
-**用途**: 展示各应用 GC 时间占 Executor 运行时间的比例趋势，识别 GC 瓶颈。
+**Purpose**: Shows the trend of GC time as a proportion of Executor runtime for each application, identifying GC bottlenecks.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ( Floor(timestamp_ms / $__interval_ms) * $__interval_ms / 1000 ) AS time,
        app_id,
@@ -75,21 +75,21 @@ ORDER  BY 1,
           2
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `time` | 时间桶 | Unix 时间戳 |
-| `app_id` | Spark 应用 ID | - |
-| `gc_ratio_pct` | GC 时间占执行时间百分比 | % |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `time` | Time bucket | Unix timestamp |
+| `app_id` | Spark application ID | - |
+| `gc_ratio_pct` | GC time as percentage of execution time | % |
 
-**使用建议**: GC 占比超过 10% 即为异常，超过 20% 会严重影响性能。GC 突增通常与数据量增大或内存配置不当有关。结合 `jvm_gc_metrics` 表可进一步区分 Full GC 和 Minor GC。
+**Usage**: A GC ratio exceeding 10% is abnormal; exceeding 20% severely impacts performance. Sudden GC spikes are usually related to increased data volume or improper memory configuration. Cross-reference with the `jvm_gc_metrics` table to distinguish between Full GC and Minor GC.
 
-### 数据倾斜检测（table）
+### Data Skew Detection (table)
 
-**用途**: 从 `stage_governance` 表中检索数据倾斜严重的 Stage，展示时长倾斜率、IO 倾斜率等关键指标。
+**Purpose**: Retrieves Stages with severe data skew from the `stage_governance` table, displaying key metrics such as duration skew ratio and IO skew ratio.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT app_id,
        stage_id,
@@ -112,29 +112,29 @@ ORDER  BY duration_skew_ratio DESC
 LIMIT  20
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `app_id` | Spark 应用 ID | - |
-| `stage_id` | Stage 编号 | - |
-| `task_count` | Stage 内任务数 | 个 |
-| `stage_duration_sec` | Stage 总时长 | 秒 |
-| `avg_task_sec` | 平均任务时长 | 秒 |
-| `max_task_sec` | 最大任务时长 | 秒 |
-| `duration_skew` | 时长倾斜率（max/avg），>2 为倾斜 | 倍数 |
-| `io_read_skew` | 读 IO 倾斜率（max/avg），>3 为严重倾斜 | 倍数 |
-| `shuffle_skew` | Shuffle 读倾斜率 | 倍数 |
-| `gc_pct` | GC 开销占比 | % |
-| `cpu_eff_pct` | CPU 效率 | % |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `app_id` | Spark application ID | - |
+| `stage_id` | Stage number | - |
+| `task_count` | Number of tasks in the Stage | count |
+| `stage_duration_sec` | Stage total duration | seconds |
+| `avg_task_sec` | Average task duration | seconds |
+| `max_task_sec` | Maximum task duration | seconds |
+| `duration_skew` | Duration skew ratio (max/avg), >2 indicates skew | multiplier |
+| `io_read_skew` | Read IO skew ratio (max/avg), >3 indicates severe skew | multiplier |
+| `shuffle_skew` | Shuffle read skew ratio | multiplier |
+| `gc_pct` | GC overhead ratio | % |
+| `cpu_eff_pct` | CPU efficiency | % |
 
-**使用建议**: `duration_skew` 大于 2 表示存在倾斜，大于 5 为严重倾斜。建议通过增加分区数、使用 `repartition` 或启用 Spark AQE 的 `skewJoin` 优化来解决。`shuffle_skew` 高时需检查 Join 键的分布。
+**Usage**: A `duration_skew` greater than 2 indicates skew; greater than 5 indicates severe skew. Mitigate by increasing partitions, using `repartition`, or enabling Spark AQE's `skewJoin` optimization. High `shuffle_skew` requires checking the distribution of Join keys.
 
-### 倾斜 Stage 数量（stat）
+### Skewed Stage Count (stat)
 
-**用途**: 统计当前时间范围内检测到的数据倾斜 Stage 总数，提供快速概览。
+**Purpose**: Counts the total number of data-skewed Stages detected within the current time range, providing a quick overview.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT COUNT(*) AS value
 FROM   stage_governance
@@ -145,19 +145,19 @@ WHERE  ( duration_skew_ratio > 2.0
        AND timestamp_ms <= ( $__unixEpochTo() * 1000 )
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `value` | 倾斜 Stage 数量 | 个 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `value` | Number of skewed Stages | count |
 
-**使用建议**: 配合 Grafana 阈值颜色：0 为绿色，1-3 为黄色，>3 为红色。该值为 0 时无需进一步排查。
+**Usage**: Use with Grafana threshold colors: 0 green, 1-3 yellow, >3 red. No further investigation is needed when the value is 0.
 
-### 平均 CPU 效率（stat）
+### Average CPU Efficiency (stat)
 
-**用途**: 展示所有 Stage 的平均 CPU 效率评分，衡量整体资源利用质量。
+**Purpose**: Displays the average CPU efficiency score across all Stages, measuring overall resource utilization quality.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ROUND(AVG(cpu_efficiency) * 100, 1) AS value
 FROM   stage_governance
@@ -166,15 +166,15 @@ WHERE  cpu_efficiency IS NOT NULL
        AND timestamp_ms <= ( $__unixEpochTo() * 1000 )
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `value` | 平均 CPU 效率 | % |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `value` | Average CPU efficiency | % |
 
-**使用建议**: CPU 效率低于 60% 时需关注，可能存在 IO 等待、调度延迟或数据倾斜。高于 80% 为良好。该指标来自 `stage_governance.cpu_efficiency`，计算方式为 `cpu_time_ms / executor_run_time_ms`。
+**Usage**: Pay attention when CPU efficiency is below 60%, as it may indicate IO wait, scheduling delay, or data skew. Above 80% is considered good. This metric comes from `stage_governance.cpu_efficiency`, calculated as `cpu_time_ms / executor_run_time_ms`.
 
-## 注意事项
-- `stage_governance` 表的数据在 Stage 完成后由 Flink Consumer 计算，存在延迟。对于运行中的 Stage 不会出现在倾斜检测结果中。
-- 倾斜阈值（`duration_skew_ratio > 2.0`、`io_read_skew_ratio > 3.0`）为经验值，可根据业务特点调整。
-- GC 趋势面板中，`app_id` 较多时图线可能过于密集，建议通过 Grafana 变量过滤特定应用。
+## Notes
+- Data in the `stage_governance` table is computed by the Flink Consumer after Stage completion, introducing latency. Stages that are still running will not appear in the skew detection results.
+- Skew thresholds (`duration_skew_ratio > 2.0`, `io_read_skew_ratio > 3.0`) are empirical values and can be adjusted based on business characteristics.
+- In the GC trend panel, when there are many `app_id` values, the graph lines may become too dense. Filter by specific applications using Grafana variables.

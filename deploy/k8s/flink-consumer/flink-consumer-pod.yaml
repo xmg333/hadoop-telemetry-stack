@@ -16,7 +16,7 @@ data:
         mysql {
           url = "jdbc:mysql://mysql:3306/metrics_db"
           username = "metrics"
-          password = "metrics"
+          password = "CHANGE_ME"
         }
       }
       timeout.seconds = 0

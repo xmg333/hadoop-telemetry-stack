@@ -1,12 +1,12 @@
-# 基础设施部署
+# Infrastructure Deployment
 
-本文档介绍 OTel Collector、Kafka、MySQL/ClickHouse 等基础设施的部署配置。
+This document describes the deployment and configuration of infrastructure components including OTel Collector, Kafka, MySQL/ClickHouse.
 
 ## OTel Collector
 
-### 最小配置
+### Minimal Configuration
 
-创建 `config.yaml`：
+Create `config.yaml`:
 
 ```yaml
 extensions:
@@ -41,7 +41,7 @@ service:
       exporters: [debug, kafka]
 ```
 
-### 运行
+### Running
 
 ```bash
 docker run -d --name otel-collector \
@@ -51,13 +51,13 @@ docker run -d --name otel-collector \
   --config=/etc/otelcol-contrib/config.yaml
 ```
 
-> **重要**: 必须使用 `otel/opentelemetry-collector-contrib` 镜像（非 core 版本），因核心镜像不含 Kafka exporter。配置中必须包含 `health_check` 扩展，否则带探针的 K8s 部署会 CrashLoopBackOff。
+> **Important**: You must use the `otel/opentelemetry-collector-contrib` image (not the core version), as the core image does not include the Kafka exporter. The configuration must include the `health_check` extension, otherwise K8s deployments with probes will enter CrashLoopBackOff.
 
 ---
 
 ## Kafka
 
-### KRaft 模式（无需 ZooKeeper）
+### KRaft Mode (No ZooKeeper Required)
 
 ```bash
 docker run -d --name kafka --network host \
@@ -70,7 +70,7 @@ docker run -d --name kafka --network host \
   apache/kafka:3.7.0
 ```
 
-### 创建 Topic
+### Create Topic
 
 ```bash
 docker exec kafka /opt/kafka/bin/kafka-topics.sh --create \
@@ -100,7 +100,7 @@ docker run -d --name clickhouse --network host \
 
 ---
 
-## Docker Compose 完整示例
+## Docker Compose Full Example
 
 ```yaml
 version: '3.8'
@@ -143,7 +143,7 @@ services:
     networks:
       - telemetry
 
-  # 可选：ClickHouse
+  # Optional: ClickHouse
   clickhouse:
     image: clickhouse/clickhouse-server:23.8
     ports:
@@ -159,23 +159,23 @@ networks:
 
 ---
 
-## 验证
+## Verification
 
-### 检查 OTel Collector 是否正常运行
+### Check OTel Collector Health
 
 ```bash
 curl http://localhost:13133/health
-# 预期输出：{"status":"server_available"}
+# Expected output: {"status":"server_available"}
 ```
 
-### 检查 Kafka Topic 是否创建
+### Check Kafka Topic
 
 ```bash
 docker exec kafka /opt/kafka/bin/kafka-topics.sh --describe \
   --topic telemetry-metrics --bootstrap-server localhost:9092
 ```
 
-### 检查 MySQL 是否可连接
+### Check MySQL Connectivity
 
 ```bash
 docker exec mysql mysql -u root -proot123 metrics_db -e "SHOW TABLES;"

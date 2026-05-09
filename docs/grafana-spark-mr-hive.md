@@ -1,87 +1,87 @@
-# 全引擎综合透视
+# All-Engine Consolidated Deep Dive
 
-## 概述
-本仪表盘是最大的基础透视面板，在一个视图中整合了 **Spark + SQL + MR + Hive** 的全部指标，共 33 个面板，提供最详细的指标展示，帮助回答以下问题：
-- Spark 应用的 Task、Stage、Job 全景如何？
-- 是否存在数据倾斜和资源效率问题？
-- JVM 内存和 GC 是否正常？
-- SQL 查询和表 IO 详情如何？
-- Hive 查询的操作分布、耗时、IO 如何？
+## Overview
+This dashboard is the largest foundational deep-dive panel, integrating all metrics from **Spark + SQL + MR + Hive** in a single view with 33 panels. It provides the most detailed metric display and helps answer the following questions:
+- What is the overall picture of Spark application Tasks, Stages, and Jobs?
+- Are there data skew and resource efficiency issues?
+- Are JVM memory and GC healthy?
+- What are the SQL query and table IO details?
+- What is the operation distribution, duration, and IO for Hive queries?
 
-本仪表盘整合了 Spark 仪表盘和 Hive 分析的全部面板，并增加 MR 相关统计，适合需要全局视角的场景。
+This dashboard combines all panels from the Spark dashboard and Hive analysis, adding MR-related statistics. It is suitable for scenarios requiring a global perspective.
 
-## 前置条件
+## Prerequisites
 
-数据源：全部 15 张独立指标表
+Data sources: All 15 independent metric tables
 
-Grafana 变量：
-:   `$app_id` — Spark 应用 ID（多选，含 All），从 `task_metrics` 获取
-:   `$hive_operation` — Hive 操作类型（多选，含 All），从 `hive_query_metrics` 获取
+Grafana variables:
+:   `$app_id` — Spark application ID (multi-select, includes All), sourced from `task_metrics`
+:   `$hive_operation` — Hive operation type (multi-select, includes All), sourced from `hive_query_metrics`
 :   `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
 
-## 面板说明
+## Panel Descriptions
 
-### Spark 概览统计（y=0，4 个 stat）
+### Spark Overview Statistics (y=0, 4 stats)
 
 #### Total Tasks / Total Stages / Skewed Stages / Avg CPU Efficiency
 
-与 [Spark 引擎透视](grafana-spark.md) 完全一致，使用 `$app_id` 变量过滤。
+Identical to [Spark Engine Deep Dive](grafana-spark.md), filtered by the `$app_id` variable.
 
-### Spark Task IO 与耗时（y=4）
+### Spark Task IO and Duration (y=4)
 
 #### Task I/O Bytes / Task Duration
 
-与 Spark 仪表盘一致。
+Same as the Spark dashboard.
 
-### Spark JVM 监控（y=12）
+### Spark JVM Monitoring (y=12)
 
 #### JVM Memory / JVM GC
 
-与 Spark 仪表盘一致。
+Same as the Spark dashboard.
 
-### Spark Stage 与 Job（y=20）
+### Spark Stage and Job (y=20)
 
 #### Stage Duration & Task Count / Job Overview
 
-与 Spark 仪表盘一致。
+Same as the Spark dashboard.
 
-### Spark 治理分析（y=28）
+### Spark Governance Analysis (y=28)
 
 #### Data Skew Detection / Resource Efficiency
 
-与 Spark 仪表盘一致。详情参见 [Spark 引擎透视 - 治理分析](grafana-spark.md#_6)。
+Same as the Spark dashboard. See [Spark Engine Deep Dive - Governance Analysis](grafana-spark.md#governance-analysis) for details.
 
-### Spark 直方图与小文件（y=36）
+### Spark Histograms and Small Files (y=36)
 
 #### Task Duration Histogram / Small File Detection
 
-与 Spark 仪表盘一致。
+Same as the Spark dashboard.
 
-### Spark Task 详情（y=44）
+### Spark Task Details (y=44)
 
-#### Task Detail（全宽表格）
+#### Task Detail (full-width table)
 
-与 Spark 仪表盘一致，展示 200 条最近 Task 的完整指标。
+Same as the Spark dashboard, displaying complete metrics for the 200 most recent Tasks.
 
-### SQL 查询分析（y=52-72）
+### SQL Query Analysis (y=52-72)
 
-#### SQL Queries / Avg SQL Query Duration / Total SQL Joins / SQL Table Scans/Writes（4 个 stat）
+#### SQL Queries / Avg SQL Query Duration / Total SQL Joins / SQL Table Scans/Writes (4 stats)
 
-**用途**: SQL 查询概览统计。
+**Purpose**: SQL query overview statistics.
 
-#### SQL Query Duration（timeseries）
+#### SQL Query Duration (timeseries)
 
-**用途**: SQL 查询的平均和最大耗时趋势。
+**Purpose**: Average and maximum duration trends for SQL queries.
 
-#### SQL Shuffle Bytes（timeseries）
+#### SQL Shuffle Bytes (timeseries)
 
-**用途**: SQL 查询的 Shuffle 读写数据量趋势。注意使用 `COALESCE` 处理 NULL 值。
+**Purpose**: Shuffle read and write data volume trends for SQL queries. Note the use of `COALESCE` to handle NULL values.
 
-#### SQL Table IO Detail（table，全宽）
+#### SQL Table IO Detail (table, full width)
 
-**用途**: 展示每个 SQL 查询的表 IO 详情（表名、操作类型、字节数、行数、文件数）。
+**Purpose**: Displays the table IO details for each SQL query (table name, operation type, bytes, rows, file count).
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id, execution_id,
        table_name, operation, bytes, `rows`, files_read, time_ms
@@ -89,50 +89,50 @@ FROM sql_query_table_metrics WHERE app_id IN ($app_id)
 ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
-#### SQL Query Detail（table，全宽）
+#### SQL Query Detail (table, full width)
 
-**用途**: 展示查询级别指标：耗时、Shuffle、Join 数。
+**Purpose**: Displays query-level metrics: duration, Shuffle, Join count.
 
-### Hive 查询分析（y=80-100）
+### Hive Query Analysis (y=80-100)
 
-#### Total Hive Queries / Avg Hive Duration / Hive Table IO Events / Hive IO Bytes（4 个 stat）
+#### Total Hive Queries / Avg Hive Duration / Hive Table IO Events / Hive IO Bytes (4 stats)
 
-**用途**: Hive 查询全局统计。注意 Hive 面板不使用 `$app_id` 过滤（Hive query_id 与 Spark app_id 是不同维度）。
+**Purpose**: Global Hive query statistics. Note that the Hive panels do not use the `$app_id` filter (Hive query_id and Spark app_id are different dimensions).
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 -- Total Hive Queries
 SELECT COUNT(*) AS value FROM hive_query_metrics WHERE ...
 
--- Hive IO Bytes（2 个 target）
+-- Hive IO Bytes (2 targets)
 SELECT COALESCE(SUM(input_bytes), 0) AS 'Input Bytes' FROM hive_query_metrics WHERE ...
 SELECT COALESCE(SUM(output_bytes), 0) AS 'Output Bytes' FROM hive_query_metrics WHERE ...
 ```
 
-#### Hive Operations Distribution（piechart）
+#### Hive Operations Distribution (piechart)
 
-**用途**: 以环形图展示各操作类型的查询数量分布。
+**Purpose**: Shows the query count distribution by operation type using a donut chart.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT operation AS metric, COUNT(*) AS value
 FROM hive_query_metrics WHERE operation IS NOT NULL
 GROUP BY operation ORDER BY value DESC
 ```
 
-#### Hive Duration by Operation（timeseries）
+#### Hive Duration by Operation (timeseries)
 
-**用途**: 按操作类型展示平均耗时趋势，使用 `$hive_operation` 变量过滤。
+**Purpose**: Shows average duration trends by operation type, filterable by the `$hive_operation` variable.
 
-#### Hive IO Throughput（timeseries）
+#### Hive IO Throughput (timeseries)
 
-**用途**: 展示 Hive 查询的输入/输出字节趋势。
+**Purpose**: Shows input/output byte trends for Hive queries.
 
-#### Hive Operation Count（barchart）
+#### Hive Operation Count (barchart)
 
-**用途**: 水平柱状图展示每个操作类型的查询数量和平均耗时。
+**Purpose**: Horizontal bar chart showing the query count and average duration for each operation type.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT operation AS 'Operation', COUNT(*) AS 'Query Count',
        ROUND(AVG(duration_ms), 1) AS 'Avg Duration (ms)'
@@ -140,11 +140,11 @@ FROM hive_query_metrics WHERE operation IS NOT NULL
 GROUP BY operation ORDER BY 2 DESC
 ```
 
-#### Hive Query Detail（table）
+#### Hive Query Detail (table)
 
-**用途**: 展示最近 200 条 Hive 查询详情，支持 `$hive_operation` 过滤。
+**Purpose**: Displays details for the most recent 200 Hive queries, filterable by `$hive_operation`.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, operation, user_name,
        success, duration_ms, input_bytes, output_bytes, input_rows, output_rows
@@ -152,19 +152,19 @@ FROM hive_query_metrics WHERE operation IN ($hive_operation)
 ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `query_id` | Hive 查询唯一 ID | - |
-| `success` | OK（绿色）/ FAIL（红色） | - |
-| `input_bytes` / `output_bytes` | 输入/输出字节 | bytes |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `query_id` | Hive query unique ID | - |
+| `success` | OK (green) / FAIL (red) | - |
+| `input_bytes` / `output_bytes` | Input/output bytes | bytes |
 
-#### Hive Table IO Detail（table）
+#### Hive Table IO Detail (table)
 
-**用途**: 展示表级别 IO 血缘，支持 `$hive_operation` 过滤。
+**Purpose**: Displays table-level IO lineage, filterable by `$hive_operation`.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, query_id, table_name,
        table_type, operation, user_name
@@ -172,15 +172,15 @@ FROM hive_table_io_metrics WHERE operation IN ($hive_operation)
 ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
-## 导航
-顶部导航栏可快速切换到：
-- **Overview** — 平台总览
-- **Spark** — Spark 引擎详细透视
-- **MapReduce** — MR 引擎详细透视
-- **Hive on MR** / **Hive on Spark** — Hive 查询分析
+## Navigation
+The top navigation bar provides quick access to:
+- **Overview** — Platform overview
+- **Spark** — Spark engine detailed view
+- **MapReduce** — MR engine detailed view
+- **Hive on MR** / **Hive on Spark** — Hive query analysis
 
-## 注意事项
-- 本仪表盘是最全面的基础透视，包含 33 个面板，页面加载可能较慢
-- Spark 部分使用 `$app_id` 过滤，Hive 部分使用 `$hive_operation` 过滤，两者独立
-- Hive 面板不区分执行引擎（显示所有 Hive 查询），如需按引擎过滤请使用 Hive on MR / Hive on Spark 面板
-- `stage_governance` 和 `task_histogram_buckets` 的数据依赖 Stage 完成后触发计算
+## Notes
+- This dashboard is the most comprehensive foundational view, containing 33 panels; page load may be slower.
+- The Spark section uses `$app_id` for filtering, while the Hive section uses `$hive_operation`; they are independent.
+- The Hive panels do not distinguish execution engines (showing all Hive queries). To filter by engine, use the Hive on MR / Hive on Spark panels.
+- Data in `stage_governance` and `task_histogram_buckets` depends on computation triggered after Stage completion.

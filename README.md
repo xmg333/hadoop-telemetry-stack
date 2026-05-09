@@ -1,94 +1,113 @@
-# Spark Telemetry Listener
+# Hadoop Telemetry Stack
 
-透明的大数据可观测性方案，通过 OpenTelemetry 协议采集 Spark / MapReduce 任务指标，经 Kafka 持久化到 MySQL / ClickHouse，最终通过 Grafana 可视化。
+A transparent observability solution for big data workloads. Capture Spark / MapReduce / Hive metrics via OpenTelemetry, stream through Kafka to MySQL or ClickHouse, and visualize everything in Grafana.
 
-## 系统架构
+```mermaid
+graph TD
+    subgraph Collection
+        SP["Spark Plugin<br/>(Task/Stage/JVM)"]
+        MR["MR Collector<br/>(History Server)"]
+        MA["MR Agent<br/>(Bytecode)"]
+        HV["Hive Hook<br/>(HiveServer2)"]
+    end
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  采集层                                                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Spark Plugin │  │ MR Collector │  │  MR Agent    │      │
-│  │ (Task/Stage/ │  │ (History Svr)│  │ (字节码增强)  │      │
-│  │  JVM Metrics)│  │              │  │              │      │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
-│         └──────── OTLP gRPC ────────┬───────┘              │
-└─────────────────────────────────────┼───────────────────────┘
-                                      ▼
-                        ┌─────────────────────────┐
-                        │     OTel Collector       │
-                        └────────────┬────────────┘
-                                     │ Kafka (OTLP Protobuf)
-                                     ▼
-                        ┌─────────────────────────┐
-                        │  Flink Metrics Consumer  │
-                        └────────────┬────────────┘
-                                     ▼
-                        ┌─────────────────────────┐
-                        │  MySQL / ClickHouse      │
-                        │  + Grafana 可视化         │
-                        └─────────────────────────┘
+    SP -->|"OTLP gRPC :4317"| OTEL
+    MR -->|"OTLP gRPC :4317"| OTEL
+    MA -->|"OTLP gRPC :4317"| OTEL
+    HV -->|"OTLP gRPC :4317"| OTEL
+
+    OTEL["OTel Collector"]
+    KAFKA["Kafka"]
+    FLINK["Flink Consumer"]
+    DB[("MySQL / ClickHouse")]
+    GRAFANA["Grafana Dashboards"]
+
+    OTEL -->|"Kafka Export (OTLP Protobuf)"| KAFKA
+    KAFKA -->|"KafkaSource"| FLINK
+    FLINK -->|"JDBC Batch"| DB
+    DB -->|"SQL"| GRAFANA
 ```
 
-## 目录结构
+**Key package**: `x.mg.metrics` | **Build tool**: Maven multi-module with Spark version profiles
 
-```
-docs/                        # 完整文档
-  index.md                     全文索引（指标、基准测试、兼容性矩阵）
-  quickstart.md                快速开始
-  deployment-guide.md          部署指南与排查手册
-  spark-plugin.md              Spark Plugin 配置与指标参考
-  mr-telemetry.md              MR Collector / Agent 配置与指标参考
-  flink-consumer.md            Flink Consumer 配置与数据库表结构
-  grafana-problem.md           Grafana 面板问题排查
-conf/examples/               # 配置示例
-  telemetry.conf.example       Spark 插件
-  mr-collector.conf.example    MR Collector
-  flink-consumer.conf.example  Flink Consumer
-  hive-telemetry.conf.example  Hive Hook
-deploy/
-  k8s/                        # Kubernetes 测试环境清单
-  grafana/                    # Grafana 仪表盘 JSON
-  otel-collector/             # OTel Collector 配置
-  sql/                        # 数据库建表 SQL
-spark/                       # Spark 相关 Maven 模块
-mapreduce-agent/             # MR Agent Maven 模块
-mapreduce-collector/         # MR Collector Maven 模块
-hive/                        # Hive Hook Maven 模块
-flink/                       # Flink Consumer Maven 模块
-integration-tests/           # 集成测试
-```
+## Supported Versions
 
-## 快速构建
+| Spark | Scala | Profile | Mechanism |
+|-------|-------|---------|-----------|
+| 2.4.x | 2.11 | `spark-2` | `spark.extraListeners` |
+| 3.0 - 3.5.x | 2.12 | `spark-3` (default) | `SparkPlugin` API |
+| 4.0.x | 2.13 | `spark-4` | `SparkPlugin` API |
+
+Also compatible with Hadoop 2.7+ / 3.x, Hive 2.3+ / 3.x, and Flink 1.18.
+
+## Quick Build
 
 ```bash
-# Omnipackage（推荐，单 JAR 支持 Spark 2/3/4 + MR Agent/Collector + Hive Hook）
+# Omnipackage (single JAR supports Spark 2/3/4 + MR Agent/Collector + Hive Hook)
 chmod +x build-omni.sh && ./build-omni.sh
 
-# 或单独构建各版本
-mvn clean package -DskipTests              # Spark 3.x（默认）
+# Or build per version
+mvn clean package -DskipTests              # Spark 3.x (default)
 mvn clean package -Pspark-2 -DskipTests    # Spark 2.x
 mvn clean package -Pspark-4 -DskipTests    # Spark 4.x
 ```
 
-## 支持版本
+## Quick Deploy
 
-| Spark 版本 | Scala | Maven Profile | 加载方式 |
-|------------|-------|---------------|---------|
-| Spark 2.4.x | 2.11 | `spark-2` | `spark.extraListeners` |
-| Spark 3.5.x | 2.12 | `spark-3`（默认） | `SparkPlugin` API |
-| Spark 4.0.x | 2.13 | `spark-4` | `SparkPlugin` API |
+```bash
+# Install omnipackage to Spark / Hive / MR
+./deploy/install-omni.sh \
+  --spark-home=/opt/spark --hive-home=/opt/hive --hadoop-home=/opt/hadoop \
+  --otel-endpoint=http://otel-collector:4317 -y
 
-## 文档导航
+# Import Grafana dashboards
+./deploy/deploy-grafana.sh \
+  --grafana-url=http://grafana:3000 --user=admin --password=admin
+```
 
-| 文档 | 说明 |
-|------|------|
-| [快速开始](docs/quickstart.md) | 构建到验证的完整部署流程 |
-| [部署指南](docs/deployment-guide.md) | 配置参数、指标参考、排查手册 |
-| [Spark Plugin](docs/spark-plugin.md) | Spark 插件配置与指标参考 |
-| [MR Telemetry](docs/mr-telemetry.md) | MR Collector / Agent 配置与指标参考 |
-| [Flink Consumer](docs/flink-consumer.md) | Flink Consumer 配置与数据库表结构 |
-| [Grafana 排查](docs/grafana-problem.md) | Grafana 面板问题排查 |
+## How It Works
+
+The stack collects metrics at four integration points:
+
+| Component | Mechanism | Metrics |
+|-----------|-----------|---------|
+| **Spark Plugin** | `SparkPlugin` API or `spark.extraListeners` | Task/stage IO, shuffle, execution time, JVM heap/GC, SQL query metrics |
+| **MR Collector** | Standalone Java app polling History Server REST API | Job-level HDFS IO, CPU, GC, maps/reduces |
+| **MR Agent** | Java Agent via ByteBuddy bytecode instrumentation | Task-level map/reduce input/output records, shuffle bytes |
+| **Hive Hook** | `ExecuteWithHookContext` post-execution hook | Query duration, input/output bytes/rows, table lineage |
+
+All exporters use OTLP gRPC with **DELTA temporality** to prevent duplicate data. Metrics flow through an OTel Collector to Kafka, where a Flink DataStream job consumes and writes them to MySQL or ClickHouse. Grafana dashboards provide the visualization layer.
+
+## Documentation
+
+| Doc | Description |
+|-----|-------------|
+| [Quick Start](docs/quickstart.md) | Build through verification, end-to-end |
+| [Architecture](docs/architecture.md) | Module structure, data flow, design decisions |
+| [Deployment Guide](docs/deployment-guide.md) | Configuration parameters, metric reference, troubleshooting |
+| [Spark Plugin](docs/spark-plugin.md) | Spark plugin configuration and metric reference |
+| [MR Telemetry](docs/mr-telemetry.md) | MR Collector / Agent configuration and metric reference |
+| [Flink Consumer](docs/flink-consumer.md) | Flink Consumer configuration and database schema |
+| [Release Guide](docs/release.md) | Version bump, tagging, artifact deployment |
+
+## Key Design Principles
+
+- **Never blocks user tasks**: All telemetry failures are isolated via try-catch; initialization failures produce no-op instances, not crashes
+- **DELTA aggregation**: Prevents metric duplication on re-export
+- **Three-tier config merge**: Spark conf overrides > HOCON file > built-in defaults
+- **Shaded fat JARs**: All OTel/gRPC/Protobuf dependencies relocated to `x.mg.metrics.shaded.*` -- zero classpath conflicts
+- **Runtime version detection**: Omnipackage probes Spark version at runtime via `Class.forName` -- no separate JARs needed
+
+## Grafana Dashboards
+
+13 pre-built dashboards are available in `deploy/grafana/`, covering platform overview, per-engine metrics, performance analysis, cost attribution, capacity planning, and IO analysis. Six dashboards use engine-specific tables; seven cross-engine analysis dashboards use the `metric_events` unified wide table.
+
+## Performance
+
+Benchmarked with Intel HiBench (small profile) on 4C8G single-node with Spark 3.2.0 + Hadoop 3.2.0:
+- Average overhead across 10 workloads: approximately -1.3% (within measurement noise)
+- Hive hook overhead: <2%
+- MR Agent: verified metrics arrive at MySQL for all workloads
 
 ## License
 

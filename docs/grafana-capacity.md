@@ -1,23 +1,23 @@
-# 容量规划与资源利用率
+# Capacity Planning and Resource Utilization
 
-## 概述
-本仪表盘从集群容量和资源利用视角出发，帮助回答以下问题：
-- 每小时的任务并发量如何变化？
-- Executor 内存使用趋势是否健康？
-- GC 活动是否过于频繁？
-- 每日 Job 吞吐量是否稳定？
+## Overview
+This dashboard approaches analysis from a cluster capacity and resource utilization perspective, helping answer the following questions:
+- How does the hourly task concurrency change?
+- Is the Executor memory usage trend healthy?
+- Is GC activity too frequent?
+- Is the daily Job throughput stable?
 
-## 前置条件
-- 数据源：`metric_events` 大宽表、`jvm_memory_metrics` 表、`jvm_gc_metrics` 表（由 Flink Consumer 写入）
-- Grafana 变量：`$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
+## Prerequisites
+- Data sources: `metric_events` wide table, `jvm_memory_metrics` table, `jvm_gc_metrics` table (written by Flink Consumer)
+- Grafana variables: `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
 
-## 面板说明
+## Panel Descriptions
 
-### 每小时任务并发数（timeseries）
+### Hourly Task Concurrency (timeseries)
 
-**用途**: 展示各引擎在每小时内执行的任务数，评估集群并发负载和高峰时段。
+**Purpose**: Shows the number of tasks executed per hour for each engine, evaluating cluster concurrency load and peak periods.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ( Floor(timestamp_ms / $__interval_ms) * $__interval_ms / 1000 ) AS time,
        engine,
@@ -33,22 +33,22 @@ ORDER  BY 1,
           2
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `time` | 时间桶 | Unix 时间戳 |
-| `engine` | 执行引擎（SPARK / MR） | - |
-| `task_count` | 该时段内完成的任务数 | 个 |
-| `app_count` | 该时段内活跃的应用数 | 个 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `time` | Time bucket | Unix timestamp |
+| `engine` | Execution engine (SPARK / MR) | - |
+| `task_count` | Number of tasks completed in this period | count |
+| `app_count` | Number of active applications in this period | count |
 
-**使用建议**: 任务数曲线的波峰波谷反映业务周期。如果高峰期任务数接近集群容量上限（通过 YARN ResourceManager 可查看），需考虑扩容或错峰调度。`app_count` 与 `task_count` 的比值反映应用并发度。
+**Usage**: The peaks and troughs of the task count curve reflect business cycles. If the task count during peak periods approaches the cluster capacity limit (checkable via YARN ResourceManager), consider scaling up or staggered scheduling. The ratio of `app_count` to `task_count` reflects application concurrency.
 
-### Executor 内存使用趋势（timeseries）
+### Executor Memory Usage Trend (timeseries)
 
-**用途**: 展示各 Executor 的堆内存和非堆内存使用趋势，监控内存压力。
+**Purpose**: Shows the heap and non-heap memory usage trends for each Executor, monitoring memory pressure.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ( Floor(timestamp_ms / $__interval_ms) * $__interval_ms / 1000 ) AS time,
        app_id,
@@ -66,23 +66,23 @@ ORDER  BY 1,
           3
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `time` | 时间桶 | Unix 时间戳 |
-| `app_id` | Spark 应用 ID | - |
-| `executor_id` | Executor 编号 | - |
-| `heap_gb` | 平均堆内存使用量 | GB |
-| `non_heap_gb` | 平均非堆内存使用量 | GB |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `time` | Time bucket | Unix timestamp |
+| `app_id` | Spark application ID | - |
+| `executor_id` | Executor number | - |
+| `heap_gb` | Average heap memory usage | GB |
+| `non_heap_gb` | Average non-heap memory usage | GB |
 
-**使用建议**: 堆内存持续增长且不回落可能存在内存泄漏。如果堆内存接近 `spark.executor.memory` 配置值的 80% 以上，建议增加内存或优化数据结构。该面板直接查询 `jvm_memory_metrics` 物理表。
+**Usage**: Continuously growing heap memory that does not decrease may indicate a memory leak. If heap memory is above 80% of the `spark.executor.memory` configured value, consider increasing memory or optimizing data structures. This panel queries the `jvm_memory_metrics` physical table directly.
 
-### GC 活动趋势（timeseries）
+### GC Activity Trend (timeseries)
 
-**用途**: 展示各应用的 GC 次数和 GC 时间趋势，识别 GC 压力过大的时段。
+**Purpose**: Shows the GC count and GC time trends for each application, identifying periods of excessive GC pressure.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ( Floor(timestamp_ms / $__interval_ms) * $__interval_ms / 1000 ) AS time,
        app_id,
@@ -100,23 +100,23 @@ ORDER  BY 1,
           3
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `time` | 时间桶 | Unix 时间戳 |
-| `app_id` | Spark 应用 ID | - |
-| `gc_name` | GC 算法名称（如 G1 Old Generation、ParNew 等） | - |
-| `total_gc_count` | 该时段内 GC 总次数 | 次 |
-| `total_gc_sec` | 该时段内 GC 总耗时 | 秒 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `time` | Time bucket | Unix timestamp |
+| `app_id` | Spark application ID | - |
+| `gc_name` | GC algorithm name (e.g., G1 Old Generation, ParNew, etc.) | - |
+| `total_gc_count` | Total GC count during this period | count |
+| `total_gc_sec` | Total GC duration during this period | seconds |
 
-**使用建议**: 区分 Old GC（Full GC）和 Young GC（Minor GC）。Full GC 频繁出现（每小时超过 5 次）说明堆内存严重不足。Young GC 频率高但耗时短属正常现象。该面板直接查询 `jvm_gc_metrics` 物理表。
+**Usage**: Distinguish between Old GC (Full GC) and Young GC (Minor GC). Frequent Full GC (more than 5 times per hour) indicates severe heap memory shortage. High-frequency but short-duration Young GC is normal. This panel queries the `jvm_gc_metrics` physical table directly.
 
-### 每日 Job 吞吐量（timeseries）
+### Daily Job Throughput (timeseries)
 
-**用途**: 展示各引擎每日完成的 Job/作业数量趋势，评估整体集群吞吐能力。
+**Purpose**: Shows the daily completed job/query count trend for each engine, evaluating overall cluster throughput capacity.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ( Floor(timestamp_ms / $__interval_ms) * $__interval_ms / 1000 ) AS time,
        engine,
@@ -139,20 +139,20 @@ ORDER  BY 1,
           2
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `time` | 时间桶 | Unix 时间戳 |
-| `engine` | 执行引擎（SPARK / MR / HIVE） | - |
-| `job_count` | 独立 Job/作业/查询数 | 个 |
-| `success_count` | 成功数 | 个 |
-| `fail_count` | 失败数 | 个 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `time` | Time bucket | Unix timestamp |
+| `engine` | Execution engine (SPARK / MR / HIVE) | - |
+| `job_count` | Number of distinct jobs/queries | count |
+| `success_count` | Number of successes | count |
+| `fail_count` | Number of failures | count |
 
-**使用建议**: Job 数量的周期性波动正常，但若持续下降则需检查上游提交是否正常。`fail_count` 持续大于 0 时需深入排查失败原因。跨引擎对比可评估迁移效果（如从 MR 迁移到 Spark 后的吞吐变化）。
+**Usage**: Cyclical fluctuations in job count are normal, but a sustained decline requires checking whether upstream submissions are functioning correctly. Investigate further when `fail_count` is consistently above 0. Cross-engine comparison helps evaluate the effects of migration (e.g., throughput changes after migrating from MR to Spark).
 
-## 注意事项
-- JVM 内存和 GC 指标仅适用于 Spark（通过 `ExecutorPlugin` 采集），MR 任务不包含这些数据。
-- `jvm_memory_metrics` 和 `jvm_gc_metrics` 的数据采集频率取决于 OTel SDK 的 `export.interval.ms` 配置（默认 60 秒），非每个任务一条记录。
-- 内存趋势面板中 `executor_id` 可能较多，建议通过 Grafana 变量过滤特定应用。
-- 时间范围选择超过 7 天时，建议将 `$__interval_ms` 调整为小时级（3600000）或日级（86400000）以避免查询过慢。
+## Notes
+- JVM memory and GC metrics apply only to Spark (collected via `ExecutorPlugin`); MR tasks do not include this data.
+- The data collection frequency for `jvm_memory_metrics` and `jvm_gc_metrics` depends on the OTel SDK's `export.interval.ms` configuration (default 60 seconds), not one record per task.
+- In the memory trend panel, there may be many `executor_id` values; filter by specific applications using Grafana variables.
+- When selecting a time range exceeding 7 days, set `$__interval_ms` to hourly (3600000) or daily (86400000) to avoid slow queries.

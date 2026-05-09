@@ -50,7 +50,7 @@ public class DiagnosticConfig {
         d.put("diagnostic.mysql.port", 3306);
         d.put("diagnostic.mysql.database", "telemetry");
         d.put("diagnostic.mysql.username", "metrics");
-        d.put("diagnostic.mysql.password", "metrics");
+        d.put("diagnostic.mysql.password", "CHANGE_ME");
         d.put("diagnostic.mysql.timeout-ms", 5000);
 
         // Spark

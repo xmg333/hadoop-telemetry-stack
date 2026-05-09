@@ -1,20 +1,20 @@
-# Spark Telemetry Plugin — 部署与指标参考
+# Spark Telemetry Plugin -- Deployment & Metrics Reference
 
-## 部署
+## Deployment
 
-### Spark 3.x / 4.x（SparkPlugin API）
+### Spark 3.x / 4.x (SparkPlugin API)
 
-#### 分发 JAR
+#### Distributing the JAR
 
 ```bash
-# 方式 A：HDFS
+# Option A: HDFS
 hdfs dfs -put spark/spark-telemetry-dist-spark3/target/spark-telemetry-dist-spark3-*.jar /spark/libs/
 
-# 方式 B：本地路径
+# Option B: Local Path
 scp spark/spark-telemetry-dist-spark3/target/spark-telemetry-dist-spark3-*.jar node:/opt/spark/libs/
 ```
 
-#### 配置
+#### Configuration
 
 ```bash
 spark-submit \
@@ -28,7 +28,7 @@ spark-submit \
   your-app.jar
 ```
 
-`spark-defaults.conf` 方式：
+`spark-defaults.conf` approach:
 
 ```properties
 spark.plugins              x.mg.metrics.sparktelemetry.adapter.SparkTelemetryPlugin
@@ -37,9 +37,9 @@ spark.telemetry.otel.service.name         my-spark-app
 spark.telemetry.otel.export.interval.ms   10000
 ```
 
-### Spark 2.x（spark.extraListeners）
+### Spark 2.x (spark.extraListeners)
 
-Spark 2.x 没有 `SparkPlugin` API：
+Spark 2.x does not have the `SparkPlugin` API:
 
 ```bash
 spark-submit \
@@ -51,15 +51,15 @@ spark-submit \
   your-app.jar
 ```
 
-**Spark 2.x 注意事项**：
-- 在第一个事件到达时通过 `ensureInit()` 懒初始化
-- Shuffle Write API 使用 `shuffleBytesWritten` / `shuffleWriteTime` / `shuffleRecordsWritten`（与 3.x 不同）
+**Spark 2.x Notes**:
+- Lazy initialization via `ensureInit()` on the first event
+- Shuffle Write API uses `shuffleBytesWritten` / `shuffleWriteTime` / `shuffleRecordsWritten` (different from 3.x)
 
-### Omnipackage 统一部署
+### Omnipackage Unified Deployment
 
-Omnipackage 将 Spark 2/3/4 + MR Collector + MR Agent + Hive Hook 合并为单个 JAR，运行时自动检测 Spark 版本。
+The Omnipackage combines Spark 2/3/4 + MR Collector + MR Agent + Hive Hook into a single JAR, auto-detecting the Spark version at runtime.
 
-配置方式与版本专用 JAR **完全一致**，直接替换 JAR 即可：
+Configuration is **identical** to version-specific JARs -- simply replace the JAR:
 
 ```bash
 # Spark 3/4
@@ -76,78 +76,79 @@ spark-submit --jars /opt/omnipackage.jar \
   --conf spark.telemetry.otel.service.name=my-app \
   your-app.jar
 
-# MR Collector 模式
+# MR Collector mode
 java -jar omnipackage.jar --mr-collector /path/to/mr-collector.conf
 
-# MR Agent 模式
+# MR Agent mode
 -javaagent:/opt/omnipackage.jar -Dmr.telemetry.agent.otel.exporter.endpoint=http://otel-collector:4317
 ```
 
-#### Omnipackage vs 版本专用 JAR
+#### Omnipackage vs Version-Specific JARs
 
-| 特性 | 版本专用 JAR | Omnipackage |
-|------|-------------|-------------|
-| 文件数量 | 3 个（Spark 2/3/4 各一） | 1 个 |
-| 运维复杂度 | 需按 Spark 版本分发 | 统一分发 |
-| 配置差异 | 需注意版本对应的入口类 | 同一入口类，自动检测 |
-| JAR 体积 | ~30MB 各 | ~50-60MB |
-| MR 支持 | 需额外 JAR | 内含 MR Collector + Agent |
+| Feature | Version-Specific JAR | Omnipackage |
+|---------|---------------------|-------------|
+| File count | 3 (one each for Spark 2/3/4) | 1 |
+| Operational complexity | Distribute by Spark version | Unified distribution |
+| Configuration differences | Version-specific entry classes | Same entry class, auto-detection |
+| JAR size | ~30MB each | ~50-60MB |
+| MR support | Requires separate JARs | Includes MR Collector + Agent |
 
-### HOCON 配置文件（可选）
+### HOCON Configuration File (Optional)
 
-除 Spark Conf 外，还可通过 HOCON 配置文件进行详细配置：
+In addition to Spark Conf, detailed configuration via a HOCON file is also supported:
 
 ```bash
 cp conf/examples/telemetry.conf.example telemetry.conf
 spark-submit --files telemetry.conf ...
 ```
 
-配置优先级：**Spark Conf 覆盖 > HOCON 文件 > 内置默认值**
+Config priority: **Spark Conf override > HOCON file > Built-in defaults**
 
-### 验证
+### Verification
 
 ```bash
-# 检查 Driver/Executor 日志
-# 应看到：INFO TelemetryLifecycle: Telemetry initialized, endpoint=http://collector:4317
+# Check Driver/Executor logs
+# Should see: INFO TelemetryLifecycle: Telemetry initialized, endpoint=http://collector:4317
 
-# 检查 OTel Collector
+# Check OTel Collector
 kubectl logs -l app=otel-collector --tail=100 | grep "spark\."
 ```
 
-> **注意**：短时 Spark 作业（< 10 秒）可能在 OTel SDK 首次导出前完成。建议使用较长作业测试，或减小 `spark.telemetry.otel.export.interval.ms`。
+> **Note**: Short-lived Spark jobs (< 10s) may complete before the OTel SDK's first export. Use longer-running jobs for testing, or reduce `spark.telemetry.otel.export.interval.ms`.
 
 ---
 
-## 配置参数
+## Configuration Parameters
 
-### 最小配置（必填）
+### Minimum Configuration (Required)
 
-| 参数 | 说明 | 示例 |
-|------|------|------|
-| `spark.plugins` | Spark 插件类名 | `x.mg.metrics.sparktelemetry.adapter.SparkTelemetryPlugin` |
-| `spark.telemetry.otel.exporter.endpoint` | OTel Collector gRPC 地址 | `http://collector:4317` |
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `spark.plugins` | Spark plugin class name | `x.mg.metrics.sparktelemetry.adapter.SparkTelemetryPlugin` |
+| `spark.telemetry.otel.exporter.endpoint` | OTel Collector gRPC endpoint | `http://collector:4317` |
 
-### 可选配置
+### Optional Configuration
 
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `spark.telemetry.otel.service.name` | `spark-application` | OTel 服务名 |
-| `spark.telemetry.otel.export.interval.ms` | `10000` | 指标导出间隔（毫秒） |
-| `spark.telemetry.otel.exporter.protocol` | `grpc` | 导出协议 (`grpc` / `http`) |
-| `spark.telemetry.config.path` | (classpath) | HOCON 配置文件路径 |
-| `spark.telemetry.metrics.task.execution` | `true` | Category 1: 任务执行指标 |
-| `spark.telemetry.metrics.task.shuffle-extended` | `true` | Category 2: 扩展 Shuffle 指标 |
-| `spark.telemetry.metrics.task.info` | `true` | Category 3: 任务信息属性 |
-| `spark.telemetry.metrics.stage.detailed` | `true` | Category 4: 阶段详细指标 |
-| `spark.telemetry.metrics.job.lifecycle` | `true` | Category 5: 作业生命周期 |
-| `spark.telemetry.metrics.sql.query-execution` | `true` | Category 6: SQL 查询执行指标 |
-| `spark.telemetry.sql.max-length` | `4096` | SQL 文本最大截断长度（字符） |
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `spark.telemetry.otel.service.name` | `spark-application` | OTel service name |
+| `spark.telemetry.otel.export.interval.ms` | `10000` | Metrics export interval (ms) |
+| `spark.telemetry.otel.export.max-data-points-per-batch` | `5000` | Maximum data points per OTLP export batch (used by SplittingMetricExporter for large metric batches) |
+| `spark.telemetry.otel.exporter.protocol` | `grpc` | Export protocol (`grpc` / `http`) |
+| `spark.telemetry.config.path` | (classpath) | HOCON config file path |
+| `spark.telemetry.metrics.task.execution` | `true` | Category 1: task execution metrics |
+| `spark.telemetry.metrics.task.shuffle-extended` | `true` | Category 2: extended shuffle metrics |
+| `spark.telemetry.metrics.task.info` | `true` | Category 3: task info attributes |
+| `spark.telemetry.metrics.stage.detailed` | `true` | Category 4: stage detailed metrics |
+| `spark.telemetry.metrics.job.lifecycle` | `true` | Category 5: job lifecycle metrics |
+| `spark.telemetry.metrics.sql.query-execution` | `true` | Category 6: SQL query execution metrics |
+| `spark.telemetry.metrics.sql.max-length` | `4096` | Maximum SQL text truncation length (characters) |
 
-> **重要**：Spark 配置键必须包含完整内部路径，包括 `.otel.` 段。映射规则为 `spark.telemetry.X` → `spark-telemetry.X`：
-> - 正确：`spark.telemetry.otel.exporter.endpoint=http://host:4317`
-> - 错误：`spark.telemetry.exporter.endpoint=http://host:4317`
+> **Important**: Spark config keys must include the full internal path, including the `.otel.` segment. The mapping is `spark.telemetry.X` -> `spark-telemetry.X`:
+> - Correct: `spark.telemetry.otel.exporter.endpoint=http://host:4317`
+> - Incorrect: `spark.telemetry.exporter.endpoint=http://host:4317`
 
-### HOCON 配置完整参考（telemetry.conf）
+### HOCON Complete Reference (telemetry.conf)
 
 ```hocon
 spark-telemetry {
@@ -166,7 +167,7 @@ spark-telemetry {
       enabled = true
       capture.task-end = true
       capture.stage-complete = true
-      capture.job-end = false
+      capture.job-end = true
     }
 
     system {
@@ -195,104 +196,111 @@ spark-telemetry {
 
 ---
 
-## 指标参考
+## Metrics Reference
 
-### 核心 IO 指标（始终采集）
+### Core IO Metrics (Always Collected)
 
-| 指标名 | 类型 | 单位 | 说明 |
-|--------|------|------|------|
-| `spark.task.io.bytes_read` | Counter | By | 任务读取字节数 |
-| `spark.task.io.bytes_written` | Counter | By | 任务写入字节数 |
-| `spark.task.io.records_read` | Counter | {records} | 任务读取记录数 |
-| `spark.task.io.records_written` | Counter | {records} | 任务写入记录数 |
-| `spark.task.shuffle.bytes_read` | Counter | By | Shuffle 读取字节数 |
-| `spark.task.shuffle.bytes_written` | Counter | By | Shuffle 写入字节数 |
-| `spark.task.shuffle.fetch_wait_time_ms` | Counter | ms | Shuffle 等待时间 |
-| `spark.task.disk_bytes_spilled` | Counter | By | 磁盘溢写字节数 |
-| `spark.task.memory_bytes_spilled` | Counter | By | 内存溢写字节数 |
-| `spark.task.duration_ms` | Histogram | ms | 任务执行时长 |
+| Metric Name | Type | Unit | Description |
+|-------------|------|------|-------------|
+| `spark.task.io.bytes_read` | Counter | By | Task bytes read |
+| `spark.task.io.bytes_written` | Counter | By | Task bytes written |
+| `spark.task.io.records_read` | Counter | {records} | Task records read |
+| `spark.task.io.records_written` | Counter | {records} | Task records written |
+| `spark.task.shuffle.bytes_read` | Counter | By | Shuffle bytes read |
+| `spark.task.shuffle.bytes_written` | Counter | By | Shuffle bytes written |
+| `spark.task.shuffle.fetch_wait_time_ms` | Counter | ms | Shuffle fetch wait time |
+| `spark.task.disk_bytes_spilled` | Counter | By | Disk bytes spilled |
+| `spark.task.memory_bytes_spilled` | Counter | By | Memory bytes spilled |
+| `spark.task.duration_ms` | Histogram | ms | Task execution duration |
 
-### 任务执行指标（Category 1）
+### Task Execution Metrics (Category 1)
 
-| 指标名 | 类型 | 单位 | 说明 |
-|--------|------|------|------|
-| `spark.task.executor.run_time_ms` | Histogram | ms | Executor 运行时间 |
-| `spark.task.executor.cpu_time_ns` | Counter | ns | Executor CPU 时间 |
-| `spark.task.deserialize_time_ms` | Histogram | ms | 反序列化时间 |
-| `spark.task.deserialize_cpu_time_ns` | Counter | ns | 反序列化 CPU 时间 |
-| `spark.task.result_serialization_time_ms` | Histogram | ms | 结果序列化时间 |
-| `spark.task.jvm_gc_time_ms` | Histogram | ms | 任务 JVM GC 时间 |
-| `spark.task.scheduler_delay_ms` | Histogram | ms | 调度延迟 |
-| `spark.task.result_size_bytes` | Counter | By | 任务结果大小 |
-| `spark.task.peak_execution_memory_bytes` | Counter | By | 峰值执行内存 |
+| Metric Name | Type | Unit | Description |
+|-------------|------|------|-------------|
+| `spark.task.executor.run_time_ms` | Histogram | ms | Executor run time |
+| `spark.task.executor.cpu_time_ns` | Counter | ns | Executor CPU time |
+| `spark.task.deserialize_time_ms` | Histogram | ms | Deserialization time |
+| `spark.task.deserialize_cpu_time_ns` | Counter | ns | Deserialization CPU time |
+| `spark.task.result_serialization_time_ms` | Histogram | ms | Result serialization time |
+| `spark.task.jvm_gc_time_ms` | Histogram | ms | Task JVM GC time |
+| `spark.task.scheduler_delay_ms` | Histogram | ms | Scheduler delay |
+| `spark.task.result_size_bytes` | Counter | By | Task result size |
+| `spark.task.peak_execution_memory_bytes` | Counter | By | Peak execution memory |
 
-### 扩展 Shuffle 指标（Category 2）
+### Extended Shuffle Metrics (Category 2)
 
-| 指标名 | 类型 | 单位 | 说明 |
-|--------|------|------|------|
-| `spark.task.shuffle.local_blocks_fetched` | Counter | {blocks} | 本地 Shuffle 块数 |
-| `spark.task.shuffle.records_read` | Counter | {records} | Shuffle 读取记录数 |
-| `spark.task.shuffle.remote_bytes_read_to_disk` | Counter | By | 远程 Shuffle 写盘字节数 |
-| `spark.task.shuffle.remote_reqs_duration_ms` | Counter | ms | 远程 Shuffle 请求时长 |
+| Metric Name | Type | Unit | Description |
+|-------------|------|------|-------------|
+| `spark.task.shuffle.local_blocks_fetched` | Counter | {blocks} | Local shuffle blocks fetched |
+| `spark.task.shuffle.records_read` | Counter | {records} | Shuffle records read |
+| `spark.task.shuffle.remote_bytes_read_to_disk` | Counter | By | Remote shuffle bytes read to disk |
+| `spark.task.shuffle.remote_reqs_duration_ms` | Counter | ms | Remote shuffle request duration |
 
-### 阶段详细指标（Category 4）
+### Stage Detailed Metrics (Category 4)
 
-| 指标名 | 类型 | 单位 | 说明 |
-|--------|------|------|------|
-| `spark.stage.duration_ms` | Histogram | ms | 阶段时长 |
-| `spark.stage.num_tasks` | Counter | {tasks} | 阶段任务数 |
-| `spark.stage.executor.run_time_ms` | Counter | ms | 阶段总运行时间 |
-| `spark.stage.executor.cpu_time_ns` | Counter | ns | 阶段总 CPU 时间 |
-| `spark.stage.jvm_gc_time_ms` | Counter | ms | 阶段总 GC 时间 |
-| `spark.stage.peak_execution_memory_bytes` | Counter | By | 阶段峰值内存 |
-| `spark.stage.io.bytes_read` | Counter | By | 阶段读取字节数（独立于 task 级） |
-| `spark.stage.io.bytes_written` | Counter | By | 阶段写入字节数（独立于 task 级） |
+| Metric Name | Type | Unit | Description |
+|-------------|------|------|-------------|
+| `spark.stage.duration_ms` | Histogram | ms | Stage duration |
+| `spark.stage.num_tasks` | Counter | {tasks} | Number of tasks in stage |
+| `spark.stage.executor.run_time_ms` | Counter | ms | Stage total executor run time |
+| `spark.stage.executor.cpu_time_ns` | Counter | ns | Stage total CPU time |
+| `spark.stage.jvm_gc_time_ms` | Counter | ms | Stage total GC time |
+| `spark.stage.peak_execution_memory_bytes` | Counter | By | Stage peak memory |
+| `spark.stage.io.bytes_read` | Counter | By | Stage bytes read (independent of task-level) |
+| `spark.stage.io.bytes_written` | Counter | By | Stage bytes written (independent of task-level) |
 
-### 作业生命周期指标（Category 5）
+### Job Lifecycle Metrics (Category 5)
 
-| 指标名 | 类型 | 单位 | 说明 |
-|--------|------|------|------|
-| `spark.job.duration_ms` | Histogram | ms | 作业时长 |
-| `spark.job.num_stages` | Counter | {stages} | 作业阶段数 |
+| Metric Name | Type | Unit | Description |
+|-------------|------|------|-------------|
+| `spark.job.duration_ms` | Histogram | ms | Job duration |
+| `spark.job.num_stages` | Counter | {stages} | Number of stages in job |
 
-### JVM 系统指标
+### JVM System Metrics
 
-| 指标名 | 类型 | 单位 | 说明 |
-|--------|------|------|------|
-| `spark.jvm.memory.heap_used` | Gauge | By | JVM 堆内存使用量 |
-| `spark.jvm.memory.non_heap_used` | Gauge | By | JVM 非堆内存使用量 |
-| `spark.jvm.gc.count` | Counter | {count} | GC 次数（按 gc_name 区分） |
-| `spark.jvm.gc.time_ms` | Counter | ms | GC 时间 |
+| Metric Name | Type | Unit | Description |
+|-------------|------|------|-------------|
+| `spark.jvm.memory.heap_used` | Gauge | By | JVM heap memory used |
+| `spark.jvm.memory.non_heap_used` | Gauge | By | JVM non-heap memory used |
+| `spark.jvm.gc.count` | Counter | {count} | GC count (by gc_name) |
+| `spark.jvm.gc.time_ms` | Counter | ms | GC time |
 
-### 指标标签（Attributes）
+### Metric Attributes (Labels)
 
-| 标签名 | 适用范围 | 说明 |
-|--------|---------|------|
-| `spark.app.id` | 所有 | 应用 ID |
-| `spark.executor.id` | 任务/系统 | Executor ID |
-| `spark.stage.id` | 任务/阶段 | Stage ID |
-| `spark.task.id` | 任务 | Task ID |
-| `spark.task.success` | 任务 | 任务是否成功 |
-| `spark.task.host` | 任务 | 任务执行主机（Category 3） |
-| `spark.task.locality` | 任务 | 数据本地性（Category 3） |
-| `spark.task.speculative` | 任务 | 是否推测执行（Category 3） |
-| `spark.job.id` | 作业 | Job ID |
-| `spark.job.success` | 作业 | 作业是否成功 |
-| `gc_name` | GC | GC 收集器名称 |
-| `spark.sql.execution_id` | SQL 查询 | SQL 执行 ID（Spark 3.x+） |
-| `spark.sql.query_text` | SQL 查询 | SQL 查询文本（截断后） |
+| Attribute Name | Scope | Description |
+|----------------|-------|-------------|
+| `spark.app.id` | All | Application ID |
+| `spark.app.name` | All | Application name |
+| `spark.user` | All | User running the application (from SparkConf `spark.user` or system property) |
+| `spark.yarn.queue` | All | YARN queue name |
+| `spark.executor.id` | Task / System | Executor ID |
+| `spark.stage.id` | Task / Stage | Stage ID |
+| `spark.task.id` | Task | Task ID |
+| `spark.task.success` | Task | Whether the task succeeded |
+| `spark.task.host` | Task | Task execution host (Category 3) |
+| `spark.task.locality` | Task | Data locality (Category 3) |
+| `spark.task.speculative` | Task | Whether speculative execution (Category 3) |
+| `spark.job.id` | Job | Job ID |
+| `spark.job.success` | Job | Whether the job succeeded |
+| `gc_name` | GC | GC collector name |
+| `spark.sql.execution_id` | SQL Query | SQL execution ID (Spark 3.x+) |
+| `spark.sql.query_text` | SQL Query | SQL query text (truncated) |
+| `spark.sql.table_name` | SQL Table IO | Table name (SQL table IO metrics only) |
+| `spark.sql.operation` | SQL Table IO | Operation type: scan/write (SQL table IO metrics only) |
 
-### SQL 查询执行指标（Category 6，默认关闭）
+### SQL Query Execution Metrics (Category 6, enabled by default)
 
-开启方式：`spark.telemetry.metrics.sql.query-execution=true`
+Enable with: `spark.telemetry.metrics.sql.query-execution=true`
 
-| 指标名 | 类型 | 单位 | 说明 |
-|--------|------|------|------|
-| `spark.sql.query.duration_ms` | Histogram | ms | SQL 查询执行时长 |
-| `spark.sql.query.shuffle.bytes_read` | Counter | By | Shuffle 读取字节数 |
-| `spark.sql.query.shuffle.bytes_written` | Counter | By | Shuffle 写入字节数 |
-| `spark.sql.query.join_count` | Counter | {joins} | Join 数量 |
-| `spark.sql.table.bytes` | Counter | By | 表级 IO 字节数 |
-| `spark.sql.table.rows` | Counter | {rows} | 表级 IO 行数 |
-| `spark.sql.table.files_read` | Counter | {files} | 扫描文件数 |
-| `spark.sql.table.time_ms` | Counter | ms | 表扫描耗时 |
+| Metric Name | Type | Unit | Description |
+|-------------|------|------|-------------|
+| `spark.sql.query.duration_ms` | Histogram | ms | SQL query execution duration |
+| `spark.sql.query.shuffle.bytes_read` | Counter | By | Shuffle bytes read |
+| `spark.sql.query.shuffle.bytes_written` | Counter | By | Shuffle bytes written |
+| `spark.sql.query.join_count` | Counter | {joins} | Number of joins |
+| `spark.sql.table.bytes` | Counter | By | Table-level IO bytes |
+| `spark.sql.table.rows` | Counter | {rows} | Table-level IO rows |
+| `spark.sql.table.files_read` | Counter | {files} | Number of files scanned |
+| `spark.sql.table.time_ms` | Counter | ms | Table IO time (covers both scan and write operations) |
+
+**Spark 2.x Limitation**: In Spark 2.x, `spark.sql.execution_id` and `spark.sql.query_text` are NOT available. Spark 2.x's `QueryExecution` has no `id` field, so `executionId` stays at 0 and SQL text is not captured.

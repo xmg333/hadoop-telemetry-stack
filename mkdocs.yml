@@ -1,10 +1,10 @@
-site_name: Spark Telemetry Listener
-site_description: 透明的大数据可观测性方案 — Spark / MR / Hive 指标采集
-repo_url: https://codeup.aliyun.com/68c25bfda72fbe62724140bd/yarn-telemetry
+site_name: Hadoop Telemetry Stack
+site_description: Transparent Big Data Observability — Spark / MR / Hive Telemetry Collection
+repo_url: https://github.com/xmg333/hadoop-telemetry-stack
 
 theme:
   name: material
-  language: zh
+  language: en
   features:
     - navigation.sections
     - navigation.expand
@@ -12,37 +12,39 @@ theme:
     - search.suggest
 
 nav:
-  - 首页: index.md
-  - 快速开始: quickstart.md
-  - 部署指南:
-      - 完整部署: deployment-guide.md
-      - 基础设施: infrastructure.md
-      - 故障排查: troubleshooting.md
-  - 组件参考:
+  - Home: index.md
+  - Quick Start: quickstart.md
+  - Deployment Guide:
+      - Full Deployment: deployment-guide.md
+      - Infrastructure: infrastructure.md
+      - Troubleshooting: troubleshooting.md
+  - Component Reference:
       - Spark Plugin: spark-plugin.md
       - MR Collector/Agent: mr-telemetry.md
       - Hive Hook: hive-hook.md
       - Flink Consumer: flink-consumer.md
-      - 诊断工具: diagnostic.md
-  - 架构设计: architecture.md
-  - 配置参考: configuration-reference.md
-  - Grafana 仪表盘:
-      - 概览: grafana-overview.md
-      - 引擎透视:
+      - Diagnostic Tool: diagnostic.md
+  - Architecture: architecture.md
+  - Configuration Reference: configuration-reference.md
+  - Grafana Dashboards:
+      - Overview: grafana-overview.md
+      - Engine Views:
           - Spark: grafana-spark.md
           - MapReduce: grafana-mr.md
           - Hive on MR: grafana-hive-mr.md
           - Hive on Spark: grafana-hive-spark.md
-          - 全引擎综合: grafana-spark-mr-hive.md
-      - 业务分析:
-          - 成本归属: grafana-cost-attribution.md
-          - 性能瓶颈: grafana-performance-analysis.md
-          - IO 分析: grafana-io-analysis.md
-          - 可靠性: grafana-reliability.md
-          - Hive 分析: grafana-hive-analysis.md
-          - 容量规划: grafana-capacity.md
-          - 效率评分: grafana-efficiency.md
-  - 性能基准: benchmarks.md
+          - All Engines: grafana-spark-mr-hive.md
+      - Business Analysis:
+          - Cost Attribution: grafana-cost-attribution.md
+          - Performance Analysis: grafana-performance-analysis.md
+          - IO Analysis: grafana-io-analysis.md
+          - Reliability: grafana-reliability.md
+          - Hive Analysis: grafana-hive-analysis.md
+          - Capacity Planning: grafana-capacity.md
+          - Efficiency Scoring: grafana-efficiency.md
+  - Benchmarks: benchmarks.md
+  - Release Guide: release.md
+  - 中文文档: zh_cn/index.md
 
 markdown_extensions:
   - admonition

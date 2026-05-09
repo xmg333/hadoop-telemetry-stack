@@ -1,42 +1,42 @@
-# 故障排查指南
+# Troubleshooting Guide
 
-本文档提供系统化的故障排查步骤和常见问题解决方案。
+This document provides systematic troubleshooting steps and solutions for common issues.
 
-## 问题排查决策树
+## Problem-Solving Decision Tree
 
 ```
-开始
-  │
-  ├─ 无指标数据？
-  │   ├─ 检查 Spark/MR/Hive 配置 → 未生效 → 检查 JAR 路径和配置项
-  │   ├─ OTel Collector 无日志 → 连接失败 → 检查端点地址
-  │   └─ Kafka 无消息 → 导出失败 → 检查 Kafka 连接
-  │
-  ├─ 指标不完整？
-  │   ├─ 缺少某些指标 → 配置开关未开启 → 检查 metrics.* 配置项
-  │   └─ SQL 指标为 NULL → AQE 问题 → 检查 Spark 版本
-  │
-  └─ 性能问题？
-      ├─ 作业变慢 → 指标开销大 → 减小 export.interval
-      └─ 内存不足 → OTel 缓冲过大 → 调整 batch size
+Start
+  |
+  +-- No metrics data?
+  |   +-- Check Spark/MR/Hive config -> Not active -> Check JAR path and config keys
+  |   +-- OTel Collector no logs -> Connection failure -> Check endpoint address
+  |   +-- Kafka no messages -> Export failure -> Check Kafka connection
+  |
+  +-- Incomplete metrics?
+  |   +-- Certain metrics missing -> Config switch not enabled -> Check metrics.* config keys
+  |   +-- SQL metrics are NULL -> AQE issue -> Check Spark version
+  |
+  +-- Performance issues?
+      +-- Jobs slower -> Metric overhead too high -> Reduce export.interval
+      +-- Out of memory -> OTel buffer too large -> Adjust batch size
 ```
 
 ---
 
-## 常见问题
+## Common Issues
 
-### Q1: Spark 插件不生效，没有指标输出
+### Q1: Spark plugin not working, no metrics output
 
-**症状**: Spark 作业运行后，OTel Collector 无日志，Kafka 无消息
+**Symptoms**: After Spark job runs, OTel Collector shows no logs, Kafka has no messages
 
-**排查步骤**:
+**Troubleshooting Steps**:
 
-1. 确认 JAR 路径正确且可访问
+1. Verify the JAR path is correct and accessible
    ```bash
    ls -la /path/to/spark-telemetry-dist-omni-*.jar
    ```
 
-2. 检查 `spark.plugins`（Spark 3/4）或 `spark.extraListeners`（Spark 2）配置
+2. Check the `spark.plugins` (Spark 3/4) or `spark.extraListeners` (Spark 2) configuration
    ```bash
    # Spark 3.x
    --conf spark.plugins=x.mg.metrics.sparktelemetry.adapter.SparkTelemetryPlugin
@@ -45,102 +45,102 @@
    --conf spark.extraListeners=x.mg.metrics.sparktelemetry.adapter.SparkTelemetryListener
    ```
 
-3. 检查 Driver/Executor 日志中是否有 `TelemetryLifecycle initialized`
+3. Check Driver/Executor logs for `TelemetryLifecycle initialized`
    ```bash
    yarn logs -applicationId <app_id> -log_files stdout | grep -i telemetry
    ```
 
-4. 确认 OTel Collector 地址可达
+4. Verify the OTel Collector address is reachable
    ```bash
    nc -zv otel-collector 4317
    ```
 
-5. 检查配置键是否包含 `.otel.` 段（常见错误）
+5. Check that config keys include the `.otel.` segment (common mistake)
    ```bash
-   # 正确
+   # Correct
    --conf spark.telemetry.otel.exporter.endpoint=http://otel-collector:4317
 
-   # 错误（缺少 .otel.）
+   # Incorrect (missing .otel.)
    --conf spark.telemetry.exporter.endpoint=http://otel-collector:4317
    ```
 
 ---
 
-### Q2: 短时作业指标丢失
+### Q2: Short-running job metrics missing
 
-**症状**: 运行时间短于 `export.interval` 的作业，指标未导出
+**Symptoms**: Jobs with runtime shorter than `export.interval` have no exported metrics
 
-**解决方案**:
+**Solutions**:
 
-1. 插件在 `onJobEnd` 时自动触发 `flushAsync()` 非阻塞刷新，关闭时同步 `forceFlush()`
-2. 如仍有丢失，减小导出间隔：
+1. The plugin triggers `flushAsync()` non-blocking flush automatically in `onJobEnd` and calls `forceFlush()` synchronously on shutdown
+2. If data is still missing, reduce the export interval:
    ```bash
    --conf spark.telemetry.otel.export.interval.ms=5000
    ```
 
 ---
 
-### Q3: MR Collector 连接 History Server 超时
+### Q3: MR Collector connection timeout to History Server
 
-**症状**: MR Collector 日志显示 `Connection timed out`
+**Symptoms**: MR Collector logs show `Connection timed out`
 
-**排查步骤**:
+**Troubleshooting Steps**:
 
-1. 确认 URL 和端口正确（History Server 端口均为 19888，Hadoop 2.x 和 3.x 相同）
+1. Verify the URL and port (History Server port is 19888 for both Hadoop 2.x and 3.x)
    ```hocon
    mr-telemetry.history-server.url = "http://hadoop-historyserver:19888"
    ```
 
-2. 增大超时配置：
+2. Increase timeout configuration:
    ```hocon
    mr-telemetry.history-server.connect.timeout.secs = 10
    mr-telemetry.history-server.read.timeout.secs = 30
    ```
 
-3. 检查网络连通性：
+3. Check network connectivity:
    ```bash
    curl -v http://hadoop-historyserver:19888/ws/v1/jobs
    ```
 
 ---
 
-### Q4: OTel Collector 启动失败
+### Q4: OTel Collector fails to start
 
-**症状**: Docker 容器立即退出，日志显示错误
+**Symptoms**: Docker container exits immediately, logs show errors
 
-**解决方案**:
+**Solutions**:
 
-1. 使用 `otel/opentelemetry-collector-contrib`（非核心镜像）
+1. Use `otel/opentelemetry-collector-contrib` (not the core image)
    ```bash
    docker run ... otel/opentelemetry-collector-contrib:0.96.0
    ```
 
-2. 配置中必须包含 `health_check` 扩展
+2. The configuration must include the `health_check` extension
    ```yaml
    extensions:
      health_check:
        endpoint: 0.0.0.0:13133
    ```
 
-3. 通过 `--config` 参数指定配置文件
+3. Specify the config file via the `--config` parameter
    ```bash
    docker run ... --config=/etc/otelcol-contrib/config.yaml
    ```
 
 ---
 
-### Q5: Kafka 中看不到指标数据
+### Q5: No metrics data visible in Kafka
 
-**症状**: OTel Collector 正常运行，但 Kafka 无消息
+**Symptoms**: OTel Collector is running normally, but Kafka has no messages
 
-**排查步骤**:
+**Troubleshooting Steps**:
 
-1. 检查 OTel Collector 日志：
+1. Check OTel Collector logs:
    ```bash
    docker logs otel-collector --tail=100 | grep -E "kafka|export"
    ```
 
-2. 确认 Kafka exporter 配置（broker 地址、topic）
+2. Verify Kafka exporter configuration (broker addresses, topic)
    ```yaml
    exporters:
      kafka:
@@ -149,115 +149,115 @@
          - kafka:9092
    ```
 
-3. 使用 `kafka-dump-log.sh` 验证消息存在：
+3. Use `kafka-dump-log.sh` to verify messages exist:
    ```bash
    docker exec kafka /opt/kafka/bin/kafka-dump-log.sh \
      --files /tmp/kafka-logs/telemetry-metrics-0/00000000000000000000.log
    ```
 
-4. 注意：`kafka-console-consumer.sh` 在单节点 KRaft 模式下可能超时
+4. Note: `kafka-console-consumer.sh` may time out in single-node KRaft mode
 
 ---
 
-### Q6: Omnipackage 版本检测错误
+### Q6: Omnipackage version detection error
 
-**症状**: 日志显示错误的 Spark 版本，加载错误的适配器
+**Symptoms**: Logs show incorrect Spark version, wrong adapter is loaded
 
-**排查步骤**:
+**Troubleshooting Steps**:
 
-1. 检查 Driver/Executor 日志中 `OmniContext` 检测到的版本号
+1. Check the version detected by `OmniContext` in Driver/Executor logs
    ```
    OmniContext detected: Spark 3.5.0, Scala 2.12.15
    ```
 
-2. 确认 classpath 上没有冲突的 `scala-library` JAR
+2. Verify there are no conflicting `scala-library` JARs on the classpath
    ```bash
    spark-submit --help | grep classpath
    ```
 
-3. 如使用自定义 classpath，确保 `scala-library` 与 Spark 版本匹配
+3. If using a custom classpath, ensure `scala-library` matches the Spark version
 
 ---
 
-### Q7: SQL shuffle_bytes 为 NULL
+### Q7: SQL shuffle_bytes is NULL
 
-**症状**: `sql_query_metrics` 表中 `shuffle_bytes` 字段为 NULL
+**Symptoms**: `shuffle_bytes` field in `sql_query_metrics` table is NULL
 
-**原因**: AQE `inputPlan` 返回初始计划
+**Cause**: AQE `inputPlan` returns the initial plan
 
-**解决方案**: 使用最新版本，已修复此问题。确保使用最新 Omnipackage JAR。
+**Solution**: Use the latest version, which has fixed this issue. Ensure you are using the latest Omnipackage JAR.
 
 ---
 
-## 日志分析指南
+## Log Analysis Guide
 
-### 检查 Spark 插件初始化
+### Check Spark Plugin Initialization
 
 ```bash
-# Driver 日志
+# Driver logs
 yarn logs -applicationId <app_id> -log_files stdout | grep -i "telemetry\|plugin"
 
-# 预期输出
+# Expected output
 TelemetryLifecycle initialized
 SparkTelemetryPlugin started
 ```
 
-### 检查 OTel Collector 状态
+### Check OTel Collector Status
 
 ```bash
-# 健康检查
+# Health check
 curl http://otel-collector:13133/health
 
-# 日志
+# Logs
 docker logs otel-collector --tail=100 | grep -E "error|warn|kafka"
 ```
 
-### 检查 Kafka 消息
+### Check Kafka Messages
 
 ```bash
-# 查看 Topic 消息数
+# View Topic message count
 docker exec kafka /opt/kafka/bin/kafka-topics.sh --describe \
   --topic telemetry-metrics --bootstrap-server localhost:9092
 
-# 消费测试消息
+# Consume test messages
 docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
   --topic telemetry-metrics --bootstrap-server localhost:9092 \
   --from-beginning --max-messages=5
 ```
 
-### 检查 MySQL 数据
+### Check MySQL Data
 
 ```bash
-# 连接 MySQL
+# Connect to MySQL
 docker exec -it mysql mysql -u root -proot123 metrics_db
 
-# 检查表数据
+# Check table data
 SELECT COUNT(*) FROM task_metrics;
 SELECT COUNT(*) FROM stage_metrics;
 SELECT COUNT(*) FROM sql_query_metrics;
 
-# 检查最新数据
+# Check latest data
 SELECT * FROM task_metrics ORDER BY timestamp DESC LIMIT 5;
 ```
 
 ---
 
-## 指标验证脚本
+## Metrics Verification Script
 
-### 验证端到端数据流
+### End-to-End Data Flow Verification
 
 ```bash
 #!/bin/bash
 # verify-telemetry.sh
 
-echo "=== 检查 OTel Collector ==="
+echo "=== Check OTel Collector ==="
 curl -s http://localhost:13133/health | jq .
 
-echo "=== 检查 Kafka Topic ==="
+echo "=== Check Kafka Topic ==="
 docker exec kafka /opt/kafka/bin/kafka-topics.sh --describe \
   --topic telemetry-metrics --bootstrap-server localhost:9092
 
-echo "=== 检查 MySQL 数据 ==="
+echo "=== Check MySQL Data ==="
 docker exec mysql mysql -u root -proot123 metrics_db -e \
   "SELECT 'task' as type, COUNT(*) as cnt FROM task_metrics
    UNION ALL SELECT 'stage', COUNT(*) FROM stage_metrics
@@ -266,38 +266,38 @@ docker exec mysql mysql -u root -proot123 metrics_db -e \
 
 ---
 
-## 性能调优建议
+## Performance Tuning Recommendations
 
-### 减少指标开销
+### Reducing Metric Overhead
 
-1. 关闭不需要的指标类别：
+1. Disable unnecessary metric categories:
    ```bash
    --conf spark.telemetry.metrics.stage.detailed=false
    --conf spark.telemetry.metrics.job.lifecycle=false
    ```
 
-2. 增大导出间隔（适用于短时间作业）：
+2. Increase the export interval (suitable for short-running jobs):
    ```bash
    --conf spark.telemetry.otel.export.interval.ms=30000
    ```
 
-3. 减少 OTel 批处理大小：
+3. Reduce OTel batch size:
    ```yaml
    # OTel Collector config
    exporters:
      kafka:
        producer:
-         max_message_bytes: 500000  # 默认 1MB
+         max_message_bytes: 500000  # Default 1MB
    ```
 
 ---
 
-## 联系支持
+## Contact Support
 
-如遇到未覆盖的问题，请提供以下信息：
+If you encounter an issue not covered here, please provide the following information:
 
-1. Spark/Hadoop/Hive 版本
-2. Omnipackage JAR 版本
-3. 相关日志片段（Driver/Executor/OTel Collector）
-4. 配置文件内容（脱敏）
-5. 问题复现步骤
+1. Spark/Hadoop/Hive versions
+2. Omnipackage JAR version
+3. Relevant log snippets (Driver/Executor/OTel Collector)
+4. Configuration file contents (sanitized)
+5. Steps to reproduce the issue

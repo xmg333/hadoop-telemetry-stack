@@ -1,24 +1,24 @@
-# 成本归属与资源排行
+# Cost Attribution and Resource Ranking
 
-## 概述
-本仪表盘从资源成本归属视角出发，帮助回答以下问题：
-- 哪些用户消耗了最多的 CPU 时间？
-- 哪些队列占用了最多的计算资源？
-- 哪些应用是资源消耗大户？
-- 每日资源消耗趋势如何变化？
+## Overview
+This dashboard approaches resource analysis from a cost attribution perspective, helping answer the following questions:
+- Which users consume the most CPU time?
+- Which queues occupy the most computing resources?
+- Which applications are the largest resource consumers?
+- How does daily resource consumption trend over time?
 
-## 前置条件
-- 数据源：`metric_events` 大宽表（由 Flink Consumer 写入）
-- Grafana 变量：`$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
-- 时间范围过滤：所有查询均使用 `timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)`
+## Prerequisites
+- Data source: `metric_events` wide table (written by Flink Consumer)
+- Grafana variables: `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
+- Time range filter: All queries use `timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)`
 
-## 面板说明
+## Panel Descriptions
 
-### 用户 CPU 时间排行 TOP 20（table）
+### User CPU Time Ranking TOP 20 (table)
 
-**用途**: 展示 CPU 时间消耗最多的前 20 名用户，帮助定位资源消耗大户，支撑成本分摊与容量规划。
+**Purpose**: Displays the top 20 users by CPU time consumption, helping identify resource-heavy users and supporting cost allocation and capacity planning.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT user_name,
        SUM(cpu_time_ms) / 3600000                                AS cpu_hours,
@@ -35,23 +35,23 @@ ORDER  BY cpu_hours DESC
 LIMIT  20
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `user_name` | 提交任务的用户名 | - |
-| `cpu_hours` | 累计 CPU 时间 | 小时 |
-| `gc_hours` | 累计 GC 时间 | 小时 |
-| `wall_clock_hours` | 累计挂钟时间（任务执行时长） | 小时 |
-| `event_count` | 事件总数（Task 级别） | 个 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `user_name` | Username who submitted the task | - |
+| `cpu_hours` | Cumulative CPU time | hours |
+| `gc_hours` | Cumulative GC time | hours |
+| `wall_clock_hours` | Cumulative wall clock time (task execution duration) | hours |
+| `event_count` | Total number of events (Task level) | count |
 
-**使用建议**: 关注 `cpu_hours` 与 `wall_clock_hours` 的比值，比值越低说明 CPU 利用率越低，可能存在 IO 等待或调度延迟。GC 时间占比过高（>10%）需检查 JVM 堆配置。
+**Usage**: Pay attention to the ratio of `cpu_hours` to `wall_clock_hours`. A lower ratio indicates lower CPU utilization, possibly due to IO wait or scheduling delay. If GC time exceeds 10%, check the JVM heap configuration.
 
-### 队列资源消耗对比（barchart）
+### Queue Resource Consumption Comparison (barchart)
 
-**用途**: 对比不同 YARN 队列的 CPU 时间、IO 数据量和应用数量，评估各队列的资源消耗是否均衡。
+**Purpose**: Compares CPU time, IO data volume, and application count across different YARN queues to evaluate whether resource consumption is balanced.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT queue,
        engine,
@@ -68,23 +68,23 @@ GROUP  BY queue,
 ORDER  BY cpu_hours DESC
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `queue` | YARN 队列名称 | - |
-| `engine` | 执行引擎（SPARK / MR） | - |
-| `cpu_hours` | 队列内累计 CPU 时间 | 小时 |
-| `io_gb` | 队列内累计 IO 数据量 | GB |
-| `app_count` | 队列内独立应用/作业数 | 个 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `queue` | YARN queue name | - |
+| `engine` | Execution engine (SPARK / MR) | - |
+| `cpu_hours` | Cumulative CPU time within the queue | hours |
+| `io_gb` | Cumulative IO data volume within the queue | GB |
+| `app_count` | Number of distinct applications/jobs within the queue | count |
 
-**使用建议**: 如果某个队列 CPU 占比极高但应用数少，说明存在资源集中的大户应用。可通过调整队列权重或配额实现更公平的资源分配。
+**Usage**: If a queue has a very high CPU share but few applications, it indicates a concentrated resource-heavy application. Adjust queue weights or quotas to achieve more balanced resource allocation.
 
-### 应用资源消耗排行 TOP 10（table）
+### Application Resource Consumption Ranking TOP 10 (table)
 
-**用途**: 列出资源消耗最大的前 10 个应用，包含 CPU、GC、IO、Spill 等全维度指标，便于快速定位高负载应用。
+**Purpose**: Lists the top 10 applications by resource consumption, including CPU, GC, IO, Spill, and other full-dimension metrics, enabling quick identification of high-load applications.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT app_name,
        engine,
@@ -105,26 +105,26 @@ ORDER  BY cpu_hours DESC
 LIMIT  10
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `app_name` | 应用/作业名称 | - |
-| `engine` | 执行引擎（SPARK / MR） | - |
-| `cpu_hours` | 累计 CPU 时间 | 小时 |
-| `gc_hours` | 累计 GC 时间 | 小时 |
-| `read_gb` | 累计读取数据量 | GB |
-| `write_gb` | 累计写入数据量 | GB |
-| `spill_gb` | 累计 Spill 数据量（内存 + 磁盘） | GB |
-| `task_count` | 任务总数 | 个 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `app_name` | Application/job name | - |
+| `engine` | Execution engine (SPARK / MR) | - |
+| `cpu_hours` | Cumulative CPU time | hours |
+| `gc_hours` | Cumulative GC time | hours |
+| `read_gb` | Cumulative data read | GB |
+| `write_gb` | Cumulative data written | GB |
+| `spill_gb` | Cumulative Spill data volume (memory + disk) | GB |
+| `task_count` | Total number of tasks | count |
 
-**使用建议**: `spill_gb` 较大说明内存不足，需要增加 Executor 内存或调整 `spark.sql.shuffle.partitions`。结合 `cpu_hours` 与 `task_count` 可估算单任务平均 CPU 开销。
+**Usage**: A large `spill_gb` indicates insufficient memory. Increase Executor memory or adjust `spark.sql.shuffle.partitions`. Combining `cpu_hours` with `task_count` helps estimate the average CPU cost per task.
 
-### 每日资源消耗趋势（timeseries）
+### Daily Resource Consumption Trend (timeseries)
 
-**用途**: 以时间维度展示各引擎（SPARK / MR / HIVE）的每日 CPU 消耗趋势，用于追踪资源使用变化。
+**Purpose**: Shows the daily CPU consumption trend by engine (SPARK / MR / HIVE) over time, used for tracking resource usage changes.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ( Floor(timestamp_ms / $__interval_ms) * $__interval_ms / 1000 ) AS time,
        engine,
@@ -140,18 +140,18 @@ ORDER  BY 1,
           2
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `time` | 时间桶（由 `$__interval_ms` 控制粒度） | Unix 时间戳 |
-| `engine` | 执行引擎（SPARK / MR） | - |
-| `cpu_hours` | 该时间桶内 CPU 时间 | 小时 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `time` | Time bucket (granularity controlled by `$__interval_ms`) | Unix timestamp |
+| `engine` | Execution engine (SPARK / MR) | - |
+| `cpu_hours` | CPU time within this time bucket | hours |
 
-**使用建议**: 选择时间范围大于 7 天时，建议在 Grafana 中将 `$__interval_ms` 设为 86400000（1 天）以获得日级粒度。若某引擎曲线突然上升，需检查是否有新上线的高负载作业。
+**Usage**: When selecting a time range greater than 7 days, set `$__interval_ms` to 86400000 (1 day) in Grafana for daily granularity. If a particular engine's curve suddenly rises, check for newly deployed high-load jobs.
 
-## 注意事项
-- `metric_events` 为统一大宽表（物理表，非视图），实际数据同时写入各分类表和大宽表。如需直接查询分类表，请将 `event_type` 替换为对应表名。
-- `cpu_time_ms` 对 Spark 来源于 `executor_cpu_time_ns` 的毫秒转换，对 MR 来源于 MR Counter 中的 `CPU_MILLISECONDS`。
-- `queue` 字段依赖 v4+ 版本的 Flink Consumer 写入。早期版本中该字段为空，需先执行 `v4_migration.sql` 升级。
-- 排行类面板建议设置时间范围为 1 天至 7 天，过大的时间范围会导致聚合计算缓慢。
+## Notes
+- `metric_events` is a unified wide table (physical table, not a view); data is simultaneously written to both the individual category tables and the wide table. To query category tables directly, replace `event_type` with the corresponding table name.
+- `cpu_time_ms` for Spark is converted from `executor_cpu_time_ns` (nanoseconds to milliseconds), and for MR it comes from `CPU_MILLISECONDS` in MR Counters.
+- The `queue` field depends on the v4+ version of the Flink Consumer. In earlier versions, this field is empty; run `v4_migration.sql` to upgrade.
+- For ranking panels, it is recommended to set the time range to 1 to 7 days; larger time ranges will cause slow aggregation queries.

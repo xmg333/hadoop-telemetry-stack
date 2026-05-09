@@ -174,13 +174,13 @@ docker exec kafka /opt/kafka/bin/kafka-topics.sh --create \
 
 # MySQL
 docker run -d --name mysql --network host \
-  -e MYSQL_ROOT_PASSWORD=root123 \
+  -e MYSQL_ROOT_PASSWORD=CHANGE_ME \
   -e MYSQL_DATABASE=telemetry \
   mysql:8.0
 
 # Grafana
 docker run -d --name grafana --network host \
-  -e GF_SECURITY_ADMIN_PASSWORD=admin123 \
+  -e GF_SECURITY_ADMIN_PASSWORD=CHANGE_ME \
   grafana/grafana:latest
 ```
 
@@ -248,7 +248,7 @@ nohup java -jar lib/spark-telemetry-omni.jar --mr-collector conf/mr-collector.co
 
 ```bash
 # 批量导入 13 个仪表盘
-./deploy/deploy-grafana.sh --grafana-url=http://localhost:3000 --password=admin123
+./deploy/deploy-grafana.sh --grafana-url=http://localhost:3000 --password=CHANGE_ME
 ```
 
 ### 7. 诊断工具

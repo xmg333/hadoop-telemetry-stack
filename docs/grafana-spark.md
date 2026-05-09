@@ -1,33 +1,33 @@
-# Spark 引擎透视
+# Spark Engine Deep Dive
 
-## 概述
-本仪表盘是 Spark 引擎的基础透视面板，提供最全面的 Spark 指标展示，帮助回答以下问题：
-- 当前应用有多少 Task、Stage、Job？
-- 是否存在数据倾斜的 Stage？
-- CPU 效率如何？
-- Task IO、Shuffle、内存使用情况如何？
-- JVM 内存和 GC 是否正常？
-- SQL 查询和表 IO 详情如何？
+## Overview
+This dashboard provides a foundational deep-dive view of the Spark engine, offering the most comprehensive set of Spark metrics. It helps answer the following questions:
+- How many Tasks, Stages, and Jobs does the current application have?
+- Are there any data-skewed Stages?
+- What is the CPU efficiency?
+- How are Task IO, Shuffle, and memory usage performing?
+- Are JVM memory and GC healthy?
+- What are the SQL query and table IO details?
 
-## 前置条件
+## Prerequisites
 
-数据源：`task_metrics`、`stage_metrics`、`job_metrics`、`jvm_memory_metrics`、`jvm_gc_metrics`、`sql_query_metrics`、`sql_query_table_metrics`、`stage_governance`、`task_histogram_buckets`
+Data sources: `task_metrics`, `stage_metrics`, `job_metrics`, `jvm_memory_metrics`, `jvm_gc_metrics`, `sql_query_metrics`, `sql_query_table_metrics`, `stage_governance`, `task_histogram_buckets`
 
-Grafana 变量：
-:   `$app_id` — Spark 应用 ID（多选，含 All）
+Grafana variables:
+:   `$app_id` — Spark application ID (multi-select, includes All)
 :   `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
 
-变量查询：`SELECT DISTINCT app_id FROM task_metrics ORDER BY app_id`
+Variable query: `SELECT DISTINCT app_id FROM task_metrics ORDER BY app_id`
 
-## 面板说明
+## Panel Descriptions
 
-### 概览统计（4 个 stat 面板，y=0）
+### Overview Statistics (4 stat panels, y=0)
 
-#### Total Tasks（stat）
+#### Total Tasks (stat)
 
-**用途**: 展示选中应用的总 Task 数。
+**Purpose**: Displays the total number of Tasks for the selected application.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT COUNT(DISTINCT task_id) AS value
 FROM task_metrics
@@ -36,11 +36,11 @@ WHERE timestamp_ms >= ($__unixEpochFrom() * 1000)
   AND app_id IN ($app_id)
 ```
 
-#### Total Stages（stat）
+#### Total Stages (stat)
 
-**用途**: 展示选中应用的总 Stage 数。
+**Purpose**: Displays the total number of Stages for the selected application.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT COUNT(DISTINCT stage_id) AS value
 FROM stage_metrics
@@ -49,11 +49,11 @@ WHERE timestamp_ms >= ($__unixEpochFrom() * 1000)
   AND app_id IN ($app_id)
 ```
 
-#### Skewed Stages（stat）
+#### Skewed Stages (stat)
 
-**用途**: 检测数据倾斜的 Stage 数量（`duration_skew_ratio > 2`）。阈值：0 绿色，1+ 黄色，5+ 红色。
+**Purpose**: Detects the number of data-skewed Stages (`duration_skew_ratio > 2`). Thresholds: 0 green, 1+ yellow, 5+ red.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT COUNT(DISTINCT stage_id) AS value
 FROM stage_governance
@@ -63,13 +63,13 @@ WHERE timestamp_ms >= ($__unixEpochFrom() * 1000)
   AND duration_skew_ratio > 2
 ```
 
-**使用建议**: 如果倾斜 Stage 数 > 0，查看 Data Skew Detection 面板详情，考虑 repartition 或增加分区数。
+**Usage**: If the number of skewed Stages > 0, check the Data Skew Detection panel for details and consider repartitioning or increasing the number of partitions.
 
-#### Avg CPU Efficiency（stat）
+#### Avg CPU Efficiency (stat)
 
-**用途**: 展示所有 Stage 的平均 CPU 效率（CPU 时间 / 执行时间）。阈值：<0.3 红色，0.3-0.5 橙色，0.5-0.7 黄色，>0.7 绿色。
+**Purpose**: Displays the average CPU efficiency across all Stages (CPU time / execution time). Thresholds: <0.3 red, 0.3-0.5 orange, 0.5-0.7 yellow, >0.7 green.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT AVG(cpu_efficiency) AS value
 FROM stage_governance
@@ -79,75 +79,75 @@ WHERE timestamp_ms >= ($__unixEpochFrom() * 1000)
   AND cpu_efficiency IS NOT NULL
 ```
 
-**使用建议**: CPU 效率低于 0.5 说明任务大部分时间在等待 IO 或 GC，需检查 Shuffle 和 GC 面板。
+**Usage**: CPU efficiency below 0.5 indicates tasks spend most of their time waiting for IO or GC. Check the Shuffle and GC panels.
 
-### Task IO 与耗时趋势（y=4）
+### Task IO and Duration Trends (y=4)
 
-#### Task I/O Bytes（timeseries）
+#### Task I/O Bytes (timeseries)
 
-**用途**: 展示 4 条线：Bytes Read、Bytes Written、Shuffle Read、Shuffle Written 随时间的变化。
+**Purpose**: Displays 4 time-series lines: Bytes Read, Bytes Written, Shuffle Read, Shuffle Written over time.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
--- 4 个 target 分别查询 io_bytes_read、io_bytes_written、shuffle_bytes_read、shuffle_bytes_written
+-- 4 targets querying io_bytes_read, io_bytes_written, shuffle_bytes_read, shuffle_bytes_written respectively
 -- FROM task_metrics WHERE ... AND app_id IN ($app_id) AND duration_ms IS NOT NULL
 ```
 
-**使用建议**: Shuffle 数据量大且持续增长可能说明 Join 策略不佳或分区过多。
+**Usage**: High and continuously growing Shuffle data volume may indicate poor Join strategies or excessive partitioning.
 
-#### Task Duration（timeseries）
+#### Task Duration (timeseries)
 
-**用途**: 展示 Task 耗时的 AVG / MAX / MIN 三条趋势线。
+**Purpose**: Displays three trend lines for AVG / MAX / MIN Task duration.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
--- 3 个 target: AVG(duration_ms), MAX(duration_ms), MIN(duration_ms)
+-- 3 targets: AVG(duration_ms), MAX(duration_ms), MIN(duration_ms)
 -- FROM task_metrics WHERE ... AND app_id IN ($app_id) AND duration_ms IS NOT NULL
 ```
 
-**使用建议**: MAX 与 AVG 差距过大说明存在长尾 Task，可能是数据倾斜或资源竞争。
+**Usage**: A large gap between MAX and AVG indicates the presence of long-tail Tasks, which may be caused by data skew or resource contention.
 
-### JVM 监控（y=12）
+### JVM Monitoring (y=12)
 
-#### JVM Memory（timeseries）
+#### JVM Memory (timeseries)
 
-**用途**: 展示 Heap Used 和 Non-Heap Used 的平均内存使用趋势。
+**Purpose**: Shows the average memory usage trends for Heap Used and Non-Heap Used.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 -- AVG(heap_used), AVG(non_heap_used) FROM jvm_memory_metrics WHERE app_id IN ($app_id)
 ```
 
-**使用建议**: Heap 持续增长不回落可能存在内存泄漏。Non-Heap 异常增长检查 Metaspace 或线程栈。
+**Usage**: Continuously growing heap that does not decrease may indicate a memory leak. Abnormally growing non-heap memory should be investigated for Metaspace or thread stack issues.
 
-#### JVM GC（timeseries）
+#### JVM GC (timeseries)
 
-**用途**: 展示 GC Count 和 GC Time 趋势。GC Count 在右轴，GC Time 在左轴（ms）。
+**Purpose**: Shows GC Count and GC Time trends. GC Count is on the right axis, GC Time is on the left axis (ms).
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 -- SUM(gc_count), SUM(gc_time_ms) FROM jvm_gc_metrics WHERE app_id IN ($app_id)
 ```
 
-**使用建议**: GC Time 占 Task Duration 比例 > 10% 需优化 JVM 参数（增大堆或切换 GC 算法）。
+**Usage**: If GC Time accounts for more than 10% of Task Duration, optimize JVM parameters (increase heap or switch GC algorithm).
 
-### Stage 与 Job（y=20）
+### Stage and Job (y=20)
 
-#### Stage Duration & Task Count（timeseries）
+#### Stage Duration & Task Count (timeseries)
 
-**用途**: 双轴图展示 Stage 平均耗时和平均 Task 数。
+**Purpose**: Dual-axis chart showing average Stage duration and average Task count.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 -- AVG(duration_ms) AS 'Stage Duration', AVG(num_tasks) AS 'Task Count'
 -- FROM stage_metrics WHERE app_id IN ($app_id)
 ```
 
-#### Job Overview（table）
+#### Job Overview (table)
 
-**用途**: 展示 Job 列表及完成状态。
+**Purpose**: Displays a list of Jobs and their completion status.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT app_id, job_id, job_success, duration_ms, num_stages,
        FROM_UNIXTIME(timestamp_ms/1000) AS completed_at
@@ -156,21 +156,21 @@ WHERE ... AND app_id IN ($app_id)
 ORDER BY timestamp_ms DESC LIMIT 100
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 |
-|------|------|
-| `job_success` | 任务状态（SUCCESS 绿色 / FAILED 红色） |
-| `duration_ms` | Job 耗时（ms） |
-| `num_stages` | Stage 数量 |
+| Column | Description |
+|--------|-------------|
+| `job_success` | Job status (SUCCESS green / FAILED red) |
+| `duration_ms` | Job duration (ms) |
+| `num_stages` | Number of Stages |
 
-### 治理分析（y=28）
+### Governance Analysis (y=28)
 
-#### Data Skew Detection（table）
+#### Data Skew Detection (table)
 
-**用途**: 展示存在数据倾斜的 Stage 列表，按 `duration_skew_ratio` 降序排列。倾斜比率用渐变色标注（>1.5 黄色，>2 红色）。
+**Purpose**: Displays a list of Stages with data skew, sorted by `duration_skew_ratio` in descending order. The skew ratio is color-coded (>1.5 yellow, >2 red).
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT app_id, stage_id, task_count, stage_duration_ms,
        avg_task_duration_ms, max_task_duration_ms, min_task_duration_ms,
@@ -180,13 +180,13 @@ FROM stage_governance WHERE app_id IN ($app_id)
 ORDER BY timestamp_ms DESC LIMIT 50
 ```
 
-**使用建议**: `duration_skew_ratio > 2` 表示某些 Task 耗时远超均值。`io_read_skew_ratio > 2` 表示读取数据不均。可考虑 `repartition()` 或 `coalesce()` 调整。
+**Usage**: `duration_skew_ratio > 2` indicates that some Tasks have durations far exceeding the average. `io_read_skew_ratio > 2` indicates uneven data reads. Consider using `repartition()` or `coalesce()` to adjust.
 
-#### Resource Efficiency（table）
+#### Resource Efficiency (table)
 
-**用途**: 展示每个 Stage 的 CPU 效率、GC 开销、Shuffle 等待、Spill 比率等资源使用指标。关键指标用渐变色标注。
+**Purpose**: Displays resource usage metrics for each Stage, including CPU efficiency, GC overhead, Shuffle wait, Spill ratio, etc. Key metrics are color-coded.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT app_id, stage_id, task_count, cpu_efficiency, gc_overhead_ratio,
        shuffle_wait_ratio, spill_ratio, deserialize_overhead, scheduler_delay_ratio
@@ -194,21 +194,21 @@ FROM stage_governance WHERE app_id IN ($app_id)
 ORDER BY timestamp_ms DESC LIMIT 50
 ```
 
-**关键指标阈值**:
-| 指标 | 黄色 | 红色 |
-|------|------|------|
+**Key Metric Thresholds**:
+| Metric | Yellow | Red |
+|--------|--------|-----|
 | `cpu_efficiency` | 0.5 | <0.5 |
 | `gc_overhead_ratio` | 0.05 | >0.1 |
 | `shuffle_wait_ratio` | 0.05 | >0.1 |
 | `spill_ratio` | 0.1 | >0.3 |
 
-### 直方图与小文件（y=36）
+### Histograms and Small Files (y=36)
 
-#### Task Duration Histogram（barchart）
+#### Task Duration Histogram (barchart)
 
-**用途**: 展示 Task 耗时分布直方图，X 轴为 Bucket 上界（ms），Y 轴为计数。
+**Purpose**: Displays the distribution histogram of Task durations, with the X-axis showing bucket upper bounds (ms) and the Y-axis showing counts.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ROUND(bucket_le) AS 'Bucket LE (ms)', SUM(bucket_count) AS 'Count'
 FROM task_histogram_buckets
@@ -216,13 +216,13 @@ WHERE metric_name = 'spark.task.duration_ms' AND app_id IN ($app_id)
 GROUP BY bucket_le ORDER BY bucket_le
 ```
 
-**使用建议**: 如果大量 Task 集中在低耗时区间但有少量在高区间，说明存在长尾问题。
+**Usage**: If a large number of Tasks are concentrated in low-duration ranges but a small number are in high ranges, this indicates a long-tail problem.
 
-#### Small File Detection（table）
+#### Small File Detection (table)
 
-**用途**: 检测小文件问题。当 `avg_output_bytes_per_task < 32MB` 时可能存在小文件问题。
+**Purpose**: Detects small file issues. When `avg_output_bytes_per_task < 32MB`, there may be a small file problem.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT app_id, stage_id, task_count, total_bytes_read, total_bytes_written,
        total_shuffle_bytes_read, total_shuffle_bytes_written,
@@ -232,15 +232,15 @@ FROM stage_governance WHERE app_id IN ($app_id)
 ORDER BY timestamp_ms DESC LIMIT 50
 ```
 
-**使用建议**: `small_output_task_count > 0` 时考虑减少分区数或合并输出文件。
+**Usage**: When `small_output_task_count > 0`, consider reducing the number of partitions or merging output files.
 
-### Task 详情（y=44）
+### Task Details (y=44)
 
-#### Task Detail（table，全宽）
+#### Task Detail (table, full width)
 
-**用途**: 展示最近 200 条 Task 的完整指标详情，包括 IO、耗时、CPU、GC、Spill 等。
+**Purpose**: Displays complete metric details for the most recent 200 Tasks, including IO, duration, CPU, GC, Spill, etc.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id, executor_id, stage_id,
        task_id, task_success, duration_ms, io_bytes_read, io_bytes_written,
@@ -251,35 +251,35 @@ FROM task_metrics WHERE app_id IN ($app_id) AND duration_ms IS NOT NULL
 ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `task_success` | OK（绿色）/ FAIL（红色） | - |
-| `executor_cpu_time_ns` | Executor CPU 时间 | ns |
-| `jvm_gc_time_ms` | JVM GC 耗时 | ms |
-| `disk_bytes_spilled` | 磁盘溢写 | bytes |
-| `memory_bytes_spilled` | 内存溢写 | bytes |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `task_success` | OK (green) / FAIL (red) | - |
+| `executor_cpu_time_ns` | Executor CPU time | ns |
+| `jvm_gc_time_ms` | JVM GC duration | ms |
+| `disk_bytes_spilled` | Disk spill | bytes |
+| `memory_bytes_spilled` | Memory spill | bytes |
 
-### SQL 查询分析（y=52-72）
+### SQL Query Analysis (y=52-72)
 
-#### SQL Queries / Avg SQL Query Duration / Total SQL Joins / SQL Table Scans/Writes（4 个 stat）
+#### SQL Queries / Avg SQL Query Duration / Total SQL Joins / SQL Table Scans/Writes (4 stats)
 
-**用途**: SQL 查询概览统计，分别展示查询数、平均耗时、总 Join 数、表扫描/写入数。
+**Purpose**: SQL query overview statistics, showing query count, average duration, total Join count, and table scan/write counts respectively.
 
-#### SQL Query Duration（timeseries）
+#### SQL Query Duration (timeseries)
 
-**用途**: SQL 查询的平均和最大耗时趋势。
+**Purpose**: Average and maximum duration trends for SQL queries.
 
-#### SQL Shuffle Bytes（timeseries）
+#### SQL Shuffle Bytes (timeseries)
 
-**用途**: SQL 查询的 Shuffle 读写数据量趋势。
+**Purpose**: Shuffle read and write data volume trends for SQL queries.
 
-#### SQL Table IO Detail（table，全宽）
+#### SQL Table IO Detail (table, full width)
 
-**用途**: 展示每个 SQL 查询的表 IO 详情（表名、操作类型、字节数、行数、文件数）。
+**Purpose**: Displays the table IO details for each SQL query (table name, operation type, bytes, rows, file count).
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id, execution_id,
        table_name, operation, bytes, `rows`, files_read, time_ms
@@ -287,11 +287,11 @@ FROM sql_query_table_metrics WHERE app_id IN ($app_id)
 ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
-#### SQL Query Detail（table，全宽）
+#### SQL Query Detail (table, full width)
 
-**用途**: 展示查询级别指标：耗时、Shuffle、Join 数。
+**Purpose**: Displays query-level metrics: duration, Shuffle, Join count.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, app_id, execution_id,
        duration_ms, shuffle_bytes_read, shuffle_bytes_written, join_count
@@ -299,14 +299,14 @@ FROM sql_query_metrics WHERE app_id IN ($app_id)
 ORDER BY timestamp_ms DESC LIMIT 100
 ```
 
-## 导航
-顶部导航栏可快速切换到：
-- **Overview** — 平台总览
-- **MapReduce** — MR 引擎详细透视
-- **Hive on MR** / **Hive on Spark** — Hive 查询分析
-- **Spark / MR / Hive** — 全引擎综合仪表盘
+## Navigation
+The top navigation bar provides quick access to:
+- **Overview** — Platform overview
+- **MapReduce** — MR engine detailed view
+- **Hive on MR** / **Hive on Spark** — Hive query analysis
+- **Spark / MR / Hive** — All-engine consolidated dashboard
 
-## 注意事项
-- `$app_id` 变量从 `task_metrics` 表获取，仅包含有 Task 事件的应用
-- `stage_governance` 和 `task_histogram_buckets` 的数据依赖 Stage 完成，短生命周期应用可能无数据
-- JVM 面板数据来自 Executor Plugin，需确保 `spark.telemetry.metrics.stage.detailed=true` 配置
+## Notes
+- The `$app_id` variable is sourced from the `task_metrics` table and only includes applications with Task events
+- Data in `stage_governance` and `task_histogram_buckets` depends on Stage completion; short-lived applications may have no data
+- JVM panel data comes from the Executor Plugin; ensure `spark.telemetry.metrics.stage.detailed=true` is configured

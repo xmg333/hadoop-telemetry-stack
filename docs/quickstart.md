@@ -1,6 +1,6 @@
-# Quick Start — Spark / MR / Hive Telemetry 部署指南
+# Quick Start -- Spark / MR / Hive Telemetry Deployment Guide
 
-## 架构总览
+## Architecture Overview
 
 ```mermaid
 graph TD
@@ -12,15 +12,15 @@ graph TD
     OTEL["OTel Collector<br/>(Kafka Export)"]
     HS["Hadoop History Server<br/>REST API :19888"]
     KAFKA["Kafka"]
-    FLINK["Flink Consumer<br/>(Kafka → DB)"]
+    FLINK["Flink Consumer<br/>(Kafka -> DB)"]
     MYSQL["MySQL"]
     CH["ClickHouse"]
-    GRAFANA["Grafana (13面板)"]
+    GRAFANA["Grafana (13 dashboards)"]
 
     SP -->|"OTLP gRPC :4317"| OTEL
     MA -->|"OTLP gRPC :4317"| OTEL
     HH -->|"OTLP gRPC :4317"| OTEL
-    HS -->|"轮询采集"| MC
+    HS -->|"Polling Collection"| MC
     MC -->|"OTLP gRPC :4317"| OTEL
 
     OTEL --> KAFKA
@@ -31,24 +31,24 @@ graph TD
     CH --> GRAFANA
 ```
 
-## 1. 构建
+## 1. Build
 
 ```bash
-# 前置：JDK 8, Maven 3.6+
+# Prerequisites: JDK 8, Maven 3.6+
 git clone <repo-url> && cd spark-telemetry-listener
 
-# 构建 Omnipackage（单 JAR 支持 Spark 2/3/4 + MR Agent/Collector + Hive Hook）
+# Build Omnipackage (single JAR supporting Spark 2/3/4 + MR Agent/Collector + Hive Hook)
 chmod +x build-omni.sh && ./build-omni.sh
 
-# 产物位置
+# Build output location
 ls spark/spark-telemetry-dist-omni/target/spark-telemetry-dist-omni-*.jar
 
-# 单独构建各组件（可选）
+# Build individual components (optional)
 mvn clean package -pl hive/hive-telemetry-hook,hive/hive-telemetry-hook-dist -am -DskipTests      # Hive Hook
 mvn clean package -pl flink/metrics-flink-consumer,flink/metrics-flink-consumer-dist -am -DskipTests  # Flink Consumer
 ```
 
-## 2. 基础设施部署
+## 2. Infrastructure Deployment
 
 ### 2.1 OTel Collector
 
@@ -80,19 +80,19 @@ service:
 ```
 
 ```bash
-# Docker 部署
+# Docker deployment
 docker run -d --name otel-collector --network host \
   -v $(pwd)/deploy/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml \
   otel/opentelemetry-collector-contrib:0.96.0 \
   --config=/etc/otelcol-contrib/config.yaml
 ```
 
-> **注意**: 必须使用 `otel/opentelemetry-collector-contrib`（非 core 版本），core 不含 Kafka exporter。
+> **Note**: Must use `otel/opentelemetry-collector-contrib` (not the core version), as the core version does not include the Kafka exporter.
 
 ### 2.2 Kafka
 
 ```bash
-# KRaft 模式（无需 ZooKeeper）
+# KRaft mode (no ZooKeeper required)
 docker run -d --name kafka --network host \
   -e KAFKA_NODE_ID=1 \
   -e KAFKA_PROCESS_ROLES=broker,controller \
@@ -102,7 +102,7 @@ docker run -d --name kafka --network host \
   -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://$(hostname):9092 \
   apache/kafka:3.7.0
 
-# 创建 topic
+# Create topic
 docker exec kafka /opt/kafka/bin/kafka-topics.sh --create \
   --topic telemetry-metrics --bootstrap-server localhost:9092 \
   --partitions 3 --replication-factor 1
@@ -117,42 +117,42 @@ docker run -d --name mysql --network host \
   -e MYSQL_DATABASE=metrics_db \
   mysql:8.0
 
-# ClickHouse（可选）
+# ClickHouse (optional)
 docker run -d --name clickhouse --network host \
   clickhouse/clickhouse-server:23.8
 ```
 
-### 2.4 Flink Consumer（Kafka → DB）
+### 2.4 Flink Consumer (Kafka -> DB)
 
-基于 Flink DataStream API 的 Kafka 消费作业，使用 Flink KafkaSource + Checkpoint 管理 offset。
+A Flink DataStream API-based Kafka consumption job, using Flink KafkaSource + Checkpoint for offset management.
 
 ```bash
-# 创建配置文件 flink-consumer.conf
-# 参考 conf/flink/flink-consumer-mysql.conf 或 flink-consumer-clickhouse.conf
+# Create configuration file flink-consumer.conf
+# Refer to conf/flink/flink-consumer-mysql.conf or flink-consumer-clickhouse.conf
 
-# 独立运行（不需要 Flink 集群，使用 Flink LocalEnvironment）
+# Standalone run (no Flink cluster needed, uses Flink LocalEnvironment)
 java -jar metrics-flink-consumer-dist-1.0.0-SNAPSHOT.jar /path/to/flink-consumer.conf
 
-# 提交到 Flink 集群（推荐生产环境）
+# Submit to Flink cluster (recommended for production)
 /opt/flink-1.18.0/bin/flink run -c x.mg.metrics.flink.Main \
   -m localhost:8081 \
   /path/to/metrics-flink-consumer-dist-1.0.0-SNAPSHOT.jar /path/to/flink-consumer.conf
 
-# 后台提交（断开 SSH 不中断）
+# Background submission (survives SSH disconnection)
 nohup /opt/flink-1.18.0/bin/flink run -c x.mg.metrics.flink.Main \
   -m localhost:8081 \
   /path/to/metrics-flink-consumer-dist-1.0.0-SNAPSHOT.jar /path/to/flink-consumer.conf \
   > /tmp/flink-submit.log 2>&1 &
 
-# 查看集群作业状态
+# Check cluster job status
 curl -s http://localhost:8081/jobs | python3 -c \
   'import json,sys; [print(j["id"],j["status"]) for j in json.load(sys.stdin)["jobs"]]'
 
-# 取消作业
+# Cancel a job
 /opt/flink-1.18.0/bin/flink cancel <job-id>
 ```
 
-Flink Consumer 启动后自动建表（15 张分类表 + `metric_events` 统一宽表），无需手动初始化 schema。`metric_events` 宽表整合全部引擎数据用于跨引擎分析。Kafka offset 由 Flink checkpoint 管理，`checkpoint.path` 为 checkpoint 存储目录。
+The Flink Consumer automatically creates tables on startup (15 category tables + `metric_events` unified wide table), no manual schema initialization needed. The `metric_events` wide table consolidates data from all engines for cross-engine analysis. Kafka offsets are managed by Flink checkpoint, with `checkpoint.path` as the checkpoint storage directory.
 
 ### 2.5 Grafana
 
@@ -162,24 +162,24 @@ docker run -d --name grafana --network host \
   grafana/grafana:latest
 ```
 
-配置数据源和导入面板见下方 §6。
+For data source configuration and dashboard import, see section 6 below.
 
 ---
 
-## 3. 组件部署
+## 3. Component Deployment
 
-> 以下均使用 Omnipackage 单 JAR（`spark-telemetry-dist-omni-*.jar`），
-> 自动检测 Spark 版本（2.x / 3.x / 4.x），无需选择不同 JAR。
+> All sections below use the Omnipackage single JAR (`spark-telemetry-dist-omni-*.jar`),
+> which auto-detects the Spark version (2.x / 3.x / 4.x), no need to select different JARs.
 
 ### 3.1 Spark Plugin
 
-将 JAR 分发到所有节点的相同路径：
+Copy the JAR to the same path on all nodes:
 
 ```bash
 scp spark-telemetry-dist-omni-*.jar node:/opt/spark-telemetry-plugin.jar
 ```
 
-#### Spark 3.x / 4.x（SparkPlugin API）
+#### Spark 3.x / 4.x (SparkPlugin API)
 
 ```bash
 spark-submit --master yarn \
@@ -190,7 +190,7 @@ spark-submit --master yarn \
   your-app.jar
 ```
 
-#### Spark 2.x（spark.extraListeners）
+#### Spark 2.x (spark.extraListeners)
 
 ```bash
 spark-submit --master yarn \
@@ -201,70 +201,70 @@ spark-submit --master yarn \
   your-app.jar
 ```
 
-#### 配置方式（三选一）
+#### Configuration Methods (pick one)
 
-| 方式 | 示例 |
-|------|------|
-| Spark conf 内联 | `--conf spark.telemetry.otel.exporter.endpoint=http://...` |
-| HOCON 配置文件 | `--conf spark.telemetry.config.path=/etc/telemetry.conf` |
-| 混合（conf 覆盖文件） | 同时使用，Spark conf 优先级最高 |
+| Method | Example |
+|--------|---------|
+| Spark conf inline | `--conf spark.telemetry.otel.exporter.endpoint=http://...` |
+| HOCON config file | `--conf spark.telemetry.config.path=/etc/telemetry.conf` |
+| Hybrid (conf overrides file) | Use both simultaneously, Spark conf takes highest priority |
 
-#### 预设配置
+#### Preset Configurations
 
-| 预设 | 路径 | 说明 |
-|------|------|------|
-| basic | `conf/spark{version}/basic/telemetry.conf` | 仅 task 核心指标，开销最小 |
-| full | `conf/spark{version}/full/telemetry.conf` | 全部指标（task + stage + job + SQL） |
+| Preset | Path | Description |
+|--------|------|-------------|
+| basic | `conf/spark{version}/basic/telemetry.conf` | Core task metrics only, minimal overhead |
+| full | `conf/spark{version}/full/telemetry.conf` | All metrics (task + stage + job + SQL) |
 
-预设配置目录对应 Spark 版本：
+Preset configuration directories correspond to Spark versions:
 
-| 目录 | 适用版本 |
-|------|---------|
+| Directory | Applicable Version |
+|-----------|-------------------|
 | `conf/spark24-hadoop27-hive2.3.9/` | Spark 2.4 + Hadoop 2.7 |
 | `conf/spark30-hadoop3-hive2.3.9/` | Spark 3.0 + Hadoop 3 |
 | `conf/spark32-hadoop3-hive2.3.9/` | Spark 3.2 + Hadoop 3 |
 | `conf/spark35-hadoop3-hive2.3.9/` | Spark 3.5 + Hadoop 3 |
 | `conf/spark40-hadoop3-hive2.3.9/` | Spark 4.0 + Hadoop 3 |
 
-#### 关键配置项
+#### Key Configuration Items
 
-> **YARN 模式要求**: 使用 `--master yarn` 时必须设置 `HADOOP_CONF_DIR` 环境变量指向 Hadoop 配置目录（含 `core-site.xml`, `yarn-site.xml`, `mapred-site.xml`）。`mapred-site.xml` 必须包含 `mapreduce.framework.name=yarn` 和 `mapreduce.application.classpath`，否则 MR/Hive 会回退到 local 模式。
+> **YARN Mode Requirement**: When using `--master yarn`, the `HADOOP_CONF_DIR` environment variable must point to the Hadoop configuration directory (containing `core-site.xml`, `yarn-site.xml`, `mapred-site.xml`). `mapred-site.xml` must include `mapreduce.framework.name=yarn` and `mapreduce.application.classpath`, otherwise MR/Hive will fall back to local mode.
 
 ```properties
-# 必填
+# Required
 spark.telemetry.otel.exporter.endpoint=http://otel-collector:4317
 
-# 推荐配置
-spark.telemetry.otel.service.name=my-spark-app          # 服务名，Grafana 过滤用
-spark.telemetry.otel.export.interval.ms=10000            # 导出间隔（默认10s）
-spark.telemetry.config.path=/etc/telemetry.conf          # 配置文件路径
+# Recommended configuration
+spark.telemetry.otel.service.name=my-spark-app          # Service name, used for Grafana filtering
+spark.telemetry.otel.export.interval.ms=10000            # Export interval (default 10s)
+spark.telemetry.config.path=/etc/telemetry.conf          # Config file path
 
-# 指标开关（默认值如下）
-spark.telemetry.metrics.task.execution=true              # task CPU/GC/内存/耗时
-spark.telemetry.metrics.task.shuffle-extended=true       # shuffle 详细指标
-spark.telemetry.metrics.task.info=true                   # task host/locality 信息
-spark.telemetry.metrics.stage.detailed=true              # stage 级指标
-spark.telemetry.metrics.job.lifecycle=true               # job 生命周期事件
-spark.telemetry.metrics.sql.query-execution=true         # SQL 执行指标（join/shuffle bytes/query text）
-spark.telemetry.sql.max-length=4096                      # SQL 文本最大截断长度（字符）
+# Metric switches (default values below)
+spark.telemetry.metrics.task.execution=true              # task CPU/GC/memory/duration
+spark.telemetry.metrics.task.shuffle-extended=true       # detailed shuffle metrics
+spark.telemetry.metrics.task.info=true                   # task host/locality info
+spark.telemetry.metrics.stage.detailed=true              # stage-level metrics
+spark.telemetry.metrics.job.lifecycle=true               # job lifecycle events
+spark.telemetry.metrics.sql.query-execution=true         # SQL execution metrics (join/shuffle bytes/query text)
+spark.telemetry.sql.max-length=4096                      # SQL text max truncation length (characters)
 ```
 
-> **注意**: conf key 必须包含完整路径含 `.otel.` 段。正确：`spark.telemetry.otel.exporter.endpoint`，
-> 错误：`spark.telemetry.exporter.endpoint`。
+> **Note**: conf keys must include the full path including the `.otel.` segment. Correct: `spark.telemetry.otel.exporter.endpoint`,
+> Wrong: `spark.telemetry.exporter.endpoint`.
 
 ---
 
-### 3.2 MR Agent（Task 级别实时指标）
+### 3.2 MR Agent (Task-level Real-time Metrics)
 
-通过 Java Agent 注入 Mapper/Reducer JVM，采集 task 级别 IO 计数器。
+Injects into Mapper/Reducer JVMs via Java Agent, collecting task-level IO counters.
 
-> **前提**: 确保 `mapred-site.xml` 已配置 `mapreduce.framework.name=yarn`，否则 MR 作业会以 local 模式运行，Agent 无法通过 YARN 分发。
+> **Prerequisite**: Ensure `mapred-site.xml` has `mapreduce.framework.name=yarn` configured, otherwise MR jobs will run in local mode and the Agent cannot be distributed via YARN.
 
 ```bash
-# 1. 将 JAR 放到 Hadoop 节点
+# 1. Copy JAR to Hadoop node
 scp spark-telemetry-dist-omni-*.jar node:/opt/hadoop/lib/mr-telemetry-agent.jar
 
-# 2. 配置 mapred-site.xml
+# 2. Configure mapred-site.xml
 ```
 
 ```xml
@@ -283,20 +283,20 @@ scp spark-telemetry-dist-omni-*.jar node:/opt/hadoop/lib/mr-telemetry-agent.jar
 </property>
 ```
 
-MR Agent 采集的指标写入 `mr_task_metrics` 表：
+MR Agent-collected metrics are written to the `mr_task_metrics` table:
 - `map_input_records`, `map_output_records`, `map_output_bytes`
 - `reduce_input_records`, `reduce_output_records`, `reduce_shuffle_bytes`
 - `spilled_records`
 
 ---
 
-### 3.3 MR Collector（Job 级别历史指标）
+### 3.3 MR Collector (Job-level Historical Metrics)
 
-独立进程，轮询 Hadoop History Server REST API，采集已完成的 MR job 指标。
+A standalone process that polls the Hadoop History Server REST API to collect completed MR job metrics.
 
 ```bash
-# 1. 创建配置文件 mr-collector.conf
-# 参考 conf/examples/mr-collector.conf.example 或 conf/spark35-hadoop3-hive2.3.9/mr-collector.conf
+# 1. Create configuration file mr-collector.conf
+# Refer to conf/examples/mr-collector.conf.example or conf/spark35-hadoop3-hive2.3.9/mr-collector.conf
 ```
 
 ```hocon
@@ -312,25 +312,25 @@ mr-telemetry {
     export.interval.ms = 10000
   }
   state {
-    file = "/tmp/mr-telemetry-state.json"   # 断点续传，重启后不重复采集
+    file = "/tmp/mr-telemetry-state.json"   # Resume from checkpoint, no duplicate collection after restart
   }
   collection {
-    job.counters = true      # job 级别：HDFS IO, CPU, GC, maps/reduces 数
-    task.counters = false    # task 级别（数据量大，按需开启）
-    job.details = true       # job 名称、用户、状态
+    job.counters = true      # job-level: HDFS IO, CPU, GC, maps/reduces count
+    task.counters = false    # task-level (large data volume, enable on demand)
+    job.details = true       # job name, user, status
   }
 }
 ```
 
 ```bash
-# 2. 运行（使用 Omnipackage）
+# 2. Run (using Omnipackage)
 java -jar spark-telemetry-dist-omni-*.jar --mr-collector /path/to/mr-collector.conf
 
-# 3. 生产环境建议用 systemd 或 nohup 后台运行
+# 3. For production, use systemd or nohup for background execution
 nohup java -jar spark-telemetry-dist-omni-*.jar --mr-collector /etc/mr-collector.conf &
 ```
 
-MR Collector 采集的指标写入 `mr_job_metrics` 表：
+MR Collector-collected metrics are written to the `mr_job_metrics` table:
 - `elapsed_time_ms`, `state`, `launched_maps`, `launched_reduces`
 - `hdfs_bytes_read`, `hdfs_bytes_written`, `file_bytes_read`, `file_bytes_written`
 - `cpu_time_ms`, `gc_time_ms`
@@ -339,10 +339,10 @@ MR Collector 采集的指标写入 `mr_job_metrics` 表：
 
 ### 3.4 Hive Telemetry Hook
 
-采集 HiveServer2 查询指标（执行引擎无关，支持 MR 和 Spark 引擎）。
+Captures HiveServer2 query metrics (engine-independent, supports MR and Spark engines).
 
 ```bash
-# 1. 将 Omnipackage JAR 放到 HiveServer2 auxlib（自动加载，无需 hive.aux.jars.path）
+# 1. Place the Omnipackage JAR in HiveServer2 auxlib (auto-loaded, no need for hive.aux.jars.path)
 cp spark-telemetry-dist-omni-*.jar $HIVE_HOME/auxlib/
 ```
 
@@ -362,83 +362,83 @@ cp spark-telemetry-dist-omni-*.jar $HIVE_HOME/auxlib/
 </property>
 ```
 
-Hive Hook 采集的指标写入 `hive_query_metrics` 和 `hive_table_io_metrics` 表：
+Hive Hook-collected metrics are written to the `hive_query_metrics` and `hive_table_io_metrics` tables:
 - `query_id`, `operation`, `user_name`, `success`, `duration_ms`
 - `input_bytes`, `output_bytes`, `input_rows`, `output_rows`
-- `input_tables`, `output_tables`, `execution_engine`（mr/spark）
+- `input_tables`, `output_tables`, `execution_engine` (mr/spark)
 
 ---
 
-## 4. 数据流验证
+## 4. Data Flow Verification
 
-### 检查 OTel Collector 是否收到数据
+### Check if OTel Collector Received Data
 
 ```bash
 docker logs otel-collector --tail=50 | grep -E "spark\.|mr\.|hive\."
 ```
 
-### 检查 Kafka 中的消息
+### Check Messages in Kafka
 
 ```bash
 docker exec kafka /opt/kafka/bin/kafka-dump-log.sh \
   --files /tmp/kafka-logs/telemetry-metrics-0/00000000000000000000.log
 ```
 
-### 检查 MySQL 数据
+### Check MySQL Data
 
 ```sql
--- Spark 指标
+-- Spark metrics
 SELECT COUNT(*) FROM task_metrics;
 SELECT COUNT(*) FROM sql_query_metrics;
 
--- MR 指标
+-- MR metrics
 SELECT COUNT(*) FROM mr_job_metrics;    -- MR Collector
 SELECT COUNT(*) FROM mr_task_metrics;   -- MR Agent
 
--- Hive 指标
+-- Hive metrics
 SELECT COUNT(*) FROM hive_query_metrics;
 SELECT COUNT(*) FROM hive_table_io_metrics;
 
--- 统一宽表
+-- Unified wide table
 SELECT engine, event_type, COUNT(*) FROM metric_events GROUP BY engine, event_type;
 ```
 
-### 使用诊断工具
+### Using the Diagnostic Tool
 
-构建并运行诊断工具，自动检查全部后端组件和应用配置：
+Build and run the diagnostic tool to automatically verify all backend components and application configuration:
 
 ```bash
-# 构建诊断工具
+# Build diagnostic tool
 mvn clean package -pl diagnostic/diagnostic-core -am -DskipTests
 
-# 运行（交互式 CLI，JLine 终端）
+# Run (interactive CLI, JLine terminal)
 java -jar diagnostic/diagnostic-core/target/diagnostic-core-1.0.0-SNAPSHOT.jar
 
-# 指定配置文件
+# Specify configuration file
 java -jar diagnostic/diagnostic-core/target/diagnostic-core-1.0.0-SNAPSHOT.jar \
   --config /path/to/diagnostic.conf
 ```
 
-诊断工具自动执行以下检查：
+The diagnostic tool automatically performs the following checks:
 
-| 检查项 | 说明 |
-|--------|------|
-| Spark Plugin | JAR 存在性、spark.plugins 配置 |
-| Hive Hook | hive.exec.post.hooks 配置 |
-| MR Collector | 配置文件、History Server 连通性 |
-| OTel Collector | gRPC 端口连通性、Health Check |
-| Kafka | Broker 连通性、Topic 存在性 |
-| MySQL | 数据库连通性、表 schema 验证 |
-| Grafana 面板 | Dashboard SQL 查询有效性检查 |
-| 数据流 | 端到端数据完整性验证 |
+| Check Item | Description |
+|------------|-------------|
+| Spark Plugin | JAR existence, spark.plugins configuration |
+| Hive Hook | hive.exec.post.hooks configuration |
+| MR Collector | Configuration file, History Server connectivity |
+| OTel Collector | gRPC port connectivity, Health Check |
+| Kafka | Broker connectivity, Topic existence |
+| MySQL | Database connectivity, table schema validation |
+| Grafana Dashboards | Dashboard SQL query validity check |
+| Data Flow | End-to-end data integrity verification |
 
-配置文件参考：`diagnostic/diagnostic-core/src/main/resources/diagnostic.conf`
+Configuration file reference: `diagnostic/diagnostic-core/src/main/resources/diagnostic.conf`
 
 ---
 
-## 5. Grafana 面板配置
+## 5. Grafana Dashboard Configuration
 
-### 5.1 添加 MySQL 数据源
+### 5.1 Add MySQL Data Source
 
 ```
 URL: mysql:3306
@@ -446,58 +446,58 @@ Database: metrics_db
 User: metrics / Password: metrics
 ```
 
-数据源 UID 设为 `DS_MYSQL`（面板 SQL 引用此 UID）。
+Set data source UID to `DS_MYSQL` (dashboard SQL queries reference this UID).
 
-### 5.2 导入面板
+### 5.2 Import Dashboards
 
-将 `deploy/grafana/` 目录下的 JSON 文件导入 Grafana：
+Import the JSON files from the `deploy/grafana/` directory into Grafana:
 
-| 文件 | 面板名 | 说明 |
-|------|--------|------|
-| `overview.json` | Platform Telemetry Overview | 全平台总览 |
-| `spark.json` | Spark Telemetry | Task/Stage/SQL 指标 |
+| File | Dashboard Name | Description |
+|------|----------------|-------------|
+| `overview.json` | Platform Telemetry Overview | Full platform overview |
+| `spark.json` | Spark Telemetry | Task/Stage/SQL metrics |
 | `mr.json` | MapReduce Telemetry | Job Level + Task Level |
-| `hive-mr.json` | Hive on MR Telemetry | Hive MR 引擎查询 |
-| `hive-spark.json` | Hive on Spark Telemetry | Hive Spark 引擎查询 |
-| `spark-mr-telemetry-dashboard.json` | Spark/MR/Hive 合并面板 | 综合视图 |
-| `hive-analysis.json` | Hive 查询与数据血缘分析 | 操作分布、表 IO、执行引擎对比 |
-| `performance-analysis.json` | 性能异常与瓶颈分析 | Stage 耗时、GC 开销、数据倾斜检测 |
-| `efficiency.json` | 综合效率评分 | 资源效率评分、队列效率对比 |
-| `reliability.json` | 可靠性与失败分析 | 任务成功率趋势、失败事件 |
-| `capacity.json` | 容量规划与资源利用率 | 任务并发量、内存趋势、GC 频率 |
-| `cost-attribution.json` | 成本归属与资源排行 | 用户/队列/应用资源排行 |
-| `io-analysis.json` | 数据吞吐与 IO 分析 | 各引擎 IO 吞吐量、Shuffle 分析 |
+| `hive-mr.json` | Hive on MR Telemetry | Hive MR engine queries |
+| `hive-spark.json` | Hive on Spark Telemetry | Hive Spark engine queries |
+| `spark-mr-telemetry-dashboard.json` | Spark/MR/Hive Combined Panel | Consolidated view |
+| `hive-analysis.json` | Hive Query & Data Lineage Analysis | Operation distribution, table IO, execution engine comparison |
+| `performance-analysis.json` | Performance Anomaly & Bottleneck Analysis | Stage duration, GC overhead, data skew detection |
+| `efficiency.json` | Comprehensive Efficiency Score | Resource efficiency score, queue efficiency comparison |
+| `reliability.json` | Reliability & Failure Analysis | Task success rate trends, failure events |
+| `capacity.json` | Capacity Planning & Resource Utilization | Task concurrency, memory trends, GC frequency |
+| `cost-attribution.json` | Cost Attribution & Resource Ranking | User/queue/application resource ranking |
+| `io-analysis.json` | Data Throughput & IO Analysis | Cross-engine IO throughput, Shuffle analysis |
 
-### 5.3 MR Dashboard 说明
+### 5.3 MR Dashboard Description
 
-MR 面板分为两个层级（数据来源不同）：
+The MR dashboard is divided into two tiers (with different data sources):
 
-| 层级 | 数据来源 | 采集方式 | 面板内容 |
-|------|---------|---------|---------|
-| **Job Level** | `mr_job_metrics` | MR Collector (History Server) | Job 数量、耗时、成功率、HDFS IO、CPU/GC |
-| **Task Level** | `mr_task_metrics` | MR Agent (javaagent) | Map/Reduce task 数、output bytes、shuffle bytes、records |
+| Tier | Data Source | Collection Method | Dashboard Content |
+|------|-------------|-------------------|-------------------|
+| **Job Level** | `mr_job_metrics` | MR Collector (History Server) | Job count, duration, success rate, HDFS IO, CPU/GC |
+| **Task Level** | `mr_task_metrics` | MR Agent (javaagent) | Map/Reduce task count, output bytes, shuffle bytes, records |
 
-两个层级独立运行，可单独或同时部署。
-
----
-
-## 6. 常见问题
-
-| 问题 | 原因 | 解决 |
-|------|------|------|
-| `ClassNotFoundException: scala.$less$colon$less` | 旧版 JAR 在 `$SPARK_HOME/jars/`，或 `scala-collection-compat` 误判 Scala 2.13 | 删除 `$SPARK_HOME/jars/` 下的旧 JAR，使用最新 Omnipackage |
-| `No GrpcSenderProvider found` | Shade 缺少 OkHttp3/Kotlin 依赖 | 确保使用 `build-omni.sh` 构建，不要单独 shade |
-| 短 job 无指标 | job 在 OTel 首次 export 前结束 | 减小 `spark.telemetry.otel.export.interval.ms`（如 5000） |
-| `module-info.class` 冲突 | JDK 9+ 模块系统冲突 | `zip -d <jar> META-INF/versions/9/module-info.class` |
-| SQL shuffle_bytes 为 NULL | AQE `inputPlan` 返回初始计划 | 已在最新版本修复，使用反射访问 `currentPhysicalPlan` |
-| Hive 面板 `Unknown column 'mr'` | Grafana 面板旧版本 | 重新导入 `deploy/grafana/hive-mr.json` |
+The two tiers run independently and can be deployed separately or together.
 
 ---
 
-## 7. 版本兼容性
+## 6. Frequently Asked Questions
 
-| 组件 | 最低版本 | 已验证版本 |
-|------|---------|-----------|
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| `ClassNotFoundException: scala.$less$colon$less` | Old JAR in `$SPARK_HOME/jars/`, or `scala-collection-compat` falsely detecting Scala 2.13 | Delete old JARs from `$SPARK_HOME/jars/`, use the latest Omnipackage |
+| `No GrpcSenderProvider found` | Shade missing OkHttp3/Kotlin dependencies | Ensure building with `build-omni.sh`, do not shade independently |
+| Short jobs have no metrics | Job completes before OTel first export | Reduce `spark.telemetry.otel.export.interval.ms` (e.g., 5000) |
+| `module-info.class` conflict | JDK 9+ module system conflict | `zip -d <jar> META-INF/versions/9/module-info.class` |
+| SQL shuffle_bytes NULL | AQE `inputPlan` returns initial plan | Already fixed in latest version, uses reflection to access `currentPhysicalPlan` |
+| Hive dashboard `Unknown column 'mr'` | Old Grafana dashboard version | Re-import `deploy/grafana/hive-mr.json` |
+
+---
+
+## 7. Version Compatibility
+
+| Component | Minimum Version | Verified Versions |
+|-----------|-----------------|-------------------|
 | Spark | 2.4.x | 2.4.4, 3.0.x, 3.2.0, 3.5.8 |
 | Hadoop | 2.7.x | 2.7.0, 3.2.0, 3.4.3 |
 | Hive | 2.3.x | 2.3.9, 3.1.3 |

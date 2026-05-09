@@ -1,12 +1,12 @@
-# MR Telemetry — 部署与指标参考
+# MR Telemetry -- Deployment & Metrics Reference
 
 ## MR Telemetry Collector
 
-独立 Java 应用，定时轮询 Hadoop YARN History Server REST API，获取已完成 MR 作业计数器并通过 OTel 导出。
+A standalone Java application that periodically polls the Hadoop YARN History Server REST API for completed MR job counters and exports them via OTel.
 
-### 配置
+### Configuration
 
-创建 `mr-collector.conf`：
+Create `mr-collector.conf`:
 
 ```hocon
 mr-telemetry {
@@ -25,8 +25,8 @@ mr-telemetry {
   }
 
   state {
-    # 持久化文件（记录上次轮询时间，重启后不重复采集）
-    file = "/var/lib/mr-telemetry/state.json"
+    # Persistence file (records last poll timestamp to avoid re-collecting after restart)
+    file = "/tmp/mr-telemetry-state.json"
   }
 
   filter {
@@ -38,19 +38,19 @@ mr-telemetry {
 
   collection {
     job.counters = true
-    task.counters = false    # 任务级粒度（数据量可能较大）
+    task.counters = true    # Task-level granularity (can produce large volumes)
     job.details = true
   }
 }
 ```
 
-### 运行
+### Running
 
 ```bash
-# 前台运行
+# Foreground
 java -jar mr-telemetry-dist.jar mr-collector.conf
 
-# 后台运行
+# Background
 nohup java -jar mr-telemetry-dist.jar mr-collector.conf > mr-collector.log 2>&1 &
 
 # systemd
@@ -73,9 +73,9 @@ EOF
 systemctl enable --now mr-telemetry-collector
 ```
 
-`state.file` 记录上次轮询时间戳，重启后只采集新增作业。首次运行采集所有已完成作业。
+`state.file` records the last poll timestamp; after restart, only newly completed jobs are collected. First run collects all completed jobs.
 
-### 使用 Omnipackage 运行
+### Running with Omnipackage
 
 ```bash
 java -jar omnipackage.jar --mr-collector /path/to/mr-collector.conf
@@ -85,21 +85,21 @@ java -jar omnipackage.jar --mr-collector /path/to/mr-collector.conf
 
 ## MR Telemetry Agent
 
-Java Agent，通过 ByteBuddy 字节码增强拦截 `Mapper.run()` 和 `Reducer.run()`，在任务执行期间实时采样计数器。
+A Java Agent that intercepts `Mapper.run()` and `Reducer.run()` via ByteBuddy bytecode instrumentation, sampling counters in real-time during task execution.
 
-### 配置（JVM 系统属性）
+### Configuration (JVM System Properties)
 
-| 系统属性 | 默认值 | 说明 |
-|---------|--------|------|
-| `mr.telemetry.agent.enabled` | `true` | 是否启用 Agent |
-| `mr.telemetry.agent.otel.exporter.endpoint` | `http://localhost:4317` | OTel Collector 地址 |
-| `mr.telemetry.agent.otel.service.name` | `mr-telemetry-agent` | OTel 服务名 |
-| `mr.telemetry.agent.otel.export.interval.ms` | `10000` | 导出间隔（毫秒） |
-| `mr.telemetry.agent.sampling.interval.secs` | `5` | 计数器采样间隔（秒） |
+| System Property | Default | Description |
+|-----------------|---------|-------------|
+| `mr.telemetry.agent.enabled` | `true` | Enable the Agent |
+| `mr.telemetry.agent.otel.exporter.endpoint` | `http://localhost:4317` | OTel Collector endpoint |
+| `mr.telemetry.agent.otel.service.name` | `mr-telemetry-agent` | OTel service name |
+| `mr.telemetry.agent.otel.export.interval.ms` | `10000` | Export interval (ms) |
+| `mr.telemetry.agent.sampling.interval.secs` | `5` | Counter sampling interval (seconds) |
 
-### 部署
+### Deployment
 
-在 `mapred-site.xml` 中配置：
+Configure in `mapred-site.xml`:
 
 ```xml
 <property>
@@ -117,7 +117,7 @@ Java Agent，通过 ByteBuddy 字节码增强拦截 `Mapper.run()` 和 `Reducer.
 </property>
 ```
 
-或者命令行指定：
+Or specify via command line:
 
 ```bash
 hadoop jar my-job.jar \
@@ -125,75 +125,82 @@ hadoop jar my-job.jar \
   -Dmapreduce.reduce.java.opts="-javaagent:/opt/mr-telemetry-agent.jar -Dmr.telemetry.agent.otel.exporter.endpoint=http://collector:4317"
 ```
 
-> **注意**：Agent JAR 必须在所有 NodeManager 节点的本地路径可访问。
+> **Note**: The Agent JAR must be accessible on the local filesystem of all NodeManager nodes.
 
-### 使用 Omnipackage
+### Using Omnipackage
 
-直接用 omnipackage.jar 替换 `mr-telemetry-agent.jar` 路径即可，无需其他改动。
+Simply replace the `mr-telemetry-agent.jar` path with `omnipackage.jar` -- no other changes needed.
 
 ### Collector vs Agent
 
-| 特性 | MR Collector | MR Agent |
-|------|-------------|----------|
-| 部署方式 | 独立进程 | Java Agent（嵌入 MR 任务） |
-| 指标粒度 | Job 级别 + Task 级别（可选） | Task 级别（实时采样） |
-| 数据时效 | 作业完成后采集 | 任务执行中实时采集 |
-| 运行依赖 | History Server | 无外部依赖 |
-| 对任务影响 | 无侵入 | 轻微运行时开销 |
+| Feature | MR Collector | MR Agent |
+|---------|-------------|----------|
+| Deployment | Standalone process | Java Agent (embedded in MR tasks) |
+| Metric granularity | Job-level + Task-level (optional) | Task-level (real-time sampling) |
+| Data freshness | Collected after job completion | Real-time during task execution |
+| Runtime dependency | History Server | No external dependencies |
+| Impact on tasks | Non-intrusive | Slight runtime overhead |
 
-**推荐**：两者可同时使用。Collector 用于作业级汇总，Agent 用于任务级实时监控。
+**Recommendation**: Both can be used together. The Collector provides job-level aggregation, while the Agent provides task-level real-time monitoring.
 
 ---
 
-## 指标参考
+## Metrics Reference
 
-### MR Collector 作业级指标
+### MR Collector Job-Level Metrics
 
-| 指标名 | 类型 | 单位 | 说明 |
-|--------|------|------|------|
-| `mr.job.io.hdfs_bytes_read` | Counter | By | HDFS 读取字节数 |
-| `mr.job.io.hdfs_bytes_written` | Counter | By | HDFS 写入字节数 |
-| `mr.job.cpu_time_ms` | Counter | ms | CPU 时间 |
-| `mr.job.gc_time_ms` | Counter | ms | GC 时间 |
-| `mr.job.spilled_records` | Counter | {records} | 溢出记录数 |
-| `mr.job.map_input_records` | Counter | {records} | Map 输入记录数 |
-| `mr.job.map_output_records` | Counter | {records} | Map 输出记录数 |
-| `mr.job.reduce_input_records` | Counter | {records} | Reduce 输入记录数 |
-| `mr.job.reduce_output_records` | Counter | {records} | Reduce 输出记录数 |
-| `mr.job.maps_duration_ms` | Counter | ms | Map 总时长 |
-| `mr.job.reduces_duration_ms` | Counter | ms | Reduce 总时长 |
-| `mr.job.physical_memory_bytes` | Counter | By | 物理内存 |
-| `mr.job.virtual_memory_bytes` | Counter | By | 虚拟内存 |
-| `mr.job.io.file_bytes_read` | Counter | By | 本地文件读取字节 |
-| `mr.job.io.file_bytes_written` | Counter | By | 本地文件写入字节 |
-| `mr.job.reduce_shuffle_bytes` | Counter | By | Shuffle 字节 |
-| `mr.job.map_output_bytes` | Counter | By | Map 输出字节 |
-| `mr.job.launched_maps` | Counter | {tasks} | Map 任务数 |
-| `mr.job.launched_reduces` | Counter | {tasks} | Reduce 任务数 |
-| `mr.job.elapsed_time_ms` | Counter | ms | 作业运行时长 |
+| Metric Name | Type | Unit | Description |
+|-------------|------|------|-------------|
+| `mr.job.io.hdfs_bytes_read` | Counter | By | HDFS bytes read |
+| `mr.job.io.hdfs_bytes_written` | Counter | By | HDFS bytes written |
+| `mr.job.cpu_time_ms` | Counter | ms | CPU time |
+| `mr.job.gc_time_ms` | Counter | ms | GC time |
+| `mr.job.spilled_records` | Counter | {records} | Spilled records |
+| `mr.job.map_input_records` | Counter | {records} | Map input records |
+| `mr.job.map_output_records` | Counter | {records} | Map output records |
+| `mr.job.reduce_input_records` | Counter | {records} | Reduce input records |
+| `mr.job.reduce_output_records` | Counter | {records} | Reduce output records |
+| `mr.job.maps_duration_ms` | Counter | ms | Total map duration |
+| `mr.job.reduces_duration_ms` | Counter | ms | Total reduce duration |
+| `mr.job.physical_memory_bytes` | Counter | By | Physical memory |
+| `mr.job.virtual_memory_bytes` | Counter | By | Virtual memory |
+| `mr.job.io.file_bytes_read` | Counter | By | Local file bytes read |
+| `mr.job.io.file_bytes_written` | Counter | By | Local file bytes written |
+| `mr.job.reduce_shuffle_bytes` | Counter | By | Shuffle bytes |
+| `mr.job.map_output_bytes` | Counter | By | Map output bytes |
+| `mr.job.launched_maps` | Counter | {tasks} | Launched map tasks |
+| `mr.job.launched_reduces` | Counter | {tasks} | Launched reduce tasks |
+| `mr.job.elapsed_time_ms` | Counter | ms | Job elapsed time |
+| `mr.job.committed_heap_bytes` | Counter | By | Committed heap memory bytes |
 
-#### 作业级标签
+#### Job-Level Attributes
 
-`mr.job.id`、`mr.job.name`、`mr.job.user`、`mr.job.state`、`mr.job.queue`
+`mr.job.id`, `mr.job.name`, `mr.job.user`, `mr.job.state`, `mr.job.queue`, `mr.job.finish_time_ms`, `mr.job.start_time_ms`
 
-### MR Agent 任务级指标
+### MR Agent Task-Level Metrics
 
-| 指标名 | 类型 | 单位 | 说明 |
-|--------|------|------|------|
-| `mr.task.io.map_input_records` | Counter | {records} | Map 输入记录 |
-| `mr.task.io.map_output_records` | Counter | {records} | Map 输出记录 |
-| `mr.task.io.map_output_bytes` | Counter | By | Map 输出字节 |
-| `mr.task.io.reduce_input_records` | Counter | {records} | Reduce 输入记录 |
-| `mr.task.io.reduce_output_records` | Counter | {records} | Reduce 输出记录 |
-| `mr.task.io.reduce_shuffle_bytes` | Counter | By | Reduce Shuffle 字节 |
-| `mr.task.io.spilled_records` | Counter | {records} | 溢出记录 |
-| `mr.task.cpu_time_ms` | Counter | ms | CPU 时间 |
-| `mr.task.gc_time_ms` | Counter | ms | GC 时间 |
-| `mr.task.io.hdfs_bytes_read` | Counter | By | HDFS 读取字节 |
-| `mr.task.io.hdfs_bytes_written` | Counter | By | HDFS 写入字节 |
-| `mr.task.io.file_bytes_read` | Counter | By | 本地文件读取字节 |
-| `mr.task.io.file_bytes_written` | Counter | By | 本地文件写入字节 |
+| Metric Name | Type | Unit | Description |
+|-------------|------|------|-------------|
+| `mr.task.io.map_input_records` | Counter | {records} | Map input records |
+| `mr.task.io.map_output_records` | Counter | {records} | Map output records |
+| `mr.task.io.map_output_bytes` | Counter | By | Map output bytes |
+| `mr.task.io.reduce_input_records` | Counter | {records} | Reduce input records |
+| `mr.task.io.reduce_output_records` | Counter | {records} | Reduce output records |
+| `mr.task.io.reduce_shuffle_bytes` | Counter | By | Reduce shuffle bytes |
+| `mr.task.io.spilled_records` | Counter | {records} | Spilled records |
+| `mr.task.cpu_time_ms` | Counter | ms | CPU time |
+| `mr.task.gc_time_ms` | Counter | ms | GC time |
+| `mr.task.io.hdfs_bytes_read` | Counter | By | HDFS bytes read |
+| `mr.task.io.hdfs_bytes_written` | Counter | By | HDFS bytes written |
+| `mr.task.io.file_bytes_read` | Counter | By | Local file bytes read |
+| `mr.task.io.file_bytes_written` | Counter | By | Local file bytes written |
+| `mr.task.io.hdfs_read_ops` | Counter | {ops} | HDFS read operations count |
+| `mr.task.io.hdfs_write_ops` | Counter | {ops} | HDFS write operations count |
+| `mr.task.io.hdfs_large_read_ops` | Counter | {ops} | HDFS large read operations count |
+| `mr.task.duration_ms` | Histogram | ms | Task execution duration |
+| `mr.task.success` | Counter | {tasks} | Successful tasks count |
+| `mr.task.failure` | Counter | {tasks} | Failed tasks count |
 
-#### 任务级标签
+#### Task-Level Attributes
 
-`mr.task.id`、`mr.task.type`（map/reduce）、`mr.job.id`、`mr.job.name`
+`mr.task.id`, `mr.task.type` (map/reduce), `mr.job.id`, `mr.job.name`, `mr.task.state`, `mr.job.user`, `mr.job.queue`

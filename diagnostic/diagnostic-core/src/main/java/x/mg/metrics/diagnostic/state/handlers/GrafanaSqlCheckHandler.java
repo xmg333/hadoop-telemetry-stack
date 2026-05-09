@@ -101,7 +101,7 @@ public class GrafanaSqlCheckHandler extends CheckHandler {
             "../deploy/grafana",
             "../../deploy/grafana",
             "/opt/grafana/dashboards",
-            "/home/xmg333/spark-telemetry-listener/deploy/grafana",
+            "/opt/spark-telemetry/deploy/grafana",
             "/root/deploy/grafana",
             "/data/grafana/dashboards",
             "/var/lib/grafana/dashboards",

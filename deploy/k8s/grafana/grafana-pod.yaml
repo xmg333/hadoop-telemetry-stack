@@ -10,7 +10,7 @@ spec:
     image: grafana/grafana:10.4.1
     env:
     - name: GF_SECURITY_ADMIN_PASSWORD
-      value: "admin"
+      value: "CHANGE_ME"
     - name: GF_INSTALL_PLUGINS
       value: "grafana-clickhouse-datasource"
     ports:

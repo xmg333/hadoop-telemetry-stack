@@ -1,10 +1,10 @@
 #!/bin/bash
 # Auto benchmark: Spark/MR/Hive telemetry plugin vs baseline
-# Runs on 192.168.10.65 via SSH
+# Runs on benchmark server via SSH
 set -uo pipefail
 
 SSH="ssh -i $HOME/.ssh/id_rsa -o StrictHostKeyChecking=no"
-REMOTE="root@192.168.10.65"
+REMOTE="root@<BENCHMARK_SERVER_IP>"
 RUN_ID="bench-$(date +%Y%m%d-%H%M%S)"
 RESULT_DIR="/root/benchmark-results/$RUN_ID"
 
@@ -313,8 +313,8 @@ log "========== Phase 2: Hadoop 2.7 + Spark 2.4 =========="
 
 # Rebuild HiBench for Spark 2.4
 log "--- Rebuilding HiBench for Spark 2.4 ---"
-(cd /home/xmg333/spark-telemetry-listener/hibench && mvn -Dspark=2.4 -Dscala=2.11 -Phadoopbench -Psparkbench clean package -DskipTests 2>&1 | tail -5)
-rsync -az -e "$SSH" /home/xmg333/spark-telemetry-listener/hibench/ $REMOTE:$HIBENCH_HOME/ 2>/dev/null
+(cd $PROJECT_ROOT/hibench && mvn -Dspark=2.4 -Dscala=2.11 -Phadoopbench -Psparkbench clean package -DskipTests 2>&1 | tail -5)
+rsync -az -e "$SSH" $PROJECT_ROOT/hibench/ $REMOTE:$HIBENCH_HOME/ 2>/dev/null
 # Re-fix Python3
 run "sed -i '1s|python2|python3|' $HIBENCH_HOME/bin/functions/load_config.py"
 

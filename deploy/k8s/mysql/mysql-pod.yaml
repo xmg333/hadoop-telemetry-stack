@@ -10,13 +10,13 @@ spec:
     image: mysql:8.0
     env:
     - name: MYSQL_ROOT_PASSWORD
-      value: "root"
+      value: "CHANGE_ME"
     - name: MYSQL_DATABASE
       value: "metrics_db"
     - name: MYSQL_USER
       value: "metrics"
     - name: MYSQL_PASSWORD
-      value: "metrics"
+      value: "CHANGE_ME"
     ports:
     - containerPort: 3306
     resources:
@@ -35,7 +35,7 @@ spec:
         - localhost
         - -u
         - root
-        - -proot
+        - -pCHANGE_ME
       initialDelaySeconds: 30
       periodSeconds: 10
     readinessProbe:
@@ -47,7 +47,7 @@ spec:
         - localhost
         - -u
         - root
-        - -proot
+        - -pCHANGE_ME
       initialDelaySeconds: 15
       periodSeconds: 5
 ---

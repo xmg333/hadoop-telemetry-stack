@@ -1,26 +1,26 @@
-# 平台总览
+# Platform Overview
 
-## 概述
-本仪表盘是整个平台的全局概览，一目了然地展示三大引擎（Spark / MR / Hive）的核心指标，帮助回答以下问题：
-- 当前有多少 Spark 应用、MR 作业、Hive 查询在运行？
-- MR 作业成功率是否正常？
-- 各引擎的成功率对比如何？
-- IO 吞吐量随时间如何变化？
-- Job/Query 的平均耗时趋势如何？
-- 最近有哪些失败的任务？
+## Overview
+This dashboard provides a global overview of the entire platform, displaying core metrics from all three engines (Spark / MR / Hive) at a glance. It helps answer the following questions:
+- How many Spark applications, MR jobs, and Hive queries are currently running?
+- Is the MR job success rate normal?
+- How do the success rates compare across engines?
+- How does IO throughput change over time?
+- What are the average duration trends for Jobs/Queries?
+- What are the most recent failed tasks?
 
-## 前置条件
-- 数据源：15 张独立指标表（由 Flink Consumer 写入）
-- Grafana 变量：`$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
-- 时间范围过滤：所有查询均使用 `timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)`
+## Prerequisites
+- Data sources: 15 independent metric tables (written by Flink Consumer)
+- Grafana variables: `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
+- Time range filter: All queries use `timestamp_ms >= ($__unixEpochFrom() * 1000) AND timestamp_ms <= ($__unixEpochTo() * 1000)`
 
-## 面板说明
+## Panel Descriptions
 
-### Total Spark Apps（stat）
+### Total Spark Apps (stat)
 
-**用途**: 展示时间范围内出现的独立 Spark 应用数。
+**Purpose**: Displays the number of distinct Spark applications within the time range.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT COUNT(DISTINCT app_id) AS value
 FROM task_metrics
@@ -28,13 +28,13 @@ WHERE timestamp_ms >= ($__unixEpochFrom() * 1000)
   AND timestamp_ms <= ($__unixEpochTo() * 1000)
 ```
 
-**使用建议**: 正常运行时应看到与应用提交频率匹配的数量。如果突降为 0，检查 Spark Plugin 或 OTel Collector 是否正常。
+**Usage**: Under normal operation, the count should match the application submission frequency. If it suddenly drops to 0, check whether the Spark Plugin or OTel Collector is functioning properly.
 
-### Total MR Jobs（stat）
+### Total MR Jobs (stat)
 
-**用途**: 展示时间范围内完成的独立 MR 作业数。
+**Purpose**: Displays the number of distinct completed MR jobs within the time range.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT COUNT(DISTINCT job_id) AS value
 FROM mr_job_metrics
@@ -42,11 +42,11 @@ WHERE timestamp_ms >= ($__unixEpochFrom() * 1000)
   AND timestamp_ms <= ($__unixEpochTo() * 1000)
 ```
 
-### Total Hive Queries（stat）
+### Total Hive Queries (stat)
 
-**用途**: 展示时间范围内的 Hive 查询总数。
+**Purpose**: Displays the total number of Hive queries within the time range.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT COUNT(*) AS value
 FROM hive_query_metrics
@@ -54,11 +54,11 @@ WHERE timestamp_ms >= ($__unixEpochFrom() * 1000)
   AND timestamp_ms <= ($__unixEpochTo() * 1000)
 ```
 
-### MR Job Success Rate（stat）
+### MR Job Success Rate (stat)
 
-**用途**: 展示 MR 作业的成功率百分比。阈值：<80% 红色，80-95% 黄色，>95% 绿色。
+**Purpose**: Displays the MR job success rate as a percentage. Thresholds: <80% red, 80-95% yellow, >95% green.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ROUND(
   SUM(CASE WHEN state='SUCCEEDED' THEN 1 ELSE 0 END) * 100.0
@@ -69,16 +69,16 @@ WHERE timestamp_ms >= ($__unixEpochFrom() * 1000)
   AND timestamp_ms <= ($__unixEpochTo() * 1000)
 ```
 
-**使用建议**: 成功率低于 80% 需要立即排查。检查失败作业的日志和资源分配。
+**Usage**: A success rate below 80% requires immediate investigation. Check the logs and resource allocation of failed jobs.
 
-### Success Rates by Engine（piechart）
+### Success Rates by Engine (piechart)
 
-**用途**: 以环形图形式对比三大引擎（Spark / MR / Hive）的成功与失败数量分布。
+**Purpose**: Compares the distribution of success and failure counts across the three engines (Spark / MR / Hive) using a donut chart.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
--- 从 job_metrics、mr_job_metrics、hive_query_metrics 三个表聚合
--- 分别统计 Spark OK/Fail、MR OK/Fail、Hive OK/Fail
+-- Aggregate from job_metrics, mr_job_metrics, and hive_query_metrics
+-- Count Spark OK/Fail, MR OK/Fail, Hive OK/Fail respectively
 SELECT
   SUM(CASE WHEN job_success='true' THEN 1 ELSE 0 END) AS 'Spark OK',
   SUM(CASE WHEN job_success='false' AND duration_ms IS NULL ... END) AS 'Spark Fail',
@@ -89,38 +89,38 @@ SELECT
 FROM job_metrics WHERE ...
 ```
 
-**使用建议**: 快速判断哪个引擎存在稳定性问题。如果某个引擎失败占比偏高，深入到对应引擎的专属仪表盘排查。
+**Usage**: Quickly identify which engine has stability issues. If a particular engine has a high failure ratio, drill down into its dedicated dashboard for further investigation.
 
-### IO Throughput by Engine（timeseries）
+### IO Throughput by Engine (timeseries)
 
-**用途**: 展示各引擎随时间的 IO 吞吐量趋势（字节），包含 Spark、MapReduce、Hive 三条线。
+**Purpose**: Shows IO throughput trends in bytes over time for each engine, including three lines for Spark, MapReduce, and Hive.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 -- Spark: SUM(io_bytes_read + io_bytes_written) FROM task_metrics
 -- MapReduce: SUM(hdfs_bytes_read + hdfs_bytes_written) FROM mr_job_metrics
 -- Hive: SUM(input_bytes + output_bytes) FROM hive_query_metrics
 ```
 
-**使用建议**: 观察 IO 峰值是否与业务周期一致。如果某时段 IO 异常高，可能与数据倾斜或大查询有关。
+**Usage**: Observe whether IO peaks align with business cycles. If IO is abnormally high during certain periods, it may be related to data skew or large queries.
 
-### Job Duration Trends（timeseries）
+### Job Duration Trends (timeseries)
 
-**用途**: 展示 Spark Job 和 MR Job 的平均耗时随时间的趋势对比。
+**Purpose**: Shows a trend comparison of average duration for Spark Jobs and MR Jobs over time.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 -- Spark: AVG(duration_ms) FROM job_metrics
 -- MR: AVG(elapsed_time_ms) FROM mr_job_metrics
 ```
 
-**使用建议**: 耗时突增可能由数据量增大、资源不足、或 GC 问题导致。与 GC 面板交叉验证。
+**Usage**: Sudden increases in duration may be caused by larger data volumes, insufficient resources, or GC issues. Cross-validate with the GC panel.
 
-### Recent Failed Tasks（table）
+### Recent Failed Tasks (table)
 
-**用途**: 展示最近 50 条失败任务列表，包含 Spark 和 MR 的 UNION 合并结果。
+**Purpose**: Displays the most recent 50 failed tasks, combining UNION results from Spark and MR.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT 'Spark' AS engine, app_id AS id, stage_id, task_id, duration_ms,
        FROM_UNIXTIME(timestamp_ms/1000) AS time
@@ -132,28 +132,28 @@ FROM mr_task_metrics WHERE state != 'SUCCEEDED' ...
 ORDER BY time DESC LIMIT 50
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `engine` | 执行引擎（Spark / MR） | - |
-| `id` | 应用 ID 或 Job ID | - |
-| `stage_id` | Stage 编号（仅 Spark） | - |
-| `task_id` | Task 编号 | - |
-| `duration_ms` | 任务耗时 | ms |
-| `time` | 事件发生时间 | - |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `engine` | Execution engine (Spark / MR) | - |
+| `id` | Application ID or Job ID | - |
+| `stage_id` | Stage number (Spark only) | - |
+| `task_id` | Task number | - |
+| `duration_ms` | Task duration | ms |
+| `time` | Event occurrence time | - |
 
-**使用建议**: 定期检查此面板。如果同一 app_id 反复出现失败，需深入 Spark/MR 专属面板排查。
+**Usage**: Check this panel regularly. If the same `app_id` appears repeatedly as failed, drill into the Spark/MR dedicated dashboards for investigation.
 
-## 导航
-本仪表盘顶部导航栏可快速切换到：
-- **Spark** — Spark 引擎详细透视
-- **MapReduce** — MR 引擎详细透视
-- **Hive on MR** — Hive on MR 查询分析
-- **Hive on Spark** — Hive on Spark 查询分析
-- **Spark / MR / Hive** — 全引擎综合仪表盘
+## Navigation
+The top navigation bar of this dashboard provides quick access to:
+- **Spark** — Spark engine detailed view
+- **MapReduce** — MR engine detailed view
+- **Hive on MR** — Hive on MR query analysis
+- **Hive on Spark** — Hive on Spark query analysis
+- **Spark / MR / Hive** — All-engine consolidated dashboard
 
-## 注意事项
-- 本仪表盘查询 15 张独立表，不使用大宽表 `metric_events`
-- MR 任务级别的失败检测依赖 MR Agent 是否部署
-- Hive 查询统计不区分执行引擎（MR / Spark / Tez），需在 Hive 专属面板过滤
+## Notes
+- This dashboard queries 15 independent tables, not the wide `metric_events` table
+- MR task-level failure detection depends on whether MR Agent is deployed
+- Hive query statistics do not distinguish execution engines (MR / Spark / Tez); use the Hive dedicated panels for filtering

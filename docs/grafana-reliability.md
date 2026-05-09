@@ -1,25 +1,25 @@
-# 可靠性与失败分析
+# Reliability and Failure Analysis
 
-## 概述
-本仪表盘从任务可靠性视角出发，帮助回答以下问题：
-- 各引擎的任务成功率趋势如何？
-- 最近有哪些失败事件？
-- GC 是否与失败存在关联？
-- Speculative 任务比例是否异常？
-- Hive 查询的失败分布如何？
+## Overview
+This dashboard approaches analysis from a task reliability perspective, helping answer the following questions:
+- What are the task success rate trends for each engine?
+- What are the most recent failure events?
+- Is GC correlated with failures?
+- Is the speculative task ratio abnormal?
+- What is the failure distribution for Hive queries?
 
-## 前置条件
-- 数据源：`metric_events` 大宽表、`hive_query_metrics` 表（由 Flink Consumer 写入）
-- Grafana 变量：`$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
-- 失败事件通过 `status` 字段判断：Spark Task 为 `task_success` = `false`，MR 为 `state` != `SUCCEEDED`，Hive 为 `success` = `false`
+## Prerequisites
+- Data sources: `metric_events` wide table, `hive_query_metrics` table (written by Flink Consumer)
+- Grafana variables: `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
+- Failure events are determined by the `status` field: Spark Task `task_success` = `false`, MR `state` != `SUCCEEDED`, Hive `success` = `false`
 
-## 面板说明
+## Panel Descriptions
 
-### 跨引擎成功率趋势（timeseries）
+### Cross-Engine Success Rate Trend (timeseries)
 
-**用途**: 展示各引擎随时间变化的任务/作业成功率趋势，快速发现异常下降。
+**Purpose**: Shows the task/job success rate trend over time for each engine, enabling rapid detection of abnormal declines.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ( Floor(timestamp_ms / $__interval_ms) * $__interval_ms / 1000 ) AS time,
        engine,
@@ -39,21 +39,21 @@ ORDER  BY 1,
           2
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `time` | 时间桶 | Unix 时间戳 |
-| `engine` | 执行引擎（SPARK / MR / HIVE） | - |
-| `success_rate_pct` | 成功率 | % |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `time` | Time bucket | Unix timestamp |
+| `engine` | Execution engine (SPARK / MR / HIVE) | - |
+| `success_rate_pct` | Success rate | % |
 
-**使用建议**: 成功率低于 95% 应触发告警。短期下降可能是单次作业失败导致，长期下降需排查集群环境问题。MR 和 Spark 的成功率分开看，MR 通常高于 Spark（重试机制不同）。
+**Usage**: A success rate below 95% should trigger an alert. Short-term declines may be caused by a single job failure, while long-term declines require investigation of the cluster environment. Review MR and Spark success rates separately; MR is typically higher than Spark (due to different retry mechanisms).
 
-### 最近失败事件（table）
+### Recent Failure Events (table)
 
-**用途**: 列出最近的失败事件详情，包括应用、用户、时间和引擎类型，便于快速定位问题。
+**Purpose**: Lists details of recent failure events, including application, user, time, and engine type, enabling rapid problem localization.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT FROM_UNIXTIME(timestamp_ms / 1000) AS event_time,
        engine,
@@ -71,26 +71,26 @@ ORDER  BY timestamp_ms DESC
 LIMIT  50
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `event_time` | 事件发生时间（UTC） | - |
-| `engine` | 执行引擎 | - |
-| `event_type` | 事件类型（TASK / MR_TASK / HIVE_QUERY） | - |
-| `app_id` | 应用/作业/查询 ID | - |
-| `app_name` | 应用名称 | - |
-| `user_name` | 用户名 | - |
-| `queue` | 队列 | - |
-| `duration_sec` | 执行时长（失败前） | 秒 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `event_time` | Event occurrence time (UTC) | - |
+| `engine` | Execution engine | - |
+| `event_type` | Event type (TASK / MR_TASK / HIVE_QUERY) | - |
+| `app_id` | Application/job/query ID | - |
+| `app_name` | Application name | - |
+| `user_name` | Username | - |
+| `queue` | Queue | - |
+| `duration_sec` | Execution duration (before failure) | seconds |
 
-**使用建议**: 同一 `app_id` 多次失败说明应用本身有问题。`duration_sec` 为 0 可能是启动失败，较大值可能是运行时错误。优先关注失败频率最高的用户和应用。
+**Usage**: Repeated failures for the same `app_id` indicate a problem with the application itself. A `duration_sec` of 0 may indicate a startup failure, while a larger value suggests a runtime error. Prioritize users and applications with the highest failure frequency.
 
-### GC 与失败关联分析（barchart）
+### GC and Failure Correlation Analysis (barchart)
 
-**用途**: 对比成功与失败任务的 GC 开销分布，验证 GC 是否为导致失败的因素。
+**Purpose**: Compares GC overhead distribution between successful and failed tasks to verify whether GC is a contributing factor to failures.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT CASE
          WHEN status = 'true' THEN 'SUCCESS'
@@ -115,21 +115,21 @@ ORDER  BY 1,
           2
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `outcome` | 任务结果（SUCCESS / FAILURE） | - |
-| `gc_bucket` | GC 时间占执行时间比例区间 | - |
-| `count` | 该组合的事件数量 | 个 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `outcome` | Task outcome (SUCCESS / FAILURE) | - |
+| `gc_bucket` | GC time as percentage of execution time range | - |
+| `count` | Number of events in this combination | count |
 
-**使用建议**: 如果 FAILURE 中高 GC 比例（>20%）的占比远高于 SUCCESS，则说明 GC 确实是导致失败的重要因素，需优化内存配置。
+**Usage**: If the proportion of FAILURE events with high GC ratio (>20%) is significantly higher than SUCCESS events, GC is indeed a major factor contributing to failures, and memory configuration should be optimized.
 
-### Speculative 任务率（stat）
+### Speculative Task Rate (stat)
 
-**用途**: 统计 Spark Speculative（推测执行）任务的比例，评估是否存在慢任务问题。
+**Purpose**: Calculates the proportion of Spark speculative execution tasks to evaluate whether there is a slow task problem.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ROUND(SUM(CASE
                    WHEN task_speculative = 'true' THEN 1
@@ -141,19 +141,19 @@ WHERE  event_type = 'TASK'
        AND timestamp_ms <= ( $__unixEpochTo() * 1000 )
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `value` | Speculative 任务占比 | % |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `value` | Speculative task ratio | % |
 
-**使用建议**: Speculative 率大于 5% 说明存在明显的慢任务，通常由数据倾斜、节点故障或 IO 热点导致。需结合数据倾斜面板进一步排查。该指标仅适用于 Spark（MR 无推测执行机制）。
+**Usage**: A speculative rate greater than 5% indicates a significant slow task problem, usually caused by data skew, node failures, or IO hotspots. Investigate further using the data skew panel. This metric applies only to Spark (MR has no speculative execution mechanism).
 
-### Hive 操作失败率（barchart）
+### Hive Operation Failure Rate (barchart)
 
-**用途**: 按 Hive 操作类型（SELECT / INSERT / CREATE 等）展示失败率分布。
+**Purpose**: Displays the failure rate distribution by Hive operation type (SELECT / INSERT / CREATE, etc.).
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT operation,
        SUM(CASE
@@ -172,19 +172,19 @@ GROUP  BY operation
 ORDER  BY fail_rate_pct DESC
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `operation` | Hive 操作类型 | - |
-| `fail_count` | 失败次数 | 次 |
-| `total_count` | 总次数 | 次 |
-| `fail_rate_pct` | 失败率 | % |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `operation` | Hive operation type | - |
+| `fail_count` | Number of failures | count |
+| `total_count` | Total count | count |
+| `fail_rate_pct` | Failure rate | % |
 
-**使用建议**: INSERT 操作失败率高可能是目标表权限或空间不足。DDL 操作失败通常与语法错误或元数据冲突有关。该面板直接查询 `hive_query_metrics` 物理表。
+**Usage**: A high failure rate for INSERT operations may be due to insufficient target table permissions or space. DDL operation failures are usually related to syntax errors or metadata conflicts. This panel queries the `hive_query_metrics` physical table directly.
 
-## 注意事项
-- `status` 字段在 `metric_events` 中为标准化字段：Spark 为 `"true"` / `"false"`，MR 从 `state` 字段映射（`SUCCEEDED` -> `"true"`），Hive 从 `success` 字段映射。
-- MR Job 的失败由 `mr_job_metrics.state` 字段体现，不等同于 Task 级别的失败。
-- Speculative 任务率依赖 `task_speculative` 字段，该字段需要 Flink Consumer v4+ 版本支持。
-- Hive 失败分析面板查询的是 `hive_query_metrics` 物理表，不受 `metric_events` 视图影响。
+## Notes
+- The `status` field in `metric_events` is a standardized field: Spark uses `"true"` / `"false"`, MR is mapped from the `state` field (`SUCCEEDED` -> `"true"`), and Hive is mapped from the `success` field.
+- MR Job failures are represented by the `mr_job_metrics.state` field, which is not equivalent to Task-level failures.
+- The speculative task rate depends on the `task_speculative` field, which requires Flink Consumer v4+ version support.
+- The Hive failure analysis panel queries the `hive_query_metrics` physical table and is not affected by the `metric_events` view.

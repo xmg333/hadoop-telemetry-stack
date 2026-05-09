@@ -1,24 +1,24 @@
-# Hive 查询与数据血缘分析
+# Hive Query and Data Lineage Analysis
 
-## 概述
-本仪表盘从 Hive 查询分析视角出发，帮助回答以下问题：
-- 哪些 Hive 查询执行时间最长？
-- Hive 操作类型的分布如何？
-- 哪些表的读写频次最高？
-- 不同执行引擎（MR / Spark / Tez）的查询性能差异如何？
+## Overview
+This dashboard approaches analysis from a Hive query analysis perspective, helping answer the following questions:
+- Which Hive queries have the longest execution times?
+- What is the distribution of Hive operation types?
+- Which tables have the highest read/write frequency?
+- How do query performance differences compare across execution engines (MR / Spark / Tez)?
 
-## 前置条件
-- 数据源：`hive_query_metrics` 表、`hive_table_io_metrics` 表（由 Flink Consumer 写入）
-- Grafana 变量：`$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
-- Hive 指标由 `HiveTelemetryHook` 通过 `ExecuteWithHookContext` 采集，需在 HiveServer2 的 `hive-site.xml` 中配置 `hive.exec.post.hooks`
+## Prerequisites
+- Data sources: `hive_query_metrics` table, `hive_table_io_metrics` table (written by Flink Consumer)
+- Grafana variables: `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
+- Hive metrics are collected by `HiveTelemetryHook` via `ExecuteWithHookContext`. Configure `hive.exec.post.hooks` in HiveServer2's `hive-site.xml`.
 
-## 面板说明
+## Panel Descriptions
 
-### Hive 慢查询 TOP 20（table）
+### Hive Slow Query TOP 20 (table)
 
-**用途**: 列出执行时间最长的 20 条 Hive 查询，帮助优化慢查询。
+**Purpose**: Lists the 20 Hive queries with the longest execution times to help optimize slow queries.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT query_id,
        operation,
@@ -38,29 +38,29 @@ ORDER  BY duration_ms DESC
 LIMIT  20
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `query_id` | Hive 查询唯一 ID | - |
-| `operation` | 操作类型（QUERY / DDL / DML 等） | - |
-| `user_name` | 执行用户 | - |
-| `execution_engine` | 执行引擎（mr / spark / tez） | - |
-| `success` | 是否成功（true / false） | - |
-| `duration_sec` | 查询执行时长 | 秒 |
-| `input_gb` | 输入数据量 | GB |
-| `output_gb` | 输出数据量 | GB |
-| `input_m_rows` | 输入行数 | 百万行 |
-| `output_m_rows` | 输出行数 | 百万行 |
-| `event_time` | 查询发生时间（UTC） | - |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `query_id` | Hive query unique ID | - |
+| `operation` | Operation type (QUERY / DDL / DML, etc.) | - |
+| `user_name` | Executing user | - |
+| `execution_engine` | Execution engine (mr / spark / tez) | - |
+| `success` | Whether successful (true / false) | - |
+| `duration_sec` | Query execution duration | seconds |
+| `input_gb` | Input data volume | GB |
+| `output_gb` | Output data volume | GB |
+| `input_m_rows` | Input row count | million rows |
+| `output_m_rows` | Output row count | million rows |
+| `event_time` | Query occurrence time (UTC) | - |
 
-**使用建议**: 重点关注 `duration_sec` 高且 `input_gb` 低的不合理查询，可能是缺少分区过滤或索引。对比不同 `execution_engine` 下同类查询的执行时间，评估引擎切换的效果。
+**Usage**: Pay special attention to queries with high `duration_sec` but low `input_gb`, as this may indicate missing partition filters or indexes. Compare execution times of similar queries under different `execution_engine` values to evaluate the impact of engine switching.
 
-### 操作类型分布（piechart）
+### Operation Type Distribution (piechart)
 
-**用途**: 展示 Hive 查询中各类操作（SELECT / INSERT / CREATE 等）的占比分布。
+**Purpose**: Shows the proportion distribution of various Hive query operations (SELECT / INSERT / CREATE, etc.).
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT operation,
        COUNT(*) AS count
@@ -71,20 +71,20 @@ GROUP  BY operation
 ORDER  BY count DESC
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `operation` | 操作类型 | - |
-| `count` | 该操作的执行次数 | 次 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `operation` | Operation type | - |
+| `count` | Number of executions for this operation | count |
 
-**使用建议**: 如果 SELECT 占比过高，说明大量查询可能来自即席查询或报表系统，可考虑引入缓存层。INSERT 占比高说明 ETL 负载较重，需关注写入性能。
+**Usage**: If SELECT operations account for a very high proportion, it may indicate a workload dominated by ad-hoc queries or reporting systems; consider introducing a caching layer. A high proportion of INSERT operations indicates heavy ETL workloads; focus on write performance.
 
-### 表读写频次排行（table）
+### Table Read/Write Frequency Ranking (table)
 
-**用途**: 统计被读写频次最高的表，识别热点数据和数据血缘关系。
+**Purpose**: Identifies the tables with the highest read/write frequency and detects hot data and data lineage relationships.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT table_name,
        table_type,
@@ -103,24 +103,24 @@ ORDER  BY access_count DESC
 LIMIT  20
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `table_name` | 表名 | - |
-| `table_type` | 表角色（input / output） | - |
-| `operation` | 触发该表 IO 的操作类型 | - |
-| `execution_engine` | 执行引擎 | - |
-| `access_count` | 表被访问的次数 | 次 |
-| `query_count` | 涉及该表的独立查询数 | 个 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `table_name` | Table name | - |
+| `table_type` | Table role (input / output) | - |
+| `operation` | Operation type that triggered the table IO | - |
+| `execution_engine` | Execution engine | - |
+| `access_count` | Number of times the table was accessed | count |
+| `query_count` | Number of distinct queries involving this table | count |
 
-**使用建议**: `input` 类型的热点表适合做分区裁剪优化或物化视图。`output` 类型的热点表需关注并发写入冲突和小文件问题。通过 `query_id` 可追溯到具体查询，建立数据血缘链路。
+**Usage**: Hot `input` type tables are suitable candidates for partition pruning optimization or materialized views. Hot `output` type tables require attention to concurrent write conflicts and small file issues. Trace back to specific queries via `query_id` to establish data lineage chains.
 
-### 执行引擎对比（barchart）
+### Execution Engine Comparison (barchart)
 
-**用途**: 对比不同执行引擎（MR / Spark / Tez）下的查询数量、平均执行时间和成功率。
+**Purpose**: Compares the query count, average execution time, and success rate across different execution engines (MR / Spark / Tez).
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT execution_engine,
        COUNT(*)                                                          AS query_count,
@@ -137,20 +137,20 @@ GROUP  BY execution_engine
 ORDER  BY query_count DESC
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `execution_engine` | 执行引擎（mr / spark / tez） | - |
-| `query_count` | 该引擎执行的查询数 | 个 |
-| `avg_duration_sec` | 平均查询时长 | 秒 |
-| `success_rate_pct` | 成功率 | % |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `execution_engine` | Execution engine (mr / spark / tez) | - |
+| `query_count` | Number of queries executed by this engine | count |
+| `avg_duration_sec` | Average query duration | seconds |
+| `success_rate_pct` | Success rate | % |
 
-**使用建议**: 如果 Spark 引擎的平均时长远低于 MR，建议将更多查询迁移到 Spark 引擎（通过 `hive.execution.engine=spark`）。成功率差异过大时需检查引擎配置兼容性。
+**Usage**: If the Spark engine's average duration is significantly lower than MR, consider migrating more queries to the Spark engine (via `hive.execution.engine=spark`). If there is a large discrepancy in success rates, check engine configuration compatibility.
 
-## 注意事项
-- Hive 指标依赖 `hive.exec.post.hooks` 配置。如果未部署 `HiveTelemetryHook`，这些面板将无数据。
-- `hive_table_io_metrics` 表记录的是表级别的 IO 关系，不含具体字节数（仅记录 `input_table_count` 和 `output_table_count`）。详细的 IO 字节数需查看 `hive_query_metrics` 表中的 `input_bytes` / `output_bytes`。
-- `execution_engine` 字段来自 Hive 配置的 `hive.execution.engine`，可能值为 `mr`、`spark`、`tez`。
-- Hive on Spark 的查询同时会产生 Spark 侧的 Task 指标（通过 Spark 插件采集），可通过 `query_id` 和 `app_id` 进行关联分析。
-- ClickHouse 数据源中时间过滤需使用 `DateTime64(3)` 格式，与 MySQL 的 `BIGINT` 有差异。
+## Notes
+- Hive metrics depend on the `hive.exec.post.hooks` configuration. If `HiveTelemetryHook` is not deployed, these panels will have no data.
+- The `hive_table_io_metrics` table records table-level IO relationships without specific byte counts (it only records `input_table_count` and `output_table_count`). For detailed IO byte counts, see `input_bytes` / `output_bytes` in the `hive_query_metrics` table.
+- The `execution_engine` field comes from the Hive configuration `hive.execution.engine` and may have values `mr`, `spark`, or `tez`.
+- Hive on Spark queries also produce Spark-side Task metrics (collected via the Spark plugin); cross-reference analysis between `query_id` and `app_id` is possible.
+- For ClickHouse data sources, time filtering must use the `DateTime64(3)` format, which differs from MySQL's `BIGINT`.

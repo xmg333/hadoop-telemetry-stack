@@ -1,59 +1,86 @@
-# 配置参考
+# Configuration Reference
 
-## 三层配置合并
+## Three-Tier Configuration Merge
 
-优先级: Spark conf (`spark.telemetry.*`) > HOCON file (`telemetry.conf`) > 内置默认值
+Priority: Spark conf (`spark.telemetry.*`) > HOCON file (`telemetry.conf`) > built-in defaults
 
-自定义 HOCON 配置文件路径: `spark.telemetry.config.path=/path/to/telemetry.conf`
+Custom HOCON config file path: `spark.telemetry.config.path=/path/to/telemetry.conf`
 
-## Spark Plugin 配置
+## Spark Plugin Configuration
 
-### OTel 配置
+### OTel Configuration
 
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| `spark.telemetry.otel.exporter.endpoint` | `http://localhost:4317` | OTel Collector gRPC 端点 |
-| `spark.telemetry.otel.service.name` | `spark-telemetry` | OTel 服务名 |
-| `spark.telemetry.otel.export.interval.ms` | `60000` | 导出间隔（毫秒） |
-| `spark.telemetry.otel.exporter.protocol` | `grpc` | 导出协议 (grpc/http) |
+| Config Key | Default | Description |
+|-----------|---------|-------------|
+| `spark.telemetry.otel.exporter.endpoint` | `http://localhost:4317` | OTel Collector gRPC endpoint |
+| `spark.telemetry.otel.service.name` | `spark-application` | OTel service name |
+| `spark.telemetry.otel.export.interval.ms` | `10000` | Export interval (ms) |
+| `spark.telemetry.otel.exporter.protocol` | `grpc` | Export protocol (grpc/http) |
 
-!!! warning "配置键必须包含完整路径"
-    `spark.telemetry.X` 映射到 `spark-telemetry.X`，必须包含 `.otel.` 段：
-    - 正确: `spark.telemetry.otel.exporter.endpoint=http://host:4317`
-    - 错误: `spark.telemetry.exporter.endpoint=http://host:4317`
+!!! warning "Config keys must include the full path"
+    `spark.telemetry.X` maps to `spark-telemetry.X`; the `.otel.` segment is required:
+    - Correct: `spark.telemetry.otel.exporter.endpoint=http://host:4317`
+    - Incorrect: `spark.telemetry.exporter.endpoint=http://host:4317`
 
-### 指标类别开关
+### Metric Category Switches
 
-所有类别默认 `true`。
+All categories default to `true`.
 
-| 配置项 | 说明 |
-|--------|------|
+| Config Key | Description |
+|-----------|-------------|
 | `spark.telemetry.metrics.task.execution` | executor run time, CPU time, GC, scheduler delay, result size, peak memory |
 | `spark.telemetry.metrics.task.shuffle-extended` | local blocks fetched, records read, remote bytes to disk |
 | `spark.telemetry.metrics.task.info` | task host, locality, speculative attributes |
 | `spark.telemetry.metrics.stage.detailed` | stage duration, num tasks, executor time, GC, peak memory, stage IO bytes |
 | `spark.telemetry.metrics.job.lifecycle` | job start/end events, job duration, num stages |
-| `spark.telemetry.metrics.sql.query-execution` | SQL 查询指标 (duration, join count, shuffle bytes, query text) |
+| `spark.telemetry.metrics.sql.query-execution` | SQL query metrics (duration, join count, shuffle bytes, query text) |
 
-### SQL 文本配置
+### SQL Text Configuration
 
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| `spark.telemetry.sql.max-length` | `4096` | SQL 文本最大截断长度（字符） |
+| Config Key | Default | Description |
+|-----------|---------|-------------|
+| `spark.telemetry.sql.max-length` | `4096` | Maximum truncation length for SQL text (characters) |
 
-## Hive Hook 配置
+### Filter Configuration
+
+| Config Key | Default | Description |
+|-----------|---------|-------------|
+| `spark.telemetry.filter.app.name.include` | (empty) | Application name include regex |
+| `spark.telemetry.filter.app.name.exclude` | (empty) | Application name exclude regex |
+
+## Hive Hook Configuration
 
 HiveConf (`hive.telemetry.*`) > HOCON (`hive-telemetry.conf`) > defaults
 
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| `hive.telemetry.otel.exporter.endpoint` | `http://localhost:4317` | OTel Collector 端点 |
-| `hive.telemetry.otel.service.name` | `hive-telemetry` | 服务名 |
-| `hive.telemetry.otel.export.interval.ms` | `60000` | 导出间隔 |
-| `hive.telemetry.sql.max-length` | `4096` | SQL 文本截断长度 |
-| `hive.telemetry.config.path` | — | HOCON 配置文件路径 |
+| Config Key | Default | Description |
+|-----------|---------|-------------|
+| `hive.telemetry.otel.exporter.endpoint` | `http://localhost:4317` | OTel Collector endpoint |
+| `hive.telemetry.otel.service.name` | `hive-server2` | Service name |
+| `hive.telemetry.otel.export.interval.ms` | `10000` | Export interval |
+| `hive.telemetry.sql.max-length` | `4096` | SQL text truncation length |
+| `hive.telemetry.config.path` | -- | HOCON config file path |
 
-### 部署配置
+### Metric Category Switches
+
+All categories default to `true`.
+
+| Config Key | Default | Description |
+|-----------|---------|-------------|
+| `hive.telemetry.metrics.enabled` | `true` | Master switch for all Hive metrics |
+| `hive.telemetry.metrics.query.duration` | `true` | Query duration metrics |
+| `hive.telemetry.metrics.query.io` | `true` | Query IO metrics (bytes/rows) |
+| `hive.telemetry.metrics.query.tables` | `true` | Per-table IO metrics |
+
+### Filter Configuration
+
+| Config Key | Default | Description |
+|-----------|---------|-------------|
+| `hive.telemetry.filter.user.include` | (empty) | User include regex |
+| `hive.telemetry.filter.user.exclude` | (empty) | User exclude regex |
+| `hive.telemetry.filter.operation.include` | (empty) | Operation include regex |
+| `hive.telemetry.filter.operation.exclude` | (empty) | Operation exclude regex |
+
+### Deployment Configuration
 
 ```xml
 <!-- hive-site.xml -->
@@ -67,11 +94,11 @@ HiveConf (`hive.telemetry.*`) > HOCON (`hive-telemetry.conf`) > defaults
 </property>
 ```
 
-将 `hive-telemetry-hook-dist-*.jar` 放入 `$HIVE_HOME/auxlib/` 即可自动加载。
+Place `hive-telemetry-hook-dist-*.jar` in `$HIVE_HOME/auxlib/` for automatic loading.
 
-## MR Collector 配置
+## MR Collector Configuration
 
-HOCON 配置文件 (`mr-collector.conf`):
+HOCON config file (`mr-collector.conf`):
 
 ```hocon
 mr-telemetry {
@@ -82,7 +109,7 @@ mr-telemetry {
   otel {
     exporter.endpoint = "http://localhost:4317"
     service.name = "mr-telemetry-collector"
-    export.interval.ms = 30000
+    export.interval.ms = 10000
   }
   collection {
     job.counters = true
@@ -92,17 +119,17 @@ mr-telemetry {
 }
 ```
 
-## Flink Consumer 配置
+## Flink Consumer Configuration
 
-HOCON 配置文件 (`flink-consumer.conf`):
+HOCON config file (`flink-consumer.conf`):
 
 ```hocon
 flink-consumer {
   kafka {
-    bootstrap-servers = "localhost:9092"
-    group-id = "flink-consumer"
+    bootstrap.servers = "localhost:9092"
+    group.id = "flink-metrics-consumer"
     topic = "telemetry-metrics"
-    checkpoint.path = "/tmp/flink-consumer-checkpoint"
+    checkpoint.path = "/tmp/flink-consumer-checkpoint.txt"
   }
   sink {
     type = "mysql"  # mysql | clickhouse

@@ -116,8 +116,8 @@ diagnostic {
     host = "localhost"
     port = 3306
     database = "telemetry"       # 实际数据库名
-    username = "root"            # 实际用户名
-    password = "root123"         # 实际密码
+    username = "CHANGE_ME"            # 实际用户名
+    password = "CHANGE_ME"         # 实际密码
     timeout-ms = 5000
   }
 }

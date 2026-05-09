@@ -1,24 +1,24 @@
-# 架构设计
+# Architecture Design
 
-## 整体架构
+## Overall Architecture
 
 ```mermaid
 graph LR
-    subgraph 数据源
+    subgraph Data Sources
         SP[Spark Plugin]
         MR[MR Collector]
         HV[Hive Hook]
     end
-    subgraph 采集层
+    subgraph Collection Layer
         OTel[OTel Collector]
     end
-    subgraph 传输层
+    subgraph Transport Layer
         KF[Kafka]
     end
-    subgraph 消费层
+    subgraph Consumption Layer
         FK[Flink Consumer]
     end
-    subgraph 存储层
+    subgraph Storage Layer
         MY[MySQL/ClickHouse]
         GF[Grafana]
     end
@@ -31,7 +31,7 @@ graph LR
     MY -->|SQL| GF
 ```
 
-## 模块结构
+## Module Structure
 
 ```
 spark/
@@ -55,13 +55,13 @@ hive/
 ├── hive-telemetry-hook/             # Hive query telemetry hook
 └── hive-telemetry-hook-dist/
 flink/
-├── metrics-flink-consumer/          # Kafka → MySQL/ClickHouse
+├── metrics-flink-consumer/          # Kafka -> MySQL/ClickHouse
 └── metrics-flink-consumer-dist/
 diagnostic/
-└── diagnostic-core/                  # 诊断工具
+└── diagnostic-core/                  # Diagnostic tool
 ```
 
-## 数据流
+## Data Flow
 
 ### Spark Plugin
 
@@ -71,22 +71,22 @@ diagnostic/
 4. **SparkTelemetryListener** captures `onTaskEnd`/`onStageCompleted` events
 5. **TelemetryLifecycle.accept()** routes events to **MetricRecorder**
 6. **MetricRecorder** records OTel counters/histograms
-7. **OtelRegistry** manages: PeriodicMetricReader → OTLP gRPC exporter (DELTA temporality) → OTel Collector
+7. **OtelRegistry** manages: PeriodicMetricReader -> OTLP gRPC exporter (DELTA temporality) -> OTel Collector
 
-### Omnipackage 架构
+### Omnipackage Architecture
 
-Omnipackage 在单个 JAR 中支持 Spark 2/3/4，运行时自动检测版本：
+The omnipackage supports Spark 2/3/4 in a single JAR, auto-detecting the version at runtime:
 
-1. 每个 adapter 通过 shade 重定位到 `x.mg.metrics.sparktelemetry.adapter.internal.v{2,3,4}`
-2. Pure Java facade 通过反射委托给版本特定的 adapter
-3. 版本检测使用 `Class.forName` 探测 Spark/Scala 类
+1. Each adapter is relocated via shade to `x.mg.metrics.sparktelemetry.adapter.internal.v{2,3,4}`
+2. Pure Java facade delegates to the version-specific adapter via reflection
+3. Version detection uses `Class.forName` to probe for Spark/Scala classes
 
-## 关键设计决策
+## Key Design Decisions
 
-| 决策 | 原因 |
-|------|------|
-| DELTA Temporality | 防止 re-export 时重复数据 |
-| Async Flush | 避免 DAGScheduler 线程阻塞 |
-| appId Fallback | 处理 local mode 和短生命周期应用 |
-| MR Gauge→Counter | 避免 `buildWithCallback` 内存泄漏 |
-| SQL Text LRU Cache | 防止内存泄漏，max 1000 entries |
+| Decision | Reason |
+|----------|--------|
+| DELTA Temporality | Prevent duplicate data on re-export |
+| Async Flush | Avoid DAGScheduler thread blocking |
+| appId Fallback | Handle local mode and short-lived applications |
+| MR Gauge -> Counter | Avoid `buildWithCallback` memory leak |
+| SQL Text LRU Cache | Prevent memory leak, max 1000 entries |

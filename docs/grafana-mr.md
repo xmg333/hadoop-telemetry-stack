@@ -1,34 +1,34 @@
-# MapReduce 引擎透视
+# MapReduce Engine Deep Dive
 
-## 概述
-本仪表盘是 MapReduce 引擎的基础透视面板，分为 Job 级别（History Server / MR Collector）和 Task 级别（MR Agent）两个区域，帮助回答以下问题：
-- 有多少 MR Job？平均耗时和成功率如何？
-- Map / Reduce Task 各有多少？
-- Job 级别的 IO（HDFS + File）吞吐量如何？
-- Task 级别的耗时分布和 IO 详情如何？
+## Overview
+This dashboard provides a foundational deep-dive view of the MapReduce engine, divided into Job-level (History Server / MR Collector) and Task-level (MR Agent) sections. It helps answer the following questions:
+- How many MR Jobs are there? What are the average duration and success rate?
+- How many Map / Reduce Tasks are there?
+- What is the Job-level IO (HDFS + File) throughput?
+- What are the Task-level duration distribution and IO details?
 
-## 前置条件
+## Prerequisites
 
-数据源：`mr_job_metrics`、`mr_task_metrics`
+Data sources: `mr_job_metrics`, `mr_task_metrics`
 
-Grafana 变量：
-:   `$mr_job_id` — MR Job ID（多选，含 All）
+Grafana variables:
+:   `$mr_job_id` — MR Job ID (multi-select, includes All)
 :   `$__interval_ms`, `$__unixEpochFrom()`, `$__unixEpochTo()`
 
-变量查询：`SELECT DISTINCT job_id FROM (SELECT DISTINCT job_id FROM mr_job_metrics UNION SELECT DISTINCT job_id FROM mr_task_metrics) t ORDER BY job_id`
+Variable query: `SELECT DISTINCT job_id FROM (SELECT DISTINCT job_id FROM mr_job_metrics UNION SELECT DISTINCT job_id FROM mr_task_metrics) t ORDER BY job_id`
 
-!!! warning "注意"
-    Task 级别面板需要部署 MR Agent（ByteBuddy 字节码增强），仅靠 MR Collector（History Server 轮询）无法获取 Task 级数据
+!!! warning "Note"
+    Task-level panels require the MR Agent (ByteBuddy bytecode instrumentation) to be deployed. Relying solely on the MR Collector (History Server polling) will not provide Task-level data.
 
-## 面板说明
+## Panel Descriptions
 
-### Job Level Metrics 区域
+### Job Level Metrics Section
 
-#### Total MR Jobs（stat）
+#### Total MR Jobs (stat)
 
-**用途**: 展示选中 Job ID 范围内的独立 MR 作业数。
+**Purpose**: Displays the number of distinct MR jobs within the selected Job ID range.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT COUNT(DISTINCT job_id) AS value
 FROM mr_job_metrics
@@ -37,22 +37,22 @@ WHERE timestamp_ms >= ($__unixEpochFrom() * 1000)
   AND job_id IN ($mr_job_id)
 ```
 
-#### Avg Job Duration（stat）
+#### Avg Job Duration (stat)
 
-**用途**: 展示平均 Job 耗时（`elapsed_time_ms`）。阈值：<5s 绿色，5-30s 黄色，>30s 红色。
+**Purpose**: Displays the average Job duration (`elapsed_time_ms`). Thresholds: <5s green, 5-30s yellow, >30s red.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ROUND(AVG(elapsed_time_ms)) AS value
 FROM mr_job_metrics
 WHERE ... AND elapsed_time_ms IS NOT NULL AND job_id IN ($mr_job_id)
 ```
 
-#### Job Success Rate（stat）
+#### Job Success Rate (stat)
 
-**用途**: 展示 Job 成功率。基于 `state='SUCCEEDED'` 判断。
+**Purpose**: Displays the Job success rate based on `state='SUCCEEDED'`.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ROUND(
   SUM(CASE WHEN state='SUCCEEDED' THEN 1 ELSE 0 END) * 100.0
@@ -61,39 +61,39 @@ SELECT ROUND(
 FROM mr_job_metrics WHERE job_id IN ($mr_job_id)
 ```
 
-#### Total Map Tasks（stat）
+#### Total Map Tasks (stat)
 
-**用途**: 展示 Job 级别的 Map Task 总数（`launched_maps`）。
+**Purpose**: Displays the total number of Map Tasks at the Job level (`launched_maps`).
 
-#### Job IO Bytes（timeseries）
+#### Job IO Bytes (timeseries)
 
-**用途**: 4 条线展示 HDFS Read / HDFS Written / File Read / File Written 随时间的变化。
+**Purpose**: 4 time-series lines showing HDFS Read / HDFS Written / File Read / File Written over time.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
--- 4 个 target 分别查询 hdfs_bytes_read, hdfs_bytes_written,
--- file_bytes_read, file_bytes_written
+-- 4 targets querying hdfs_bytes_read, hdfs_bytes_written,
+-- file_bytes_read, file_bytes_written respectively
 -- FROM mr_job_metrics WHERE job_id IN ($mr_job_id)
 ```
 
-#### Map/Reduce Task Counts（timeseries）
+#### Map/Reduce Task Counts (timeseries)
 
-**用途**: 展示 `launched_maps` 和 `launched_reduces` 的趋势。
+**Purpose**: Displays trends for `launched_maps` and `launched_reduces`.
 
-#### CPU/GC Time（timeseries）
+#### CPU/GC Time (timeseries)
 
-**用途**: 展示平均 CPU Time 和平均 GC Time 趋势。
+**Purpose**: Displays average CPU Time and average GC Time trends.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 -- AVG(cpu_time_ms), AVG(gc_time_ms) FROM mr_job_metrics WHERE job_id IN ($mr_job_id)
 ```
 
-#### Job Detail（table）
+#### Job Detail (table)
 
-**用途**: 展示 Job 完整信息列表。
+**Purpose**: Displays a complete list of Job information.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, job_id, job_name, user_name,
        state, elapsed_time_ms, launched_maps, launched_reduces,
@@ -102,37 +102,37 @@ FROM mr_job_metrics WHERE job_id IN ($mr_job_id)
 ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `state` | Job 状态（SUCCEEDED / FAILED / KILLED） | - |
-| `elapsed_time_ms` | Job 总耗时 | ms |
-| `launched_maps` / `launched_reduces` | 启动的 Map / Reduce 数 | 个 |
-| `hdfs_bytes_read` / `hdfs_bytes_written` | HDFS 读写字节 | bytes |
-| `cpu_time_ms` / `gc_time_ms` | CPU / GC 时间 | ms |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `state` | Job status (SUCCEEDED / FAILED / KILLED) | - |
+| `elapsed_time_ms` | Total Job duration | ms |
+| `launched_maps` / `launched_reduces` | Number of launched Maps / Reduces | count |
+| `hdfs_bytes_read` / `hdfs_bytes_written` | HDFS read/write bytes | bytes |
+| `cpu_time_ms` / `gc_time_ms` | CPU / GC time | ms |
 
-### Task Level Metrics 区域
+### Task Level Metrics Section
 
-#### Total Tasks / Reduce Tasks（stat）
+#### Total Tasks / Reduce Tasks (stat)
 
-**用途**: 分别统计 Map 和 Reduce 类型的独立 Task 数。
+**Purpose**: Counts the distinct number of Map and Reduce tasks respectively.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 -- Map: COUNT(DISTINCT task_id) FROM mr_task_metrics WHERE task_type='map' AND job_id IN ($mr_job_id)
--- Reduce: 同上 WHERE task_type='reduce'
+-- Reduce: Same as above WHERE task_type='reduce'
 ```
 
-#### Avg Task Duration（stat）
+#### Avg Task Duration (stat)
 
-**用途**: 展示平均 Task 耗时。
+**Purpose**: Displays the average Task duration.
 
-#### Task Success Rate（stat）
+#### Task Success Rate (stat)
 
-**用途**: 基于 `success_count` 和 `failure_count` 计算成功率。
+**Purpose**: Calculates the success rate based on `success_count` and `failure_count`.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT ROUND(
   SUM(COALESCE(success_count, 0)) * 100.0
@@ -141,31 +141,31 @@ SELECT ROUND(
 FROM mr_task_metrics WHERE job_id IN ($mr_job_id)
 ```
 
-#### Total Map Output Bytes / Total Shuffle Bytes（stat）
+#### Total Map Output Bytes / Total Shuffle Bytes (stat)
 
-**用途**: 分别展示 Map 输出字节总量和 Reduce Shuffle 字节总量。
+**Purpose**: Displays the total Map output bytes and total Reduce Shuffle bytes respectively.
 
-#### Task Duration（timeseries）
+#### Task Duration (timeseries)
 
-**用途**: 展示 Task 耗时的 AVG / MAX / MIN 趋势。
+**Purpose**: Displays AVG / MAX / MIN trends for Task duration.
 
-#### File IO Throughput（timeseries）
+#### File IO Throughput (timeseries)
 
-**用途**: 4 条线展示 Task 级别的 File Read / File Written / HDFS Read / HDFS Written。
+**Purpose**: 4 time-series lines showing Task-level File Read / File Written / HDFS Read / HDFS Written.
 
-#### Task IO Bytes（timeseries）
+#### Task IO Bytes (timeseries)
 
-**用途**: 展示 `map_output_bytes` 和 `reduce_shuffle_bytes` 趋势。
+**Purpose**: Displays `map_output_bytes` and `reduce_shuffle_bytes` trends.
 
-#### Task Record Counts（timeseries）
+#### Task Record Counts (timeseries)
 
-**用途**: 4 条线展示 Map Input / Map Output / Reduce Input / Reduce Output 记录数趋势。
+**Purpose**: 4 time-series lines showing Map Input / Map Output / Reduce Input / Reduce Output record count trends.
 
-#### Task Detail（table，全宽）
+#### Task Detail (table, full width)
 
-**用途**: 展示最近 200 条 Task 的完整指标详情。
+**Purpose**: Displays complete metric details for the most recent 200 Tasks.
 
-**SQL 查询**:
+**SQL Query**:
 ```sql
 SELECT FROM_UNIXTIME(timestamp_ms/1000) AS time, task_id, task_type, job_id,
        duration_ms, success_count, map_input_records, map_output_records,
@@ -176,24 +176,24 @@ FROM mr_task_metrics WHERE job_id IN ($mr_job_id)
 ORDER BY timestamp_ms DESC LIMIT 200
 ```
 
-**列说明**:
+**Column Descriptions**:
 
-| 列名 | 含义 | 单位 |
-|------|------|------|
-| `map_output_bytes` | Map 输出字节数 | bytes |
-| `reduce_shuffle_bytes` | Reduce Shuffle 字节数 | bytes |
-| `spilled_records` | 溢写记录数 | 条 |
-| `hdfs_read_ops` / `hdfs_write_ops` | HDFS 读写操作数 | 次 |
-| `file_read_ops` / `file_write_ops` | 本地文件读写操作数 | 次 |
+| Column | Description | Unit |
+|--------|-------------|------|
+| `map_output_bytes` | Map output bytes | bytes |
+| `reduce_shuffle_bytes` | Reduce Shuffle bytes | bytes |
+| `spilled_records` | Number of spilled records | count |
+| `hdfs_read_ops` / `hdfs_write_ops` | HDFS read/write operation count | count |
+| `file_read_ops` / `file_write_ops` | Local file read/write operation count | count |
 
-## 导航
-顶部导航栏可快速切换到：
-- **Overview** — 平台总览
-- **Spark** — Spark 引擎详细透视
-- **Hive on MR** / **Hive on Spark** — Hive 查询分析
-- **Spark / MR / Hive** — 全引擎综合仪表盘
+## Navigation
+The top navigation bar provides quick access to:
+- **Overview** — Platform overview
+- **Spark** — Spark engine detailed view
+- **Hive on MR** / **Hive on Spark** — Hive query analysis
+- **Spark / MR / Hive** — All-engine consolidated dashboard
 
-## 注意事项
-- Task 级别数据（面板 10-16）依赖 MR Agent 部署。如果只部署了 MR Collector（History Server 轮询），Task 区域将无数据
-- `$mr_job_id` 变量合并了 `mr_job_metrics` 和 `mr_task_metrics` 的 job_id
-- `elapsed_time_ms` 是 Job 级别耗时，`duration_ms` 是 Task 级别耗时，语义不同
+## Notes
+- Task-level data (panels 10-16) depends on MR Agent deployment. If only the MR Collector (History Server polling) is deployed, the Task section will have no data.
+- The `$mr_job_id` variable merges job_id from both `mr_job_metrics` and `mr_task_metrics`.
+- `elapsed_time_ms` is the Job-level duration, while `duration_ms` is the Task-level duration; they have different semantics.

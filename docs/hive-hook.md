@@ -1,20 +1,20 @@
-# Hive Telemetry Hook — 部署与指标参考
+# Hive Telemetry Hook -- Deployment & Metrics Reference
 
-通过 Hive `ExecuteWithHookContext` 机制采集 HiveServer2 查询指标，导出到 OTel Collector。支持 Hive 2.x 和 3.x，兼容 MR / Spark / Tez 执行引擎。
+Captures HiveServer2 query metrics via the Hive `ExecuteWithHookContext` mechanism and exports them to an OTel Collector. Supports Hive 2.x and 3.x, compatible with MR / Spark / Tez execution engines.
 
-## 部署
+## Deployment
 
-### 分发 JAR
+### Distributing the JAR
 
 ```bash
-# 方式 A：独立 Hook JAR
+# Option A: Standalone Hook JAR
 cp hive/hive-telemetry-hook-dist/target/*.jar $HIVE_HOME/lib/
 
-# 方式 B：Omnipackage（包含 Spark/MR/Hive 全部组件）
+# Option B: Omnipackage (includes all Spark/MR/Hive components)
 cp spark/spark-telemetry-dist-omni/target/*.jar $HIVE_HOME/lib/
 ```
 
-### 配置 hive-site.xml
+### Configure hive-site.xml
 
 ```xml
 <property>
@@ -31,34 +31,36 @@ cp spark/spark-telemetry-dist-omni/target/*.jar $HIVE_HOME/lib/
 </property>
 ```
 
-### 配置方式（三选一）
+### Configuration Methods (Choose One)
 
-| 方式 | 示例 |
-|------|------|
-| HiveConf 覆盖 | `hive-site.xml` 中 `hive.telemetry.*` 配置项 |
-| HOCON 配置文件 | `hive.telemetry.config.path=/etc/hive-telemetry.conf` |
-| 混合（HiveConf 覆盖文件） | 同时使用，HiveConf 优先级最高 |
+| Method | Example |
+|--------|---------|
+| HiveConf override | `hive.telemetry.*` properties in `hive-site.xml` |
+| HOCON config file | `hive.telemetry.config.path=/etc/hive-telemetry.conf` |
+| Hybrid (HiveConf overrides file) | Use both, HiveConf takes highest priority |
 
-### 关键配置项
+### Key Configuration Items
 
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| `hive.telemetry.otel.exporter.endpoint` | `http://localhost:4317` | OTel Collector gRPC 端点 |
-| `hive.telemetry.otel.service.name` | `hive-server2` | OTel 服务名 |
-| `hive.telemetry.otel.export.interval.ms` | `10000` | 导出间隔（ms） |
-| `hive.telemetry.metrics.enabled` | `true` | 总开关 |
-| `hive.telemetry.metrics.query.duration` | `true` | 查询时长指标 |
-| `hive.telemetry.metrics.query.io` | `true` | IO 字节/行数指标 |
-| `hive.telemetry.metrics.query.tables` | `true` | 表级 IO 指标 |
-| `hive.telemetry.sql.max-length` | `4096` | SQL 文本最大截断长度（字符） |
-| `hive.telemetry.filter.user.include` | `[".*"]` | 用户白名单（正则） |
-| `hive.telemetry.filter.user.exclude` | `[]` | 用户黑名单（正则） |
-| `hive.telemetry.filter.operation.include` | `[".*"]` | 操作白名单（正则） |
-| `hive.telemetry.filter.operation.exclude` | `[]` | 操作黑名单（正则） |
+| Config Item | Default | Description |
+|-------------|---------|-------------|
+| `hive.telemetry.otel.exporter.endpoint` | `http://localhost:4317` | OTel Collector gRPC endpoint |
+| `hive.telemetry.otel.service.name` | `hive-server2` | OTel service name |
+| `hive.telemetry.otel.export.interval.ms` | `10000` | Export interval (ms) |
+| `hive.telemetry.metrics.enabled` | `true` | Master switch |
+| `hive.telemetry.metrics.query.duration` | `true` | Query duration metrics |
+| `hive.telemetry.metrics.query.io` | `true` | IO bytes/rows metrics |
+| `hive.telemetry.metrics.query.tables` | `true` | Table-level IO metrics |
+| `hive.telemetry.sql.max-length` | `4096` | Maximum SQL text truncation length (characters) |
+| `hive.telemetry.filter.user.include` | `[".*"]` | User allowlist (regex) |
+| `hive.telemetry.filter.user.exclude` | `[]` | User denylist (regex) |
+| `hive.telemetry.filter.operation.include` | `[".*"]` | Operation allowlist (regex) |
+| `hive.telemetry.filter.operation.exclude` | `[]` | Operation denylist (regex) |
 
-> **注意**: HiveConf key 必须以 `hive.telemetry.` 开头，内部映射为 `hive-telemetry.*`。
+> **Note**: HiveConf keys must start with `hive.telemetry.`, internally mapped to `hive-telemetry.*`.
 
-### HOCON 配置文件示例
+> **Note**: `hive.telemetry.sql.max-length` as a HiveConf override may NOT work because the internal config key is `hive-telemetry.metrics.sql.max-length` (the `.metrics.` segment is automatically added). The HOCON file config path (`hive-telemetry.metrics.sql.max-length`) works correctly. Use HOCON for this key.
+
+### HOCON Config File Example
 
 ```hocon
 # conf/examples/hive-telemetry.conf.example
@@ -86,92 +88,96 @@ hive-telemetry {
 
 ---
 
-## OTel 指标
+## OTel Metrics
 
-### 指标列表
+### Metric List
 
-| 指标名 | 类型 | 单位 | 说明 | 条件 |
-|--------|------|------|------|------|
-| `hive.query.duration_ms` | Histogram | ms | 查询执行时长 | `query.duration=true` |
-| `hive.query.success` | Counter | - | 成功查询计数 | 始终记录 |
-| `hive.query.failure` | Counter | - | 失败查询计数 | 始终记录 |
-| `hive.query.input_bytes` | Counter | By | 输入字节数 | `query.io=true` |
-| `hive.query.output_bytes` | Counter | By | 输出字节数 | `query.io=true` |
-| `hive.query.input_rows` | Counter | {rows} | 输入行数 | `query.io=true` |
-| `hive.query.output_rows` | Counter | {rows} | 输出行数 | `query.io=true` |
-| `hive.query.input_tables` | Counter | - | 输入表访问计数 | `query.tables=true` |
-| `hive.query.output_tables` | Counter | - | 输出表访问计数 | `query.tables=true` |
+| Metric Name | Type | Unit | Description | Condition |
+|-------------|------|------|-------------|-----------|
+| `hive.query.duration_ms` | Histogram | ms | Query execution duration | `query.duration=true` |
+| `hive.query.success` | Counter | - | Successful query count | Always recorded |
+| `hive.query.failure` | Counter | - | Failed query count | Always recorded |
+| `hive.query.input_bytes` | Counter | By | Input bytes | `query.io=true` |
+| `hive.query.output_bytes` | Counter | By | Output bytes | `query.io=true` |
+| `hive.query.input_rows` | Counter | {rows} | Input rows | `query.io=true` |
+| `hive.query.output_rows` | Counter | {rows} | Output rows | `query.io=true` |
+| `hive.query.input_tables` | Counter | - | Input table access count | `query.tables=true` |
+| `hive.query.output_tables` | Counter | - | Output table access count | `query.tables=true` |
+| `hive.table.io.bytes` | Counter | By | Per-table IO bytes (emitted when query.tables=true) |
+| `hive.table.io.rows` | Counter | {rows} | Per-table IO rows (emitted when query.tables=true) |
+| `hive.table.io.files_read` | Counter | - | Per-table files read count (emitted when query.tables=true) |
+| `hive.table.io.time_ms` | Counter | ms | Per-table IO time (emitted when query.tables=true) |
 
-### 指标属性
+### Metric Attributes
 
-所有指标共享以下基础属性：
+All metrics share the following base attributes:
 
-| 属性 | 说明 |
-|------|------|
-| `hive.query.id` | Hive 查询 ID |
-| `hive.query.operation` | 操作类型（QUERY / CREATETABLE / INSERT 等） |
-| `hive.query.user` | 执行用户 |
-| `hive.query.success` | 是否成功（"true" / "false"） |
-| `hive.query.execution_engine` | 执行引擎（mr / spark / tez） |
-| `hive.query.sql_text` | SQL 查询文本（截断后） |
+| Attribute | Description |
+|-----------|-------------|
+| `hive.query.id` | Hive query ID |
+| `hive.query.operation` | Operation type (QUERY / CREATETABLE / INSERT, etc.) |
+| `hive.query.user` | Executing user |
+| `hive.query.success` | Whether successful ("true" / "false") |
+| `hive.query.execution_engine` | Execution engine (mr / spark / tez) |
+| `hive.query.sql_text` | SQL query text (truncated) |
 
-表级指标额外属性：
+Table-level metric extra attributes:
 
-| 属性 | 说明 |
-|------|------|
-| `hive.query.input_table` | 输入表名（用于 `input_tables`） |
-| `hive.query.output_table` | 输出表名（用于 `output_tables`） |
+| Attribute | Description |
+|-----------|-------------|
+| `hive.query.input_table` | Input table name (for `input_tables`) |
+| `hive.query.output_table` | Output table name (for `output_tables`) |
 
 ---
 
-## 数据流
+## Data Flow
 
 ```
-Hive Query → HiveTelemetryHook (POST_EXEC) → HiveHookContext (singleton)
-  → HiveMetricRecorder → OTel SDK → OTLP gRPC → OTel Collector
-  → Kafka → Flink Consumer → MySQL / ClickHouse
+Hive Query -> HiveTelemetryHook (POST_EXEC) -> HiveHookContext (singleton)
+  -> HiveMetricRecorder -> OTel SDK -> OTLP gRPC -> OTel Collector
+  -> Kafka -> Flink Consumer -> MySQL / ClickHouse
 ```
 
-写入的数据库表：
-- `hive_query_metrics` — 查询级指标（duration / success / IO / query_text）
-- `hive_table_io_metrics` — 表级 IO 指标（per-table bytes / rows）
-- `metric_events` — 统一宽表（跨引擎聚合用）
+Database tables written:
+- `hive_query_metrics` -- Query-level metrics (duration / success / IO / query_text)
+- `hive_table_io_metrics` -- Table-level IO metrics (per-table bytes / rows)
+- `metric_events` -- Unified wide table (for cross-engine aggregation)
 
 ---
 
-## 设计要点
+## Design Highlights
 
-### 错误隔离
+### Error Isolation
 
-Hook 的 `run()` 方法整体包裹在 try/catch 中，**任何异常不会传播到 HiveServer2**，不影响查询执行。
+The Hook's `run()` method is entirely wrapped in try/catch -- **no exception propagates to HiveServer2**, ensuring query execution is never impacted.
 
-### 懒初始化
+### Lazy Initialization
 
-`HiveHookContext` 单例在首次查询时通过双重检查锁初始化，OTel SDK 只创建一次。注册了 JVM shutdown hook 保证退出时 flush。
+The `HiveHookContext` singleton is initialized on the first query using double-checked locking; the OTel SDK is created only once. A JVM shutdown hook is registered to ensure flushing on exit.
 
-### 短生命周期进程
+### Short-Lived Processes
 
-Hive CLI 是短生命周期 JVM 进程。Hook 在每次查询后主动调用 `flush()`，确保指标在 JVM 退出前导出。
+Hive CLI is a short-lived JVM process. The Hook proactively calls `flush()` after each query to ensure metrics are exported before the JVM exits.
 
-### IO 指标精度
+### IO Metric Precision
 
-IO 字节数和行数基于 Hive Metastore 表统计信息（`totalSize`、`numRows`），为估算值而非实际扫描量。DML 后需执行 `ANALYZE TABLE` 更新统计。
+IO byte and row counts are based on Hive Metastore table statistics (`totalSize`, `numRows`). These are estimates, not actual scan volume. Run `ANALYZE TABLE` after DML to update statistics.
 
 ---
 
-## 兼容性
+## Compatibility
 
-| Hive 版本 | 编译版本 | 执行引擎 | 状态 |
-|-----------|---------|---------|------|
-| Hive 2.3.x | Hive 2.3.9 | MR / Spark | 已验证 |
-| Hive 3.1.x | Hive 2.3.9 | MR / Spark / Tez | 已验证 |
+| Hive Version | Compiled Against | Execution Engine | Status |
+|--------------|-----------------|------------------|--------|
+| Hive 2.3.x | Hive 2.3.9 | MR / Spark | Verified |
+| Hive 3.1.x | Hive 2.3.9 | MR / Spark / Tez | Verified |
 
-## 故障排查
+## Troubleshooting
 
-| 问题 | 原因 | 解决 |
-|------|------|------|
-| 无指标输出 | Hook 未注册 | 检查 `hive.exec.post.hooks` 配置 |
-| 无指标输出 | JAR 不在 classpath | 确认 JAR 在 `$HIVE_HOME/lib/` |
-| IO 字节数为 0 | 表缺少统计信息 | 执行 `ANALYZE TABLE ... COMPUTE STATISTICS` |
-| 指标被过滤 | 用户/操作匹配 exclude 规则 | 检查 `filter.user.*` 和 `filter.operation.*` |
-| Hook 初始化失败 | OTel Collector 不可达 | 检查 endpoint 和网络连通性 |
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| No metric output | Hook not registered | Check `hive.exec.post.hooks` configuration |
+| No metric output | JAR not in classpath | Confirm JAR is in `$HIVE_HOME/lib/` |
+| IO bytes are 0 | Table missing statistics | Run `ANALYZE TABLE ... COMPUTE STATISTICS` |
+| Metrics filtered | User/operation matches exclude rules | Check `filter.user.*` and `filter.operation.*` |
+| Hook initialization failed | OTel Collector unreachable | Check endpoint and network connectivity |
