@@ -111,4 +111,4 @@ Benchmarked with Intel HiBench (small profile) on 4C8G single-node with Spark 3.
 
 ## License
 
-Private
+[Apache License 2.0](LICENSE)
